@@ -99,6 +99,9 @@ class StudyService:
             raise KeyError(f"Unknown session '{session_id}'.")
         return session
 
+    def list_sessions(self, user_id: str, status: str | None = None) -> list[StudySession]:
+        return self.repository.list_sessions(user_id, status)
+
     def save_session(self, session: StudySession) -> StudySession:
         return self.repository.save_session(session)
 
@@ -107,6 +110,13 @@ class StudyService:
 
     def list_session_responses(self, session_id: str) -> list[SessionResponse]:
         return self.repository.list_session_responses(session_id)
+
+    def list_recent_responses(self, user_id: str, limit_sessions: int = 5) -> list[SessionResponse]:
+        sessions = self.list_sessions(user_id, status="completed")[:limit_sessions]
+        responses: list[SessionResponse] = []
+        for session in sessions:
+            responses.extend(self.list_session_responses(session.session_id))
+        return responses
 
     def create_action_item(self, action_item: ActionItem) -> ActionItem:
         return self.repository.create_action_item(action_item)

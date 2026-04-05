@@ -146,6 +146,27 @@ class EngagementSummary(BaseModel):
     last_completed_on: date | None = None
 
 
+class StudyGapReport(BaseModel):
+    user_id: str
+    comprehension_gap: float = Field(ge=0, le=1)
+    application_gap: float = Field(ge=0, le=1)
+    consistency_gap: float = Field(ge=0, le=1)
+    focus_area: Literal["comprehension", "application", "consistency", "growth"]
+    observed_patterns: list[str] = Field(default_factory=list)
+
+
+class StudyRecommendation(BaseModel):
+    user_id: str
+    focus_area: Literal["comprehension", "application", "consistency", "growth"]
+    recommended_reference: PassageReference
+    recommended_guide_mode: Literal["guide", "peer", "challenger", "coach"]
+    recommended_minutes: int
+    recommended_entry_point: str
+    reason: str
+    suggested_action: str
+    gap_report: StudyGapReport
+
+
 class AgentStudyResponse(BaseModel):
     message: str
     questions: list[StudyQuestion]
@@ -158,6 +179,7 @@ class AgentSessionStartResponse(BaseModel):
     passage: PassageText
     commentary: list[CommentaryNote]
     pattern_summary: StudyPatternSummary
+    recommendation: StudyRecommendation
     current_question: StudyQuestion | None = None
 
 

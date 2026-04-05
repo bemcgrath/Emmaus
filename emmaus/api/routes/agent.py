@@ -8,6 +8,11 @@ from emmaus.core.bootstrap import Container
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 
+@router.get("/recommendations/{user_id}")
+def get_agent_recommendation(user_id: str, container: Container = Depends(get_container)):
+    return container.agent_service.recommend_next_session(user_id)
+
+
 @router.post("/session")
 def build_agent_session(payload: AgentSessionRequest, container: Container = Depends(get_container)):
     return container.agent_service.build_session(

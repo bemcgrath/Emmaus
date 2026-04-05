@@ -4,6 +4,7 @@ from emmaus.providers.llm import LLMProviderRegistry, NullLLMProvider
 from emmaus.providers.text import LocalJsonBibleTextProvider, RemoteApiBibleTextProvider, TextProviderRegistry
 from emmaus.repositories.study import SQLiteStudyRepository
 from emmaus.services.agent import AdaptiveStudyAgent
+from emmaus.services.personalization import PersonalizationService
 from emmaus.services.study import StudyService
 from emmaus.services.text import TextSourceService
 
@@ -24,8 +25,10 @@ class Container:
             repository=self.study_repository,
             history_limit=self.settings.study_history_limit,
         )
+        self.personalization_service = PersonalizationService(self.study_service)
         self.agent_service = AdaptiveStudyAgent(
             study_service=self.study_service,
+            personalization_service=self.personalization_service,
             text_service=self.text_service,
             commentary_registry=self.commentary_registry,
             llm_registry=self.llm_registry,

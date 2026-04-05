@@ -62,6 +62,7 @@ def test_phase_one_guided_session_flow(tmp_path, monkeypatch):
     session_id = started["session"]["session_id"]
     assert started["current_question"]["type"] == "observation"
     assert started["passage"]["source_id"] == "sample_local"
+    assert started["recommendation"]["recommended_minutes"] >= 10
 
     for answer in [
         "I notice the passage centers on God's love and initiative.",
@@ -102,3 +103,59 @@ def test_phase_one_guided_session_flow(tmp_path, monkeypatch):
     assert streaks.status_code == 200
     assert streaks.json()["completed_sessions"] == 1
     assert streaks.json()["current_streak"] == 1
+
+
+def test_recommendation_targets_application_gaps(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "requested_minutes": 10,
+        },
+    )
+    session_id = start.json()["session"]["session_id"]
+
+    for answer in [
+        "Love.",
+        "It means God is good.",
+        "I should do better.",
+    ]:
+        client.post(
+            "/v1/agent/session/respond",
+            json={
+                "session_id": session_id,
+                "user_id": "demo-user",
+                "response_text": answer,
+                "engagement_score": 2,
+            },
+        )
+
+    client.post(
+        "/v1/agent/session/complete",
+        json={
+            "session_id": session_id,
+            "user_id": "demo-user",
+        },
+    )
+
+    recommendation = client.get("/v1/agent/recommendations/demo-user")
+    assert recommendation.status_code == 200
+    payload = recommendation.json()
+    assert payload["focus_area"] == "application"
+    assert payload["recommended_guide_mode"] in {"coach", "peer"}
+    assert payload["gap_report"]["application_gap"] >= payload["gap_report"]["comprehension_gap"]
+
+    next_start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+        },
+    )
+    assert next_start.status_code == 200
+    next_payload = next_start.json()
+    assert next_payload["recommendation"]["focus_area"] == "application"
+    assert next_payload["session"]["guide_mode"] in {"coach", "peer"}

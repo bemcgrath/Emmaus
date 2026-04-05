@@ -227,6 +227,17 @@ class SQLiteStudyRepository:
             return None
         return self._row_to_session(row)
 
+    def list_sessions(self, user_id: str, status: str | None = None) -> list[StudySession]:
+        query = "SELECT * FROM study_sessions WHERE user_id = ?"
+        params: list[str] = [user_id]
+        if status is not None:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY started_at DESC"
+        with self._connect() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [self._row_to_session(row) for row in rows]
+
     def save_session(self, session: StudySession) -> StudySession:
         with self._connect() as connection:
             connection.execute(

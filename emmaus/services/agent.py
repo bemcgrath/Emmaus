@@ -16,9 +16,11 @@ from emmaus.domain.models import (
     StudyPlanStep,
     StudyQuestion,
     StudySession,
+    StudyRecommendation,
 )
 from emmaus.providers.commentary import CommentaryProviderRegistry
 from emmaus.providers.llm import LLMProviderRegistry
+from emmaus.services.personalization import PersonalizationService
 from emmaus.services.study import StudyService
 from emmaus.services.text import TextSourceService
 
@@ -27,12 +29,14 @@ class AdaptiveStudyAgent:
     def __init__(
         self,
         study_service: StudyService,
+        personalization_service: PersonalizationService,
         text_service: TextSourceService,
         commentary_registry: CommentaryProviderRegistry,
         llm_registry: LLMProviderRegistry,
         default_commentary_source: str,
     ) -> None:
         self.study_service = study_service
+        self.personalization_service = personalization_service
         self.text_service = text_service
         self.commentary_registry = commentary_registry
         self.llm_registry = llm_registry
@@ -60,6 +64,10 @@ class AdaptiveStudyAgent:
             pattern_summary=started.pattern_summary,
         )
 
+    def recommend_next_session(self, user_id: str) -> StudyRecommendation:
+        self.study_service.get_or_create_profile(user_id)
+        return self.personalization_service.build_recommendation(user_id)
+
     def start_session(
         self,
         user_id: str,
@@ -74,39 +82,43 @@ class AdaptiveStudyAgent:
     ) -> AgentSessionStartResponse:
         profile = self.study_service.get_or_create_profile(user_id, display_name)
         pattern_summary = self.study_service.summarize_patterns(user_id)
-        reference = reference or self._recommend_reference(entry_point, pattern_summary)
+        recommendation = self.personalization_service.build_recommendation(user_id)
+        reference = reference or recommendation.recommended_reference
         resolved_text_source = (
             text_source_id or profile.preferences.preferred_translation_source_id or self.text_service.default_source
         )
         resolved_commentary_source = commentary_source_id or self.default_commentary_source
-        resolved_mode = guide_mode or profile.preferences.preferred_guide_mode
-        resolved_minutes = requested_minutes or pattern_summary.recommended_session_minutes
+        resolved_mode = guide_mode or recommendation.recommended_guide_mode or profile.preferences.preferred_guide_mode
+        resolved_minutes = requested_minutes or recommendation.recommended_minutes or pattern_summary.recommended_session_minutes
+        resolved_entry_point = entry_point if entry_point != "continue" else recommendation.recommended_entry_point
 
         passage = self.text_service.get_passage(reference, resolved_text_source)
         commentary_provider = self.commentary_registry.get(resolved_commentary_source)
         commentary = commentary_provider.get_commentary(reference)
-        questions = self._generate_questions(pattern_summary, resolved_mode, entry_point)
-        plan = self._generate_plan(resolved_minutes, passage.text, resolved_mode)
+        questions = self._generate_questions(pattern_summary, resolved_mode, resolved_entry_point, recommendation)
+        plan = self._generate_plan(resolved_minutes, passage.text, resolved_mode, recommendation)
 
         prompt = (
             f"User pattern summary: {pattern_summary.model_dump_json()}\n"
+            f"Recommendation: {recommendation.model_dump_json()}\n"
             f"Passage: {passage.text}\n"
             f"Guide mode: {resolved_mode}\n"
-            f"Entry point: {entry_point}"
+            f"Entry point: {resolved_entry_point}"
         )
         guidance = self.llm_registry.get(llm_source_id).generate_guidance(prompt)
         latest_message = self._build_start_message(
             display_name=profile.display_name,
             reference=reference,
             requested_minutes=resolved_minutes,
-            entry_point=entry_point,
+            entry_point=resolved_entry_point,
             guidance=guidance,
+            recommendation=recommendation,
         )
 
         session = StudySession(
             session_id=str(uuid4()),
             user_id=user_id,
-            entry_point=entry_point,
+            entry_point=resolved_entry_point,
             guide_mode=resolved_mode,
             requested_minutes=resolved_minutes,
             text_source_id=resolved_text_source,
@@ -125,7 +137,7 @@ class AdaptiveStudyAgent:
                 reference=reference,
                 difficulty=pattern_summary.preferred_difficulty,
                 engagement_score=3,
-                notes=entry_point,
+                notes=resolved_entry_point,
             )
         )
         self.study_service.record_event(
@@ -143,6 +155,7 @@ class AdaptiveStudyAgent:
             passage=passage,
             commentary=commentary,
             pattern_summary=pattern_summary,
+            recommendation=recommendation,
             current_question=questions[0] if questions else None,
         )
 
@@ -266,24 +279,33 @@ class AdaptiveStudyAgent:
             engagement=self.study_service.get_engagement_summary(user_id),
         )
 
-    def _recommend_reference(self, entry_point: str, pattern_summary: StudyPatternSummary) -> PassageReference:
-        if pattern_summary.recent_topics:
-            recent = pattern_summary.recent_topics[-1]
-            if recent.startswith("Psalm 23"):
-                return PassageReference(book="Psalm", chapter=23, start_verse=1, end_verse=3)
-            if recent.startswith("John 3"):
-                return PassageReference(book="John", chapter=3, start_verse=16, end_verse=17)
-        if entry_point in {"encouragement", "restart", "help me restart after missing a few days"}:
-            return PassageReference(book="Psalm", chapter=23, start_verse=1, end_verse=3)
-        return PassageReference(book="John", chapter=3, start_verse=16, end_verse=17)
-
     def _generate_questions(
         self,
         pattern_summary: StudyPatternSummary,
         guide_mode: str,
         entry_point: str,
+        recommendation: StudyRecommendation,
     ) -> list[StudyQuestion]:
         difficulty = pattern_summary.preferred_difficulty
+        if recommendation.focus_area == "comprehension":
+            return [
+                StudyQuestion(
+                    question="What do you notice first in this passage before you interpret it?",
+                    type="observation",
+                    difficulty=difficulty,
+                ),
+                StudyQuestion(
+                    question="What do you think this passage means in its immediate context?",
+                    type="interpretation",
+                    difficulty=difficulty,
+                ),
+                StudyQuestion(
+                    question="What part still feels unclear or needs a slower second look?",
+                    type="reflection",
+                    difficulty=difficulty,
+                ),
+            ]
+
         closing_question = "What is one practical response you can make today based on this reading?"
         if guide_mode == "challenger":
             closing_question = "What comfortable assumption does this passage confront in your life right now?"
@@ -295,6 +317,12 @@ class AdaptiveStudyAgent:
         opener = "What repeated words or themes stand out in this passage?"
         if entry_point in {"encouragement", "I need encouragement"}:
             opener = "What in this passage meets you where you are emotionally today?"
+        if recommendation.focus_area == "application":
+            opener = "What in this passage is easiest to admire but hardest to obey?"
+        elif recommendation.focus_area == "consistency":
+            opener = "What part of this passage gives you a simple, steady place to begin again today?"
+        elif recommendation.focus_area == "growth":
+            opener = "What deeper tension or challenge stands out in this passage?"
 
         return [
             StudyQuestion(question=opener, type="observation", difficulty=difficulty),
@@ -306,9 +334,25 @@ class AdaptiveStudyAgent:
             StudyQuestion(question=closing_question, type="application", difficulty=difficulty),
         ]
 
-    def _generate_plan(self, requested_minutes: int, passage_text: str, guide_mode: str) -> list[StudyPlanStep]:
+    def _generate_plan(
+        self,
+        requested_minutes: int,
+        passage_text: str,
+        guide_mode: str,
+        recommendation: StudyRecommendation,
+    ) -> list[StudyPlanStep]:
         read_minutes = 5 if requested_minutes >= 15 else 3
         response_minutes = max(5, requested_minutes - (read_minutes + 5))
+        focus_instruction = "Let the guide help you slow down and respond honestly."
+        if recommendation.focus_area == "comprehension":
+            focus_instruction = "Move slowly and focus on understanding what the passage is actually saying before jumping ahead."
+        elif recommendation.focus_area == "application":
+            focus_instruction = "Pay special attention to where the passage demands a real-life response."
+        elif recommendation.focus_area == "consistency":
+            focus_instruction = "Keep this session simple and completeable so it rebuilds momentum."
+        elif recommendation.focus_area == "growth":
+            focus_instruction = "Use this session to push beyond the obvious and explore a deeper challenge."
+
         closing_instruction = "Close by naming one concrete response for the next 24 hours."
         if guide_mode == "challenger":
             closing_instruction = "Close by naming one belief or habit this passage is pressing you to revisit."
@@ -317,6 +361,11 @@ class AdaptiveStudyAgent:
                 title="Read Slowly",
                 instruction=f"Read the selected text twice. Start with this excerpt: {passage_text[:180]}",
                 estimated_minutes=read_minutes,
+            ),
+            StudyPlanStep(
+                title="Focus",
+                instruction=focus_instruction,
+                estimated_minutes=2,
             ),
             StudyPlanStep(
                 title="Reflect",
@@ -337,13 +386,14 @@ class AdaptiveStudyAgent:
         requested_minutes: int,
         entry_point: str,
         guidance: str,
+        recommendation: StudyRecommendation,
     ) -> str:
         greeting = f"Welcome back, {display_name}." if display_name else "Welcome back."
         return (
             f"{greeting} We'll spend about {requested_minutes} minutes in {reference.book} "
             f"{reference.chapter}:{reference.start_verse}"
             f"{'-' + str(reference.end_verse) if reference.end_verse else ''}. "
-            f"This session starts from '{entry_point}'. {guidance}"
+            f"This session starts from '{entry_point}' and focuses on {recommendation.focus_area}. {guidance}"
         )
 
     def _build_follow_up_message(
