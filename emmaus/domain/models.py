@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -39,10 +39,38 @@ class CommentaryNote(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class UserPreferences(BaseModel):
+    preferred_translation_source_id: str | None = None
+    preferred_difficulty: Literal["gentle", "balanced", "challenging"] = "balanced"
+    preferred_session_minutes: int = 20
+    preferred_guide_mode: Literal["guide", "peer", "challenger", "coach"] = "guide"
+    nudge_intensity: Literal["gentle", "balanced", "direct"] = "balanced"
+    preferred_study_days: list[str] = Field(default_factory=list)
+
+
+class UserProfile(BaseModel):
+    user_id: str
+    display_name: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_seen_at: datetime | None = None
+    preferences: UserPreferences = Field(default_factory=UserPreferences)
+    completed_sessions: int = 0
+    current_streak: int = 0
+    longest_streak: int = 0
+    last_completed_on: date | None = None
+
+
 class StudyEvent(BaseModel):
     user_id: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    event_type: Literal["session_started", "question_answered", "reflection_saved", "passage_viewed"]
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    event_type: Literal[
+        "session_started",
+        "question_answered",
+        "reflection_saved",
+        "passage_viewed",
+        "session_completed",
+        "action_item_completed",
+    ]
     reference: PassageReference | None = None
     difficulty: Literal["gentle", "balanced", "challenging"] = "balanced"
     engagement_score: int = 3
@@ -69,8 +97,78 @@ class StudyPlanStep(BaseModel):
     estimated_minutes: int
 
 
+class ActionItem(BaseModel):
+    action_item_id: str
+    user_id: str
+    session_id: str
+    title: str
+    detail: str
+    status: Literal["open", "completed"] = "open"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    completed_at: datetime | None = None
+
+
+class SessionResponse(BaseModel):
+    session_id: str
+    user_id: str
+    question_index: int
+    question: str
+    question_type: Literal["observation", "interpretation", "application", "reflection"]
+    response_text: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class StudySession(BaseModel):
+    session_id: str
+    user_id: str
+    status: Literal["active", "completed"] = "active"
+    entry_point: str = "continue"
+    guide_mode: Literal["guide", "peer", "challenger", "coach"] = "guide"
+    requested_minutes: int = 20
+    text_source_id: str
+    commentary_source_id: str | None = None
+    llm_source_id: str = "local_rules"
+    reference: PassageReference
+    questions: list[StudyQuestion]
+    plan: list[StudyPlanStep]
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    completed_at: datetime | None = None
+    current_question_index: int = 0
+    latest_message: str
+    action_item_id: str | None = None
+
+
+class EngagementSummary(BaseModel):
+    user_id: str
+    completed_sessions: int
+    current_streak: int
+    longest_streak: int
+    last_completed_on: date | None = None
+
+
 class AgentStudyResponse(BaseModel):
     message: str
     questions: list[StudyQuestion]
     plan: list[StudyPlanStep]
     pattern_summary: StudyPatternSummary
+
+
+class AgentSessionStartResponse(BaseModel):
+    session: StudySession
+    passage: PassageText
+    commentary: list[CommentaryNote]
+    pattern_summary: StudyPatternSummary
+    current_question: StudyQuestion | None = None
+
+
+class AgentSessionTurnResponse(BaseModel):
+    session: StudySession
+    reply_message: str
+    next_question: StudyQuestion | None = None
+    remaining_questions: int
+
+
+class AgentSessionCompleteResponse(BaseModel):
+    session: StudySession
+    action_item: ActionItem
+    engagement: EngagementSummary

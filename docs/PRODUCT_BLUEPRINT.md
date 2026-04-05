@@ -2,40 +2,42 @@
 
 ## North Star
 
-Emmaus is a personalized Bible study guide.
+Emmaus is a mobile-first personalized Bible study guide designed to help users deepen their relationship with Christ.
 
-The app should feel less like a search tool and less like a chatbot, and more like a living study companion that helps the user build a consistent rhythm of reading, reflection, and application.
+The app should feel less like a search tool and less like a chatbot, and more like a living study companion that helps the user read Scripture, understand it, apply it, and return to it consistently.
 
 Its central promise is:
 
-- the guide knows how you study
-- the guide helps you stay engaged
-- the guide asks questions that deepen insight
-- the guide helps turn reflection into action
+- the guide helps me draw nearer to Christ through Scripture
+- the guide notices what I understand and where I am struggling
+- the guide adapts my next study based on those gaps
+- the guide helps me turn reflection into action
 
 ## Primary User Promise
 
 When a user opens Emmaus, they should feel:
 
-- known: the app remembers their habits, struggles, interests, and recent study history
+- known: the app remembers their habits, struggles, interests, schedule, and recent study history
 - guided: the next best study step is suggested, not hidden
-- challenged: the app pushes deeper than a summary
+- challenged: the app pushes deeper than a summary and surfaces weak spots in understanding or application
 - encouraged: progress feels real, visible, and attainable
 - grounded: Scripture remains central to the experience
+- supported on mobile: the session feels natural, clear, and easy to complete on a smartphone
 
 ## Core Experience Loop
 
 Each Emmaus session should follow this loop:
 
-1. The guide greets the user with context.
-2. The guide proposes a study path based on time, momentum, and recent themes.
+1. The guide greets the user with context and a mobile-friendly session path.
+2. The guide proposes a study plan based on time, momentum, prior answers, and recent gaps.
 3. The user reads the biblical text from their chosen source.
-4. The guide asks dynamic questions and adapts based on responses.
-5. Optional commentary and cross references are layered in when useful.
-6. The guide closes with one action item, prayer prompt, or discussion prompt.
-7. The session is logged so the next session becomes smarter.
+4. The guide asks dynamic questions to test comprehension, reflection, and application.
+5. The guide identifies areas of weakness or incompleteness and uses them to shape future sessions.
+6. Optional commentary and cross references are layered in when helpful and only after Scripture engagement begins.
+7. The guide closes with one action item, prayer prompt, or discussion prompt.
+8. The session is logged so the next session becomes more tailored.
 
-This loop is the core product engine.
+This adaptive cycle of guiding, testing, tailoring, and applying is the core product engine.
 
 ## What The Agent Should Do
 
@@ -47,12 +49,12 @@ The agent should:
 
 - recommend what to study next
 - adjust study length based on available time and recent engagement
-- generate observation, interpretation, application, and reflection questions
-- notice missed sessions and send tailored nudges
-- detect patterns such as rushing, shallow answers, or recurring interests
+- ask questions that reveal comprehension, confusion, avoidance, and application gaps
+- identify patterns such as rushing, shallow answers, recurring struggles, or incomplete follow-through
+- adapt future study plans to revisit weak areas without becoming repetitive or discouraging
 - offer multiple perspectives when useful
 - end every session with something concrete to do
-- remember what happened in previous sessions so future sessions feel continuous
+- remember what happened in previous sessions so future sessions feel continuous and personal
 
 ### Agent modes
 
@@ -70,7 +72,7 @@ Behavior:
 
 - calm, pastoral, clear
 - suggests the next step
-- frames the text and keeps focus on Scripture
+- frames the text and keeps focus on Scripture and Christ-centered response
 
 #### Peer mode
 
@@ -127,11 +129,13 @@ Emmaus should build a living user profile from observed behavior instead of rely
 - completion rate
 - passage types the user lingers on most
 - question types that produce richer answers
+- patterns of misunderstanding or weak interpretation
+- patterns of weak or inconsistent application
 - mood or emotional tone when shared by the user
 - action item follow-through
 - streak health and return patterns after missed days
 - preferred guide mode
-- interests such as prayer, theology, leadership, suffering, relationships, wisdom, or gospel themes
+- interests such as prayer, theology, suffering, relationships, wisdom, discipleship, grace, or gospel themes
 
 ### Learning style signals
 
@@ -150,14 +154,27 @@ Based on these signals, Emmaus should adapt:
 - study plan length
 - tone of the guide
 - difficulty of questions
+- whether to revisit a misunderstood theme or passage type
+- whether to emphasize interpretation, reflection, or application in the next session
 - whether to introduce commentary early or late
-- whether to focus on narrative, doctrine, poetry, or thematic studies
+- whether to focus on narrative, doctrine, poetry, gospel themes, or a specific spiritual need
 - whether to nudge gently or directly
-- whether to emphasize reflection, memorization, application, or discussion
 
-## User Interaction Model
+## Mobile-First Interaction Model
 
-Emmaus should support both proactive and reactive interaction.
+Emmaus should be designed for smartphones first.
+
+### Mobile-first rules
+
+The mobile experience should prioritize:
+
+- concise text blocks that are easy to scan on a small screen
+- low-friction navigation between reading, answering, and reviewing
+- prominent single-action choices instead of crowded menus
+- session entry points based on realistic time windows such as 5, 10, or 20 minutes
+- agent prompts that feel natural in a chat-like mobile flow
+- minimal typing burden when possible
+- fast review of current streak, active action item, and next suggested study
 
 ### Reactive interaction
 
@@ -186,6 +203,7 @@ The guide can:
 The user should be able to enter Emmaus through several entry points:
 
 - continue where I left off
+- I have 5 minutes
 - I have 10 minutes
 - I want to study a topic
 - I need encouragement
@@ -206,7 +224,9 @@ The guide briefly sets the purpose of the session.
 Example outcomes:
 
 - continue yesterday's thread
-- explore a new passage tied to a theme
+- revisit a misunderstood theme
+- reinforce a weak area of application
+- explore a new passage tied to a recent need or question
 - revisit a prior action item
 
 ### 2. Reading
@@ -218,8 +238,9 @@ The guide can help by:
 - choosing a passage length appropriate to the session window
 - showing context before and after the passage
 - optionally presenting multiple translations if the user has configured them
+- breaking the reading into mobile-friendly chunks
 
-### 3. Reflection
+### 3. Reflection And Testing
 
 The guide asks adaptive questions.
 
@@ -231,6 +252,8 @@ Question categories should include:
 - reflection: what it surfaces emotionally or spiritually
 - application: what should change in response
 - discussion: how to bring this into a group conversation
+
+The purpose of these questions is not only conversation. The purpose is diagnosis. The guide should learn what the user understands, where they are vague, and what needs to be revisited later.
 
 ### 4. Expansion
 
@@ -262,7 +285,7 @@ This is essential. Emmaus should convert reflection into lived practice.
 
 ## Dynamic Q&A Strategy
 
-The agent should not wait for the user to ask all the right questions. It should actively propose questions that deepen the study.
+The agent should not wait for the user to ask all the right questions. It should actively propose questions that deepen the study and reveal where the next study should go.
 
 ### Question engine behavior
 
@@ -272,6 +295,8 @@ The question engine should:
 - escalate into deeper interpretation when the user is engaged
 - pivot to application when the user stays abstract
 - ask clarifying questions if the user gives vague answers
+- identify shallow or evasive responses
+- revisit weak spots across future sessions
 - generate related questions when a theme appears repeatedly
 - surface tensions, contrasts, or surprises in the text
 
@@ -279,8 +304,8 @@ The question engine should:
 
 - What repeats in this passage?
 - Why do you think that repetition matters here?
-- What assumption would change if you took this verse seriously?
-- Where does this challenge your current habits?
+- What do you think this means in context?
+- What part of this still feels unclear or difficult to live out?
 - What is one thing you should do differently in the next 24 hours?
 
 ## Nudges And Re-engagement
@@ -291,7 +316,7 @@ The app should help the user return without feeling manipulative or guilt-driven
 
 - momentum nudge: continue a strong streak
 - restart nudge: return after a missed window with a smaller session
-- theme nudge: suggest a passage connected to a recent concern
+- theme nudge: suggest a passage connected to a recent concern or weak area
 - follow-through nudge: remind the user of a prior action item
 - encouragement nudge: offer a short guided study when the user reports stress or discouragement
 
@@ -304,6 +329,7 @@ Each nudge should consider:
 - mood history if available
 - whether the user responds better to gentle encouragement or direct challenge
 - whether the user is on a streak or in recovery mode
+- whether the user needs reinforcement in understanding or application
 
 ### Anti-burnout rules
 
@@ -317,7 +343,7 @@ The system should:
 
 ## Gamification And Community
 
-Gamification should reinforce reflection and consistency, not mere button-tapping.
+Gamification should reinforce reflection, obedience, and consistency, not mere button-tapping.
 
 ### Individual progression
 
@@ -337,7 +363,7 @@ Examples:
 - seven-day rhythm
 - first completed study journey
 - five applied action items in a row
-- explored all four Gospel accounts on a theme
+- revisited and strengthened a prior weak area
 - comeback badge after restarting following a lapse
 
 ### Community features
@@ -441,7 +467,7 @@ Responsible for:
 
 - determining the session type
 - choosing the next best action
-- coordinating passage, commentary, memory, and Q&A
+- coordinating passage, commentary, memory, testing, and Q&A
 
 ### Personalization engine
 
@@ -451,6 +477,7 @@ Responsible for:
 - habit detection
 - learning style inference
 - schedule and nudge timing
+- gap detection in comprehension and application
 
 ### Q&A engine
 
@@ -459,6 +486,7 @@ Responsible for:
 - question generation
 - follow-up logic
 - role-mode behavior
+- weakness detection
 - action item generation
 
 ### Content access layer
@@ -489,6 +517,7 @@ Responsible for:
 - prior action items
 - mood and engagement signals
 - preference history
+- past misunderstandings and application gaps
 
 ## Proposed API Surface
 
@@ -514,6 +543,7 @@ The current backend scaffold is a good start. Over time, the API should expand t
 - `POST /v1/agent/session/start`
 - `POST /v1/agent/session/respond`
 - `POST /v1/agent/session/complete`
+- `GET /v1/agent/recommendations/{user_id}`
 - `POST /v1/agent/nudges/preview`
 - `POST /v1/agent/mode`
 
@@ -537,13 +567,14 @@ The current backend scaffold is a good start. Over time, the API should expand t
 To keep the first version focused, MVP should include:
 
 - one-on-one guide sessions
-- adaptive study plans based on time and engagement history
-- dynamic question generation
+- adaptive study plans based on time, prior engagement, and detected weak spots
+- dynamic question generation that tests understanding and application
 - one action item per session
 - local and API-based Bible text sources
 - placeholder commentary adapters
 - streaks and comeback nudges
 - basic guide mode and challenger mode
+- mobile-first session flows and concise prompt design
 
 Things to delay until later:
 
@@ -555,7 +586,7 @@ Things to delay until later:
 
 ## Success Metrics
 
-Emmaus should care less about raw message count and more about meaningful engagement.
+Emmaus should care less about raw message count and more about meaningful spiritual engagement.
 
 Key metrics:
 
@@ -566,14 +597,15 @@ Key metrics:
 - average depth of response to reflection prompts
 - percent of users who return after the first week
 - percent of users who complete a full guided study journey
+- percent of users who revisit and improve previously weak study areas
 
 ## Decision Filter
 
 When deciding what to build next, ask:
 
-- Does this strengthen the guide as a personalized companion?
-- Does this deepen engagement with Scripture rather than distract from it?
+- Does this help users deepen their relationship with Christ through Scripture?
+- Does this strengthen the adaptive cycle of testing, tailoring, and application?
 - Does this help the app adapt to the user over time?
 - Does this preserve modularity in text, commentary, and AI sources?
+- Does this support a strong mobile-first experience?
 - Does this lead to action, not just information?
-

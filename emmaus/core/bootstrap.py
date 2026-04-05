@@ -1,8 +1,8 @@
-from emmaus.core.config import Settings
+﻿from emmaus.core.config import Settings
 from emmaus.providers.commentary import CommentaryProviderRegistry, NotesPlaceholderCommentaryProvider
 from emmaus.providers.llm import LLMProviderRegistry, NullLLMProvider
 from emmaus.providers.text import LocalJsonBibleTextProvider, RemoteApiBibleTextProvider, TextProviderRegistry
-from emmaus.repositories.study import InMemoryStudyRepository
+from emmaus.repositories.study import SQLiteStudyRepository
 from emmaus.services.agent import AdaptiveStudyAgent
 from emmaus.services.study import StudyService
 from emmaus.services.text import TextSourceService
@@ -14,7 +14,7 @@ class Container:
         self.text_registry = TextProviderRegistry()
         self.commentary_registry = CommentaryProviderRegistry()
         self.llm_registry = LLMProviderRegistry()
-        self.study_repository = InMemoryStudyRepository()
+        self.study_repository = SQLiteStudyRepository(self.settings.database_path)
         self.text_service = TextSourceService(
             registry=self.text_registry,
             data_dir=self.settings.data_dir,

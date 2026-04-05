@@ -10,9 +10,10 @@ What should we build first, what should come next, and what should wait?
 The guiding rule is simple:
 
 - build the personalized guide first
-- keep Scripture central
-- preserve modularity in text, commentary, and AI
-- add engagement loops only when they support real reflection and action
+- keep the purpose Christ-centered and Scripture-first
+- preserve the adaptive cycle of testing, tailoring, and application
+- design mobile-first from the beginning
+- add engagement loops only when they support real reflection and real-world response
 
 ## Phase 0: Foundation
 
@@ -20,41 +21,41 @@ Goal:
 Establish the backend and domain boundaries so the rest of the product can evolve cleanly.
 
 Status:
-Mostly started through the current scaffold.
+Started and now extended into early Phase 1 work.
 
 Deliverables:
 
 - FastAPI application skeleton
-- normalized passage, commentary, and study models
+- normalized passage, commentary, user, session, and action-item models
 - pluggable Bible text provider interface
 - pluggable commentary provider interface
 - pluggable LLM provider interface
-- basic agent session endpoint
+- initial session lifecycle endpoints
 - local sample text source
-- project objective and product blueprint docs
+- project objective, blueprint, and roadmap docs
 
 Exit criteria:
 
 - the app can retrieve a passage from a provider
-- the app can generate a simple guided study response
+- the app can run a guided session loop
 - the architecture keeps text, commentary, and AI separate
 
 ## Phase 1: MVP Personalized Guide
 
 Goal:
-Ship the first real Emmaus experience centered on a one-on-one personalized guide.
+Ship the first real Emmaus experience centered on a one-on-one personalized guide that helps users deepen their relationship with Christ through adaptive study.
 
 Why this phase matters:
-This is the first version that actually proves the product thesis that the guide is the product.
+This is the first version that actually proves the product thesis that the guide is the product and that the adaptive cycle is real.
 
 User experience target:
 
-- a user opens Emmaus
+- a user opens Emmaus on a phone
 - the guide suggests a session based on available time and recent history
-- the user reads a passage
-- the guide asks adaptive questions
-- the session ends with one action item
-- the system remembers the session for next time
+- the user reads a passage in a mobile-friendly flow
+- the guide asks adaptive questions to test understanding and application
+- the session ends with one action item, prayer prompt, or reflection
+- the system remembers the session and uses it to shape what comes next
 
 Scope:
 
@@ -65,18 +66,20 @@ Scope:
 - action item creation
 - streak tracking
 - restart nudges
+- mobile-first prompt and session design
 
 Core features:
 
-- persistent storage for users, study events, and action items
+- persistent storage for users, study events, sessions, and action items
 - user preference capture
 - session start, respond, and complete endpoints
-- time-based session entry points such as `I have 10 minutes`
+- time-based session entry points such as `I have 5 minutes` and `I have 10 minutes`
 - guide mode
 - challenger mode
 - one default nudge system
 - basic streak engine
 - action item logging and completion tracking
+- concise prompt formatting intended for mobile UI
 
 Backend work:
 
@@ -104,6 +107,7 @@ Success criteria:
 - the next session reflects the previous one
 - every session closes with a concrete next step
 - the app supports at least one return loop through streaks or nudges
+- the flow feels natural on a smartphone
 
 ## Phase 2: Better Personalization
 
@@ -111,7 +115,7 @@ Goal:
 Make the guide feel noticeably more tailored to the individual user.
 
 Why this phase matters:
-MVP proves the loop; this phase makes the guide feel intelligent and relational rather than generic.
+MVP proves the loop. This phase makes the guide feel intelligent, pastoral, and personally relevant rather than generic.
 
 Focus areas:
 
@@ -120,6 +124,7 @@ Focus areas:
 - schedule-aware nudges
 - emotional self-report inputs
 - richer question adaptation
+- gap detection in understanding and application
 
 Core features:
 
@@ -130,6 +135,7 @@ Core features:
 - dynamic difficulty adjustment
 - smarter restart flows after missed sessions
 - guide tone adaptation
+- revisit logic for weak study areas
 
 Backend work:
 
@@ -138,24 +144,19 @@ Backend work:
 - add nudge decision logic
 - add profile summarization for agent prompts
 - add session recommendation logic
-
-Suggested endpoints:
-
-- `POST /v1/study/mood`
-- `GET /v1/agent/recommendations/{user_id}`
-- `POST /v1/agent/nudges/preview`
-- `POST /v1/agent/mode`
+- add gap scoring for comprehension and application
 
 Success criteria:
 
 - users receive different study plans based on actual behavior
 - the guide adjusts to low-energy and high-engagement states
+- weak understanding or weak application leads to tailored future study
 - nudges become more timely and less generic
 
 ## Phase 3: Content Depth
 
 Goal:
-Deepen the study experience without losing focus on the biblical text.
+Deepen the study experience without losing focus on Scripture or the app's Christ-centered purpose.
 
 Why this phase matters:
 Once the guide loop works, Emmaus can become more valuable by layering helpful context and multiple viewpoints.
@@ -165,6 +166,7 @@ Focus areas:
 - better text consumption
 - modular commentary expansion
 - optional cross references and alternate views
+- stronger study journeys built around repeated weak spots or recurring themes
 
 Core features:
 
@@ -175,20 +177,6 @@ Core features:
 - cross-reference suggestions
 - study plans by theme, topic, or book
 
-Backend work:
-
-- add text comparison endpoint
-- add search endpoint if metadata allows
-- add commentary comparison support
-- add source ranking and defaults per user
-- add content caching for active plans
-
-Suggested endpoints:
-
-- `POST /v1/texts/search`
-- `POST /v1/texts/compare`
-- `POST /v1/commentary/compare`
-
 Success criteria:
 
 - users can study from their preferred text setup
@@ -198,10 +186,10 @@ Success criteria:
 ## Phase 4: Engagement And Habit Formation
 
 Goal:
-Help users return consistently without making the app feel manipulative or shallow.
+Help users return consistently without making the app feel manipulative, shallow, or guilt-driven.
 
 Why this phase matters:
-Emmaus will only be valuable if it becomes part of a person’s ongoing rhythm.
+Emmaus will only be valuable if it becomes part of a person’s ongoing rhythm with Christ in real life.
 
 Focus areas:
 
@@ -209,6 +197,7 @@ Focus areas:
 - encouragement systems
 - action-item follow-through
 - comeback experiences
+- mobile-friendly habit review and weekly summaries
 
 Core features:
 
@@ -219,24 +208,12 @@ Core features:
 - low-pressure restart sessions
 - notification preference controls
 
-Backend work:
-
-- engagement engine service
-- achievement rules
-- weekly summary generation
-- notification queue integration
-
-Suggested endpoints:
-
-- `GET /v1/engagement/summary/{user_id}`
-- `GET /v1/engagement/achievements/{user_id}`
-- `POST /v1/engagement/notifications/preferences`
-
 Success criteria:
 
 - improved week-two and week-four retention
 - meaningful action-item completion rates
 - better streak recovery after missed sessions
+- users return for spiritual value, not shallow compulsion
 
 ## Phase 5: Community And Shared Study
 
@@ -261,20 +238,6 @@ Core features:
 - group discussion prompts
 - friend accountability check-ins
 - optional progress sharing
-
-Backend work:
-
-- group models and permissions
-- challenge models
-- group session prompts
-- shared milestone tracking
-
-Suggested endpoints:
-
-- `GET /v1/engagement/challenges`
-- `POST /v1/engagement/challenges/{challenge_id}/join`
-- `POST /v1/groups`
-- `POST /v1/groups/{group_id}/plans`
 
 Success criteria:
 
@@ -304,13 +267,6 @@ Core features:
 - contextual recommendations based on recurring struggles or interests
 - adaptive long-form study journeys
 - better group-aware prompting
-
-Backend work:
-
-- stronger memory summarization
-- session-to-session thematic linking
-- richer personalization prompt assembly
-- advanced guide policy layer
 
 Success criteria:
 
@@ -343,6 +299,7 @@ These should not be early priorities:
 - aggressive notification growth tactics
 - heavy marketplace complexity before the core guide is trusted
 - multi-agent systems exposed to users before one guide experience is excellent
+- desktop-heavy interaction patterns that do not serve the mobile-first experience
 
 ## Recommended Build Order
 
@@ -352,10 +309,11 @@ If we want the highest leverage path, build in this sequence:
 2. session lifecycle endpoints
 3. action items and completion tracking
 4. personalization engine basics
-5. nudges and streaks
-6. multi-translation and commentary expansion
-7. group challenges and shared study
-8. advanced guide modes and long-term memory refinement
+5. gap detection and revisit logic
+6. nudges and streaks
+7. multi-translation and commentary expansion
+8. group challenges and shared study
+9. advanced guide modes and long-term memory refinement
 
 ## Engineering Milestones
 
@@ -365,7 +323,7 @@ Emmaus can run complete personalized study sessions with persistent memory.
 
 ### Milestone 2
 
-Emmaus can adapt study rhythm, timing, and question depth based on user behavior.
+Emmaus can adapt study rhythm, timing, question depth, and future study choices based on user behavior.
 
 ### Milestone 3
 
@@ -387,8 +345,9 @@ Emmaus feels like a long-term personalized guide rather than a sequence of disco
 
 At every phase, ask:
 
-- does this strengthen the guide as the central experience?
-- does this deepen scripture engagement?
+- does this help users deepen their relationship with Christ through Scripture?
+- does this strengthen the adaptive cycle of testing, tailoring, and application?
 - does this preserve source modularity?
+- does this support a strong mobile-first experience?
 - does this encourage real-world response and action?
 - does this help the user return for the right reasons?

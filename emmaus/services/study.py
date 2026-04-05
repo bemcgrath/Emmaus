@@ -1,17 +1,54 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from collections import Counter
+from datetime import UTC, datetime
+from typing import Any
 
-from emmaus.domain.models import StudyEvent, StudyPatternSummary
-from emmaus.repositories.study import InMemoryStudyRepository
+from emmaus.domain.models import (
+    ActionItem,
+    EngagementSummary,
+    SessionResponse,
+    StudyEvent,
+    StudyPatternSummary,
+    StudySession,
+    UserProfile,
+)
+from emmaus.repositories.study import SQLiteStudyRepository
 
 
 class StudyService:
-    def __init__(self, repository: InMemoryStudyRepository, history_limit: int) -> None:
+    def __init__(self, repository: SQLiteStudyRepository, history_limit: int) -> None:
         self.repository = repository
         self.history_limit = history_limit
 
+    def get_or_create_profile(self, user_id: str, display_name: str | None = None) -> UserProfile:
+        return self.repository.get_or_create_user(user_id, display_name)
+
+    def get_profile(self, user_id: str) -> UserProfile:
+        profile = self.repository.get_user_profile(user_id)
+        if profile is None:
+            profile = self.repository.get_or_create_user(user_id)
+        return profile
+
+    def update_preferences(
+        self,
+        user_id: str,
+        updates: dict[str, Any],
+        display_name: str | None = None,
+    ) -> UserProfile:
+        profile = self.get_or_create_profile(user_id, display_name)
+        preference_updates = {key: value for key, value in updates.items() if value is not None}
+        updated = profile.model_copy(
+            update={
+                "display_name": display_name or profile.display_name,
+                "last_seen_at": datetime.now(UTC),
+                "preferences": profile.preferences.model_copy(update=preference_updates),
+            }
+        )
+        return self.repository.save_user_profile(updated)
+
     def record_event(self, event: StudyEvent) -> StudyEvent:
+        self.get_or_create_profile(event.user_id)
         return self.repository.add_event(event)
 
     def list_events(self, user_id: str) -> list[StudyEvent]:
@@ -19,14 +56,15 @@ class StudyService:
         return events[-self.history_limit :]
 
     def summarize_patterns(self, user_id: str) -> StudyPatternSummary:
+        profile = self.get_profile(user_id)
         events = self.list_events(user_id)
         if not events:
             return StudyPatternSummary(
                 user_id=user_id,
                 average_engagement=3.0,
-                preferred_difficulty="balanced",
+                preferred_difficulty=profile.preferences.preferred_difficulty,
                 recent_topics=[],
-                recommended_session_minutes=20,
+                recommended_session_minutes=profile.preferences.preferred_session_minutes,
             )
 
         average_engagement = round(sum(event.engagement_score for event in events) / len(events), 2)
@@ -37,11 +75,64 @@ class StudyService:
             if event.reference is not None
         ]
 
-        recommended_minutes = 15 if average_engagement < 2.5 else 20 if average_engagement < 4 else 30
+        recommended_minutes = profile.preferences.preferred_session_minutes
+        if average_engagement < 2.5:
+            recommended_minutes = max(10, recommended_minutes - 5)
+        elif average_engagement >= 4:
+            recommended_minutes = min(40, recommended_minutes + 5)
+
         return StudyPatternSummary(
             user_id=user_id,
             average_engagement=average_engagement,
             preferred_difficulty=preferred_difficulty,
             recent_topics=topics[-5:],
             recommended_session_minutes=recommended_minutes,
+        )
+
+    def create_session(self, session: StudySession) -> StudySession:
+        self.get_or_create_profile(session.user_id)
+        return self.repository.create_session(session)
+
+    def get_session(self, session_id: str) -> StudySession:
+        session = self.repository.get_session(session_id)
+        if session is None:
+            raise KeyError(f"Unknown session '{session_id}'.")
+        return session
+
+    def save_session(self, session: StudySession) -> StudySession:
+        return self.repository.save_session(session)
+
+    def add_session_response(self, response: SessionResponse) -> SessionResponse:
+        return self.repository.add_session_response(response)
+
+    def list_session_responses(self, session_id: str) -> list[SessionResponse]:
+        return self.repository.list_session_responses(session_id)
+
+    def create_action_item(self, action_item: ActionItem) -> ActionItem:
+        return self.repository.create_action_item(action_item)
+
+    def list_action_items(self, user_id: str, status: str | None = None) -> list[ActionItem]:
+        return self.repository.list_action_items(user_id, status)
+
+    def complete_action_item(self, action_item_id: str, user_id: str) -> ActionItem:
+        action_item = self.repository.complete_action_item(action_item_id, datetime.now(UTC))
+        if action_item is None or action_item.user_id != user_id:
+            raise KeyError(f"Unknown action item '{action_item_id}'.")
+        self.record_event(
+            StudyEvent(
+                user_id=user_id,
+                event_type="action_item_completed",
+                notes=action_item.title,
+            )
+        )
+        return action_item
+
+    def get_engagement_summary(self, user_id: str) -> EngagementSummary:
+        profile = self.get_profile(user_id)
+        return EngagementSummary(
+            user_id=user_id,
+            completed_sessions=profile.completed_sessions,
+            current_streak=profile.current_streak,
+            longest_streak=profile.longest_streak,
+            last_completed_on=profile.last_completed_on,
         )

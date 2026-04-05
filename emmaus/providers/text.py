@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
@@ -45,7 +45,7 @@ class LocalJsonBibleTextProvider(BibleTextProvider):
         )
 
     def get_passage(self, reference: PassageReference) -> PassageText:
-        payload = json.loads(self.file_path.read_text(encoding="utf-8"))
+        payload = json.loads(self.file_path.read_text(encoding="utf-8-sig"))
         book_data = payload["books"].get(reference.book)
         if not book_data:
             raise KeyError(f"Book '{reference.book}' not found in source '{self.descriptor.source_id}'.")

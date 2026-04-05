@@ -1,6 +1,8 @@
 ﻿# Emmaus
 
-Open-source backend scaffold for Emmaus, a modular, agentic Bible study application. The design keeps Bible text, commentary, and AI logic decoupled so the project can stay MIT-licensed without bundling proprietary texts.
+Emmaus is a mobile-first, agentic Bible study app built to help users deepen their relationship with Christ through adaptive, Scripture-centered guidance.
+
+The app is designed around a personalized guide that helps users read, understand, apply, and return to Scripture in a way that fits their real habits, schedule, and spiritual needs. Bible text, commentary, and AI logic remain modular so the project can stay open-source and avoid bundling proprietary content.
 
 ## Core Docs
 
@@ -8,13 +10,38 @@ Open-source backend scaffold for Emmaus, a modular, agentic Bible study applicat
 - [Product Blueprint](docs/PRODUCT_BLUEPRINT.md)
 - [Roadmap](docs/ROADMAP.md)
 
-## Goals
+## Core Product Direction
 
-- Keep Bible text providers swappable.
-- Allow users to register their own local-file or API-based text sources.
-- Keep commentary integrations modular and optional.
-- Expose clear API boundaries for text retrieval, study telemetry, and AI-driven study guidance.
-- Support adaptive study flows based on recorded study patterns.
+Emmaus is built around one core behavior:
+
+- the guide gauges comprehension
+- the guide identifies gaps in understanding or application
+- the guide adapts future study plans to address those gaps
+- the guide ends each session with a practical action or reflection
+
+This adaptive cycle of testing, tailoring, and applying is the center of the product.
+
+## Product Principles
+
+- Christ-centered: the purpose of the app is to help users grow in relationship with Christ through Scripture.
+- Scripture-first: the Bible text remains primary, and the guide serves the text rather than replacing it.
+- Personalized: study plans, prompts, and next steps adapt to the user over time.
+- Action-oriented: every session should move toward obedience, reflection, prayer, or discussion.
+- Mobile-first: the experience should feel natural, concise, and intuitive on a smartphone.
+- Modular: Bible text sources, commentary sources, and AI providers remain decoupled.
+- Open-source friendly: the architecture should remain compatible with permissive licensing like MIT.
+
+## Mobile-First Product Expectations
+
+Emmaus should be designed first for phones, then expanded outward.
+
+That means:
+
+- concise prompts and readable passage chunks
+- simple navigation with minimal taps between reading and response
+- agent messages that fit naturally in a mobile conversation flow
+- session entry points built around short available time windows
+- action items, streaks, and follow-up cues that are easy to review on a small screen
 
 ## Architecture
 
@@ -36,8 +63,8 @@ tests/            API smoke tests
 - `BibleTextProvider` isolates passage retrieval from application logic.
 - `CommentaryProvider` isolates commentary lookup from study orchestration.
 - `LLMProvider` isolates AI vendor integrations from the adaptive study agent.
-- `StudyService` records user activity and summarizes patterns.
-- `AdaptiveStudyAgent` turns passage text plus study patterns into plans and questions.
+- `StudyService` records user activity, profiles, sessions, and action items.
+- `AdaptiveStudyAgent` runs the adaptive cycle of session planning, questioning, and application.
 
 ## Included providers
 
@@ -46,29 +73,16 @@ tests/            API smoke tests
 - `NotesPlaceholderCommentaryProvider`: placeholder for commentary plugins.
 - `NullLLMProvider`: rule-based fallback until a real AI adapter is connected.
 
-## Local text source format
-
-A local source should look like this:
-
-```json
-{
-  "name": "Sample KJV Excerpt",
-  "copyright": "Public Domain",
-  "books": {
-    "John": {
-      "3": {
-        "16": "For God so loved the world..."
-      }
-    }
-  }
-}
-```
-
-## API endpoints
+## Current API Surface
 
 ### Health
 
 - `GET /health`
+
+### Users and personalization
+
+- `GET /v1/users/{user_id}/profile`
+- `PATCH /v1/users/{user_id}/preferences`
 
 ### Text sources
 
@@ -76,78 +90,33 @@ A local source should look like this:
 - `POST /v1/sources/text/local`
 - `POST /v1/sources/text/api`
 
-Example local registration:
-
-```json
-{
-  "source_id": "my_public_domain_text",
-  "name": "My Local Text",
-  "file_path": "C:/path/to/text.json",
-  "license_name": "Public Domain"
-}
-```
-
-Example API registration:
-
-```json
-{
-  "source_id": "my_api_text",
-  "name": "My Bible API",
-  "base_url": "https://api.example.com/bible",
-  "api_key": "replace-me",
-  "license_name": "User Supplied"
-}
-```
-
 ### Text lookup
 
 - `POST /v1/texts/passage`
-
-```json
-{
-  "source_id": "sample_local",
-  "book": "John",
-  "chapter": 3,
-  "start_verse": 16,
-  "end_verse": 17
-}
-```
 
 ### Commentary
 
 - `GET /v1/commentary/sources`
 - `POST /v1/commentary/lookup`
 
-### Study telemetry
+### Study and action items
 
 - `POST /v1/study/events`
 - `GET /v1/study/patterns/{user_id}`
+- `GET /v1/study/action-items/{user_id}`
+- `POST /v1/study/action-items`
+- `POST /v1/study/action-items/{action_item_id}/complete`
 
-### Agentic study guidance
+### Agentic session lifecycle
 
 - `POST /v1/agent/session`
+- `POST /v1/agent/session/start`
+- `POST /v1/agent/session/respond`
+- `POST /v1/agent/session/complete`
 
-```json
-{
-  "user_id": "demo-user",
-  "text_source_id": "sample_local",
-  "commentary_source_id": "notes_placeholder",
-  "llm_source_id": "local_rules",
-  "reference": {
-    "book": "Psalm",
-    "chapter": 23,
-    "start_verse": 1,
-    "end_verse": 3
-  }
-}
-```
+### Engagement
 
-The response includes:
-
-- a session message
-- adaptive study questions
-- a suggested study plan
-- a summary of recent study patterns
+- `GET /v1/engagement/streaks/{user_id}`
 
 ## Running locally
 
@@ -163,14 +132,3 @@ uvicorn emmaus.main:app --reload
 - The codebase is MIT licensed.
 - No proprietary Bible texts or commentary are bundled.
 - Users are expected to connect their own licensed or public-domain content through provider adapters.
-
-## Suggested next steps
-
-- Add persistent storage for study history and registered source configs.
-- Implement a real HTTP adapter for API-backed Bible text providers.
-- Add authenticated user accounts and per-user source ownership.
-- Add richer plan generation with spaced repetition, mood signals, and action tracking.
-- Add commentary provider packages for public-domain sources.
-- Add an OpenAI-compatible or other LLM adapter behind the `LLMProvider` interface.
-
-

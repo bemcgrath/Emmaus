@@ -1,6 +1,6 @@
-from fastapi import FastAPI
+﻿from fastapi import FastAPI
 
-from emmaus.api.routes import agent, commentary, health, study, text_sources, texts
+from emmaus.api.routes import agent, commentary, engagement, health, study, text_sources, texts, users
 from emmaus.core.bootstrap import build_container
 
 
@@ -15,9 +15,10 @@ app = FastAPI(
 app.state.container = container
 
 app.include_router(health.router)
+app.include_router(users.router, prefix="/v1")
 app.include_router(text_sources.router, prefix="/v1")
 app.include_router(texts.router, prefix="/v1")
 app.include_router(commentary.router, prefix="/v1")
 app.include_router(study.router, prefix="/v1")
+app.include_router(engagement.router, prefix="/v1")
 app.include_router(agent.router, prefix="/v1")
-
