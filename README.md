@@ -1,6 +1,12 @@
-# Emmaus
+﻿# Emmaus
 
 Open-source backend scaffold for Emmaus, a modular, agentic Bible study application. The design keeps Bible text, commentary, and AI logic decoupled so the project can stay MIT-licensed without bundling proprietary texts.
+
+## Core Docs
+
+- [Objective](docs/OBJECTIVE.md)
+- [Product Blueprint](docs/PRODUCT_BLUEPRINT.md)
+- [Roadmap](docs/ROADMAP.md)
 
 ## Goals
 
@@ -13,7 +19,7 @@ Open-source backend scaffold for Emmaus, a modular, agentic Bible study applicat
 ## Architecture
 
 ```text
-app/
+emmaus/
   api/            FastAPI routes and request schemas
   core/           Settings and dependency bootstrap
   domain/         Shared models
@@ -21,6 +27,7 @@ app/
   repositories/   Persistence abstractions
   services/       App logic and adaptive agent behavior
 data/             User-supplied or sample local text data
+docs/             Product and objective references
 tests/            API smoke tests
 ```
 
@@ -137,10 +144,10 @@ Example API registration:
 
 The response includes:
 
-- A session message
-- Adaptive study questions
-- A suggested study plan
-- A summary of recent study patterns
+- a session message
+- adaptive study questions
+- a suggested study plan
+- a summary of recent study patterns
 
 ## Running locally
 
@@ -162,7 +169,8 @@ uvicorn emmaus.main:app --reload
 - Add persistent storage for study history and registered source configs.
 - Implement a real HTTP adapter for API-backed Bible text providers.
 - Add authenticated user accounts and per-user source ownership.
-- Add richer plan generation with spaced repetition and topic tracking.
+- Add richer plan generation with spaced repetition, mood signals, and action tracking.
 - Add commentary provider packages for public-domain sources.
 - Add an OpenAI-compatible or other LLM adapter behind the `LLMProvider` interface.
+
 
