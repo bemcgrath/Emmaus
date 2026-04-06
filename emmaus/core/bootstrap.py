@@ -1,6 +1,6 @@
-﻿from emmaus.core.config import Settings
+from emmaus.core.config import Settings
 from emmaus.providers.commentary import CommentaryProviderRegistry, NotesPlaceholderCommentaryProvider
-from emmaus.providers.llm import LLMProviderRegistry, NullLLMProvider
+from emmaus.providers.llm import LLMProviderRegistry, NullLLMProvider, OllamaProvider
 from emmaus.providers.text import LocalJsonBibleTextProvider, RemoteApiBibleTextProvider, TextProviderRegistry
 from emmaus.repositories.study import SQLiteStudyRepository
 from emmaus.services.agent import AdaptiveStudyAgent
@@ -36,6 +36,7 @@ class Container:
         )
 
 
+
 def build_container() -> Container:
     container = Container()
     data_dir = container.settings.data_dir
@@ -68,5 +69,19 @@ def build_container() -> Container:
             name="Commentary Placeholder",
         )
     )
-    container.llm_registry.register(NullLLMProvider(source_id="local_rules"))
+
+    if OllamaProvider.is_available(
+        base_url=container.settings.ollama_base_url,
+        timeout_seconds=container.settings.ollama_connect_timeout_seconds,
+    ):
+        container.llm_registry.register(
+            OllamaProvider(
+                source_id="local_rules",
+                base_url=container.settings.ollama_base_url,
+                model=container.settings.ollama_model,
+                request_timeout_seconds=container.settings.ollama_request_timeout_seconds,
+            )
+        )
+    else:
+        container.llm_registry.register(NullLLMProvider(source_id="local_rules"))
     return container

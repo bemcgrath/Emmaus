@@ -100,6 +100,32 @@ tests/            API and frontend smoke tests
 
 - `GET /v1/engagement/streaks/{user_id}`
 
+## Local LLM via Ollama
+
+Emmaus now supports a real local LLM path through Ollama.
+
+By default, Emmaus checks whether Ollama is reachable at `http://127.0.0.1:11434`. If it is, the existing `local_rules` provider automatically uses the configured Ollama model. If not, Emmaus falls back to the null provider so local development still works.
+
+Default model:
+
+- `phi3.5`
+
+Helpful env vars:
+
+- `EMMAUS_OLLAMA_BASE_URL`
+- `EMMAUS_OLLAMA_MODEL`
+- `EMMAUS_OLLAMA_CONNECT_TIMEOUT_SECONDS`
+- `EMMAUS_OLLAMA_REQUEST_TIMEOUT_SECONDS`
+
+Typical local setup:
+
+```bash
+ollama pull phi3.5
+ollama serve
+uvicorn emmaus.main:app --reload
+```
+
+Once Ollama is running locally, Emmaus will begin using it for session guidance through the `local_rules` provider without any route changes.
 ## Running locally
 
 ```bash
