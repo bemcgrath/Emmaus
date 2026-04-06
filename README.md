@@ -10,6 +10,7 @@ The app is designed around a personalized guide that helps users read, understan
 - [Product Blueprint](docs/PRODUCT_BLUEPRINT.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Bible Source Connection](docs/BIBLE_SOURCE_CONNECTION.md)
+- [ESV Setup](docs/ESV_SETUP.md)
 
 ## Core Product Direction
 
@@ -65,6 +66,8 @@ tests/            API and frontend smoke tests
 - `POST /v1/sources/text/local`
 - `POST /v1/sources/text/upload`
 - `POST /v1/sources/text/api`
+- `POST /v1/sources/text/esv`
+- `GET /v1/sources/text/templates`
 
 ### Text lookup
 
@@ -163,13 +166,17 @@ The current connection flow is:
 
 Current supported source types:
 
+- Included starter Bible: Emmaus ships with a public-domain starter source so a user can begin immediately.
+- ESV connection: connect ESV with a Crossway API key through POST /v1/sources/text/esv or the mobile source manager.
 - Local file path: register a local JSON Bible file with POST /v1/sources/text/local.
 - Uploaded local JSON: upload a Bible JSON file directly from the app with POST /v1/sources/text/upload.
 - API-backed source: register a remote Bible API adapter with POST /v1/sources/text/api and an optional API key.
 
 Once registered, the source appears in `GET /v1/sources/text`, and the user can reference it by `source_id` either as `preferred_translation_source_id` on the profile or `text_source_id` when starting a session.
 
-The current web client now includes a mobile-friendly Bible source manager. Users can choose an existing source with one tap, upload a local JSON Bible file, or connect an API-backed source directly from the app.
+The current web client now includes a mobile-friendly, translation-first Bible source manager. Users can choose a translation card first, then Emmaus routes them into the right setup path: included starter Bible, ESV API key, upload, or another provider.
+
+If `EMMAUS_ESV_API_KEY` is configured for a deployment, Emmaus registers ESV automatically at startup and uses it as the effective default source unless another default is explicitly configured.
 
 See [docs/BIBLE_SOURCE_CONNECTION.md](docs/BIBLE_SOURCE_CONNECTION.md) for the exact request flow and examples.
 

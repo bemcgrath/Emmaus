@@ -1,7 +1,7 @@
 from emmaus.core.config import Settings
 from emmaus.providers.commentary import CommentaryProviderRegistry, NotesPlaceholderCommentaryProvider
 from emmaus.providers.llm import LLMProviderRegistry, NullLLMProvider, OllamaProvider
-from emmaus.providers.text import LocalJsonBibleTextProvider, RemoteApiBibleTextProvider, TextProviderRegistry
+from emmaus.providers.text import ESVBibleTextProvider, LocalJsonBibleTextProvider, RemoteApiBibleTextProvider, TextProviderRegistry
 from emmaus.repositories.study import SQLiteStudyRepository
 from emmaus.services.agent import AdaptiveStudyAgent
 from emmaus.services.personalization import PersonalizationService
@@ -16,10 +16,15 @@ class Container:
         self.commentary_registry = CommentaryProviderRegistry()
         self.llm_registry = LLMProviderRegistry()
         self.study_repository = SQLiteStudyRepository(self.settings.database_path)
+        effective_default_text_source = (
+            "esv"
+            if self.settings.esv_api_key and self.settings.default_text_source == "sample_local"
+            else self.settings.default_text_source
+        )
         self.text_service = TextSourceService(
             registry=self.text_registry,
             data_dir=self.settings.data_dir,
-            default_source=self.settings.default_text_source,
+            default_source=effective_default_text_source,
         )
         self.study_service = StudyService(
             repository=self.study_repository,
@@ -51,9 +56,19 @@ def build_container() -> Container:
         container.text_registry.register(
             LocalJsonBibleTextProvider(
                 source_id="sample_local",
-                name="Sample Public Domain Local Source",
+                name="Included Starter Bible",
                 file_path=sample_file,
                 license_name="Public Domain",
+            )
+        )
+
+    if container.settings.esv_api_key:
+        container.text_registry.register(
+            ESVBibleTextProvider(
+                source_id="esv",
+                name="ESV",
+                api_key=container.settings.esv_api_key,
+                license_name="Crossway API Terms",
             )
         )
 

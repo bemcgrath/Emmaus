@@ -1,6 +1,6 @@
 # Bible Source Connection
 
-This document explains how Emmaus connects users to Bible text without bundling proprietary content.
+This document explains how Emmaus connects users to Bible text without bundling proprietary content in the repository.
 
 ## Principle
 
@@ -8,9 +8,43 @@ Emmaus separates Bible text retrieval from study logic.
 
 The agent, personalization engine, and study flow never depend on one publisher or vendor format. They ask the text-source layer for a passage, and the provider returns a normalized passage payload.
 
+## Default behavior
+
+Emmaus includes a starter Bible so a new user can begin immediately.
+
+That starter source is safe for the open-source repo because it uses public-domain text. Proprietary sources such as ESV are connected at runtime instead of being bundled into the codebase.
+
 ## Supported connection paths
 
-### 1. Local file source
+### 1. Included starter Bible
+
+Emmaus registers a starter source at boot when the bundled sample data is present.
+
+This gives new users a one-tap Bible choice even before they connect anything else.
+
+### 2. ESV through the official API
+
+A user can connect ESV with a Crossway API key.
+
+Endpoint:
+
+- `POST /v1/sources/text/esv`
+
+Request body:
+
+```json
+{
+  "api_key": "your-esv-api-key",
+  "source_id": "esv",
+  "name": "ESV"
+}
+```
+
+Emmaus registers ESV as a runtime API-backed source and can make it the user's default Bible immediately after connection.
+
+If `EMMAUS_ESV_API_KEY` is set for a deployment, Emmaus also auto-registers ESV at startup.
+
+### 3. Local file source
 
 A user can register a local JSON Bible file.
 
@@ -24,20 +58,36 @@ Request body:
 {
   "source_id": "my_local_kjv",
   "name": "My Local KJV",
-  "file_path": "C:\\path\\to\\bible.json",
+  "file_path": "C:\path\to\bible.json",
   "license_name": "Public Domain"
 }
 ```
 
-This creates a local-file provider that Emmaus can call when it needs a passage.
+### 4. Uploaded local JSON source
 
-### 2. Uploaded local JSON source`r`n`r`nA user can choose a JSON file from the mobile web client or any browser and upload it directly to Emmaus.`r`n`r`nEndpoint:`r`n`r`n- `POST /v1/sources/text/upload``r`n`r`nRequest body:`r`n`r`n```json`r`n{`r`n  "source_id": "my_uploaded_bible",`r`n  "name": "My Uploaded Bible",`r`n  "filename": "my_bible.json",`r`n  "file_content": "{...json contents...}",`r`n  "license_name": "Public Domain"`r`n}`r`n```
+A user can choose a JSON file from the mobile web client or any browser and upload it directly to Emmaus.
+
+Endpoint:
+
+- `POST /v1/sources/text/upload`
+
+Request body:
+
+```json
+{
+  "source_id": "my_uploaded_bible",
+  "name": "My Uploaded Bible",
+  "filename": "my_bible.json",
+  "file_content": "{...json contents...}",
+  "license_name": "Public Domain"
+}
+```
 
 Emmaus stores the uploaded JSON under its data directory, registers it as a local provider, and makes it immediately available in the source list.
 
-### 3. API-backed source
+### 5. Generic API-backed source
 
-A user can register a remote Bible API adapter.
+A user can register another remote Bible API adapter.
 
 Endpoint:
 
@@ -55,15 +105,15 @@ Request body:
 }
 ```
 
-This creates a remote provider entry. The current implementation includes the adapter seam and placeholder response behavior so the app stays modular while users bring their own API-backed text.
+This keeps Emmaus modular even when the user brings a licensed or custom text API.
 
 ## How the app uses a registered source
 
-After a source is registered, the source appears in:
+After a source is registered, it appears in:
 
 - `GET /v1/sources/text`
 
-The user can then choose that source in one of two ways:
+The user can then choose that source in one of two ways.
 
 ### Save it on the profile
 
@@ -79,7 +129,7 @@ Example:
 
 ```json
 {
-  "preferred_translation_source_id": "my_local_kjv"
+  "preferred_translation_source_id": "esv"
 }
 ```
 
@@ -98,7 +148,7 @@ Example:
 ```json
 {
   "user_id": "demo-user",
-  "text_source_id": "my_local_kjv",
+  "text_source_id": "esv",
   "requested_minutes": 15
 }
 ```
@@ -106,14 +156,21 @@ Example:
 ## Runtime flow
 
 1. Emmaus receives a request for a passage or a study session.
-2. The app resolves a `source_id` from the session request or the user's saved preference.
+2. The app resolves a `source_id` from the session request, the user's saved preference, or the configured default source.
 3. `TextSourceService` asks the provider registry for that source.
 4. The provider returns a normalized passage object.
 5. The agent and study services use that normalized passage without needing to know where the text came from.
 
-## Important current note
+## Mobile UX note
 
-The current mobile web client lets users do all three source tasks in-app: view connected sources, make one the default Bible, and add a new source through either JSON upload or API connection.
+The mobile web client now supports a translation-first chooser, so the setup starts with the Bible the user wants rather than with provider jargon. Emmaus currently guides users into these paths:
+
+- Included Starter Bible: one tap and begin
+- ESV: connect with an API key
+- WEB, KJV, ASV: upload a JSON file from this device
+- Other licensed translations: connect a provider/API
+
+Emmaus also exposes `GET /v1/sources/text/templates` so clients can render these translation setup options consistently.
 
 ## Why this matters
 

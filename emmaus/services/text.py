@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import json
-
 from pathlib import Path
 
 from emmaus.domain.models import PassageReference, PassageText, TextSourceDescriptor
-from emmaus.providers.text import LocalJsonBibleTextProvider, RemoteApiBibleTextProvider, TextProviderRegistry
+from emmaus.providers.text import ESVBibleTextProvider, LocalJsonBibleTextProvider, RemoteApiBibleTextProvider, TextProviderRegistry
 
 
 class TextSourceService:
@@ -39,6 +38,22 @@ class TextSourceService:
             source_id=source_id,
             name=name,
             base_url=base_url,
+            api_key=api_key,
+            license_name=license_name,
+        )
+        self.registry.register(provider)
+        return provider.descriptor
+
+    def register_esv_source(
+        self,
+        api_key: str,
+        source_id: str = "esv",
+        name: str = "ESV",
+        license_name: str = "Crossway API Terms",
+    ) -> TextSourceDescriptor:
+        provider = ESVBibleTextProvider(
+            source_id=source_id,
+            name=name,
             api_key=api_key,
             license_name=license_name,
         )

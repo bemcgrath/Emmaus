@@ -95,8 +95,10 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "Demo Mode" in response.text
     assert "data-demo-scenario=\"comprehension_gap\"" in response.text
     assert "data-demo-scenario=\"scheduled_nudge\"" in response.text
+    assert "translation-template-list" in response.text
     assert "source-library" in response.text
     assert "source-use-starter" in response.text
+    assert "source-esv-form" in response.text
     assert "source-upload-form" in response.text
     assert "source-advanced-toggle" in response.text
     assert "onboarding-step-pill" in response.text
@@ -115,6 +117,10 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "comprehension_gap" in asset.text
     assert "setPreferredBibleSource" in asset.text
     assert "buildGeneratedSourceId" in asset.text
+    assert "onConnectEsvSource" in asset.text
+    assert "renderTranslationTemplates" in asset.text
+    assert "onTranslationTemplateClick" in asset.text
+    assert "buildPassageMarkup" in asset.text
     assert "deriveOnboardingStep" in asset.text
     assert "renderMemorySummary" in asset.text
     assert "buildSessionContextCard" in asset.text
@@ -130,6 +136,19 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "source-upload-file" in asset.text
     assert "followUpOutcomeSelect" in asset.text
     assert "delivery_status" in asset.text
+
+
+
+def test_text_source_templates_expose_translation_first_setup_options(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    response = client.get("/v1/sources/text/templates")
+    assert response.status_code == 200
+    payload = response.json()
+    items = payload["items"]
+    assert any(item["template_id"] == "starter" for item in items)
+    assert any(item["template_id"] == "esv" and item["setup_mode"] == "esv_api" for item in items)
+    assert any(item["template_id"] == "kjv" and item["setup_mode"] == "upload" for item in items)
+    assert any(item["template_id"] == "licensed_other" and item["setup_mode"] == "generic_api" for item in items)
 
 
 
@@ -179,6 +198,91 @@ def test_uploaded_text_source_can_be_registered_and_used(tmp_path, monkeypatch):
     assert payload["source_id"] == "uploaded_demo"
     assert "In the beginning was the Word." in payload["text"]
 
+
+
+def test_esv_text_source_can_be_registered_and_used(tmp_path, monkeypatch):
+    def fake_urlopen(req, timeout=15):
+        class DummyResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return json.dumps({
+                    "canonical": "John 3:16-17",
+                    "passages": ["For God so loved the world, that he gave his only Son, that whoever believes in him should not perish but have eternal life."],
+                }).encode("utf-8")
+
+        return DummyResponse()
+
+    monkeypatch.setattr("emmaus.providers.text.request.urlopen", fake_urlopen)
+    client = build_client(tmp_path, monkeypatch)
+
+    registered = client.post(
+        "/v1/sources/text/esv",
+        json={"api_key": "secret-esv-key"},
+    )
+    assert registered.status_code == 201
+    descriptor = registered.json()
+    assert descriptor["source_id"] == "esv"
+    assert descriptor["metadata"]["vendor"] == "esv"
+
+    passage = client.post(
+        "/v1/texts/passage",
+        json={
+            "source_id": "esv",
+            "book": "John",
+            "chapter": 3,
+            "start_verse": 16,
+            "end_verse": 17,
+        },
+    )
+    assert passage.status_code == 200
+    payload = passage.json()
+    assert payload["source_id"] == "esv"
+    assert payload["translation_name"] == "ESV"
+    assert "For God so loved the world" in payload["text"]
+    assert "Crossway" in payload["copyright_notice"]
+
+
+def test_configured_esv_becomes_effective_default_source(tmp_path, monkeypatch):
+    def fake_urlopen(req, timeout=15):
+        class DummyResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return json.dumps({
+                    "canonical": "Psalm 23:1-3",
+                    "passages": ["The Lord is my shepherd; I shall not want. He makes me lie down in green pastures."],
+                }).encode("utf-8")
+
+        return DummyResponse()
+
+    monkeypatch.setenv("EMMAUS_ESV_API_KEY", "configured-esv-key")
+    monkeypatch.setattr("emmaus.providers.text.request.urlopen", fake_urlopen)
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "requested_minutes": 10,
+        },
+    )
+    assert start.status_code == 200
+    payload = start.json()
+    assert payload["session"]["text_source_id"] == "esv"
+    assert payload["passage"]["source_id"] == "esv"
 
 
 def test_update_preferences_and_profile(tmp_path, monkeypatch):

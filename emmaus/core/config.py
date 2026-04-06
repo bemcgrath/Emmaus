@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     ollama_model: str = "phi3.5"
     ollama_connect_timeout_seconds: float = 0.25
     ollama_request_timeout_seconds: float = 20.0
+    esv_api_key: str | None = None
 
     model_config = SettingsConfigDict(
         env_prefix="EMMAUS_",

@@ -1,6 +1,16 @@
+const STARTER_SOURCE_ID = "sample_local";
+const ESV_SOURCE_ID = "esv";
 const DEFAULT_TEXT_SOURCES = [
-  { source_id: "sample_local", name: "Sample Public Domain Local Source" },
+  { source_id: STARTER_SOURCE_ID, name: "Included Starter Bible" },
   { source_id: "user_api_placeholder", name: "User API Placeholder" },
+];
+const DEFAULT_TRANSLATION_TEMPLATES = [
+  { template_id: "starter", name: "Included Starter Bible", setup_mode: "starter", description: "Begin immediately with the Bible already included in Emmaus.", recommended: true, source_id: STARTER_SOURCE_ID },
+  { template_id: "esv", name: "ESV", setup_mode: "esv_api", description: "Connect the official ESV API with your Crossway API key.", recommended: false, source_id: ESV_SOURCE_ID },
+  { template_id: "web", name: "WEB", setup_mode: "upload", description: "Upload a WEB JSON file from this device.", recommended: false, source_id: null },
+  { template_id: "kjv", name: "KJV", setup_mode: "upload", description: "Upload a KJV JSON file or connect the source you already use.", recommended: false, source_id: null },
+  { template_id: "asv", name: "ASV", setup_mode: "upload", description: "Upload an ASV JSON file from this device.", recommended: false, source_id: null },
+  { template_id: "licensed_other", name: "Other licensed translation", setup_mode: "generic_api", description: "Connect another licensed provider such as NIV, NLT, NKJV, NASB, or CSB.", recommended: false, source_id: null },
 ];
 
 const DEMO_SCENARIO_LABELS = {
@@ -31,6 +41,7 @@ const state = {
   actionItems: [],
   onboardingStep: 1,
   textSources: [],
+  translationTemplates: [],
 };
 
 const elements = {};
@@ -164,8 +175,22 @@ function initializeDefaults() {
 }
 
 async function loadApp() {
+  await loadTranslationTemplates();
   await loadTextSources();
   await refreshExperience({ restoreScreen: true });
+}
+
+async function loadTranslationTemplates() {
+  if (isDemoMode()) {
+    state.translationTemplates = DEFAULT_TRANSLATION_TEMPLATES;
+    return;
+  }
+  try {
+    const response = await fetchJson("/v1/sources/text/templates");
+    state.translationTemplates = response.items || DEFAULT_TRANSLATION_TEMPLATES;
+  } catch {
+    state.translationTemplates = DEFAULT_TRANSLATION_TEMPLATES;
+  }
 }
 
 async function refreshExperience({ restoreScreen = false } = {}) {
@@ -189,6 +214,34 @@ async function loadTextSources() {
     state.textSources = DEFAULT_TEXT_SOURCES;
   }
   renderTextSourceOptions();
+}
+
+function getSourceById(sourceId) {
+  const sources = state.textSources.length ? state.textSources : DEFAULT_TEXT_SOURCES;
+  return sources.find((source) => source.source_id === sourceId) || null;
+}
+
+function getEffectivePreferredSourceId(sources) {
+  const explicitPreference = state.profile?.preferences?.preferred_translation_source_id || elements.preferredSourceSelect?.value || "";
+  if (explicitPreference) {
+    return explicitPreference;
+  }
+  if (sources.some((source) => source.source_id === ESV_SOURCE_ID)) {
+    return ESV_SOURCE_ID;
+  }
+  return sources[0]?.source_id || "";
+}
+
+function buildPassageMarkup(passage) {
+  if (!passage?.text) {
+    return "Start a session to see the passage, plan, and first question.";
+  }
+
+  const passageBody = escapeHtml(passage.text).replace(/\n/g, "<br />");
+  const notice = passage.copyright_notice
+    ? `<p class="passage-notice">${escapeHtml(passage.copyright_notice)}</p>`
+    : "";
+  return `${passageBody}${notice}`;
 }
 
 function renderTextSourceOptions() {
@@ -305,7 +358,7 @@ function buildDemoScenarioData(scenario) {
     user_id: "demo-user",
     display_name: "Brian",
     preferences: {
-      preferred_translation_source_id: "sample_local",
+      preferred_translation_source_id: STARTER_SOURCE_ID,
       preferred_difficulty: "balanced",
       preferred_session_minutes: 15,
       preferred_guide_mode: "coach",
@@ -392,7 +445,7 @@ function buildDemoScenarioData(scenario) {
       entry_point: "continue where I left off",
       guide_mode: "coach",
       requested_minutes: 15,
-      text_source_id: "sample_local",
+      text_source_id: STARTER_SOURCE_ID,
       commentary_source_id: "notes_placeholder",
       llm_source_id: "local_rules",
       reference: { book: "John", chapter: 3, start_verse: 16, end_verse: 17 },
@@ -414,8 +467,8 @@ function buildDemoScenarioData(scenario) {
       action_item_id: null,
     },
     passage: {
-      source_id: "sample_local",
-      translation_name: "Sample Public Domain Local Source",
+      source_id: STARTER_SOURCE_ID,
+      translation_name: "Included Starter Bible",
       reference: { book: "John", chapter: 3, start_verse: 16, end_verse: 17 },
       text: "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life. For God sent not his Son into the world to condemn the world; but that the world through him might be saved.",
       copyright_notice: "Public Domain",
@@ -909,6 +962,61 @@ function renderHero(profile, recommendation, activeSession, actionItems) {
   elements.heroPrimaryButton.textContent = "Start Today's Plan";
 }
 
+function getTranslationTemplates() {
+  return state.translationTemplates.length ? state.translationTemplates : DEFAULT_TRANSLATION_TEMPLATES;
+}
+
+function renderTranslationTemplates(sources, preferredSourceId) {
+  const sourceUi = bibleSourceElements();
+  if (!sourceUi.templateList) {
+    return;
+  }
+
+  const templates = getTranslationTemplates();
+  sourceUi.templateList.innerHTML = `
+    <div class="translation-template-grid">
+      ${templates.map((template) => buildTranslationTemplateCard(template, sources, preferredSourceId)).join("")}
+    </div>
+  `;
+}
+
+function buildTranslationTemplateCard(template, sources, preferredSourceId) {
+  const connectedSource = template.source_id ? sources.find((source) => source.source_id === template.source_id) : null;
+  const isCurrent = Boolean(connectedSource && preferredSourceId === connectedSource.source_id);
+  let actionLabel = "Choose";
+  if (template.setup_mode === "starter") {
+    actionLabel = isCurrent ? "Using now" : "Use included Bible";
+  } else if (template.setup_mode === "esv_api") {
+    actionLabel = connectedSource ? (isCurrent ? "Using ESV" : "Use connected ESV") : "Connect ESV";
+  } else if (template.setup_mode === "upload") {
+    actionLabel = `Set up ${template.name}`;
+  } else {
+    actionLabel = `Connect ${template.name}`;
+  }
+
+  const meta = [];
+  if (template.recommended) {
+    meta.push('<span class="meta-pill">Recommended</span>');
+  }
+  if (isCurrent) {
+    meta.push('<span class="meta-pill">Current</span>');
+  } else if (connectedSource) {
+    meta.push('<span class="meta-pill">Connected</span>');
+  }
+  meta.push(`<span class="meta-pill">${escapeHtml(sentenceCase(template.setup_mode.replaceAll("_", " ")))}</span>`);
+
+  return `
+    <article class="action-card translation-template-card ${isCurrent ? "selected" : ""}">
+      <div>
+        <p><strong>${escapeHtml(template.name)}</strong></p>
+        <p>${escapeHtml(template.description)}</p>
+      </div>
+      <div class="template-meta">${meta.join("")}</div>
+      <button class="action-button" type="button" data-template-action="${escapeHtml(template.setup_mode)}" data-template-name="${escapeHtml(template.name)}" ${isCurrent ? "disabled" : ""}>${escapeHtml(actionLabel)}</button>
+    </article>
+  `;
+}
+
 function renderProfile(profile) {
   const preferences = profile?.preferences || {};
   elements.userIdInput.value = profile?.user_id || state.userId;
@@ -1047,6 +1155,7 @@ function renderOnboarding(profile, streaks, activeSession, actionItems) {
         <p class="today-plan-copy">Most people should start with the included Bible and begin studying right away.</p>
         <div class="source-quick-actions">
           <button class="primary-button full-width" type="button" data-action="onboarding-use-starter">Use included starter Bible</button>
+          <button class="secondary-button full-width" type="button" data-action="onboarding-use-esv">${getSourceById(ESV_SOURCE_ID) ? "Use connected ESV" : "Connect ESV with API key"}</button>
           <button class="secondary-button full-width" type="button" data-action="onboarding-focus-upload">Upload Bible from this device</button>
           <button class="secondary-button full-width" type="button" data-action="onboarding-focus-advanced">Use a licensed provider</button>
         </div>
@@ -1426,7 +1535,7 @@ function renderSessionStart(payload, { navigate = true } = {}) {
       </div>
     </div>
   `;
-  elements.passageText.textContent = payload.passage?.text || "No passage is available yet.";
+  elements.passageText.innerHTML = buildPassageMarkup(payload.passage);
   elements.sessionPlan.innerHTML = safeArray(session.plan).length
     ? safeArray(session.plan)
         .map(
@@ -1485,7 +1594,7 @@ function clearSessionView() {
   elements.sessionReference.textContent = "No active session yet";
   elements.questionProgressPill.textContent = "0 / 0";
   elements.sessionHero.innerHTML = '<p class="empty-state">Start a session to see the passage, plan, and first question.</p>';
-  elements.passageText.textContent = "Start a session to see the passage, plan, and first question.";
+  elements.passageText.innerHTML = "Start a session to see the passage, plan, and first question.";
   elements.sessionPlan.innerHTML = '<p class="empty-state">Your study plan will appear here once a session starts.</p>';
   elements.commentaryBlock.innerHTML = "";
   elements.currentQuestionHeading.textContent = "Current question";
@@ -1673,7 +1782,17 @@ async function onOnboardingAction(event) {
   }
   if (action === "onboarding-use-starter") {
     setStoredOnboardingStep(2);
-    await setPreferredBibleSource("sample_local", { successMessage: "Starter Bible selected." });
+    await setPreferredBibleSource(STARTER_SOURCE_ID, { successMessage: "Starter Bible selected." });
+    return;
+  }
+  if (action === "onboarding-use-esv") {
+    const esvSource = getSourceById(ESV_SOURCE_ID);
+    if (esvSource) {
+      setStoredOnboardingStep(2);
+      await setPreferredBibleSource(ESV_SOURCE_ID, { successMessage: "ESV selected." });
+      return;
+    }
+    onFocusEsvSource();
     return;
   }
   if (action === "onboarding-focus-upload") {
@@ -2180,9 +2299,13 @@ async function loadTextSources() {
 
 function bibleSourceElements() {
   return {
+    templateList: document.getElementById("translation-template-list"),
     library: document.getElementById("source-library"),
     copy: document.getElementById("source-manager-copy"),
     useStarterButton: document.getElementById("source-use-starter"),
+    focusEsvButton: document.getElementById("source-focus-esv"),
+    esvForm: document.getElementById("source-esv-form"),
+    esvKey: document.getElementById("source-esv-key"),
     advancedToggle: document.getElementById("source-advanced-toggle"),
     advancedPanel: document.getElementById("source-advanced-panel"),
     uploadForm: document.getElementById("source-upload-form"),
@@ -2197,8 +2320,11 @@ function bibleSourceElements() {
 
 document.addEventListener("DOMContentLoaded", () => {
   const sourceUi = bibleSourceElements();
+  sourceUi.templateList?.addEventListener("click", onTranslationTemplateClick);
   sourceUi.library?.addEventListener("click", onSourceLibraryClick);
   sourceUi.useStarterButton?.addEventListener("click", onUseStarterBible);
+  sourceUi.focusEsvButton?.addEventListener("click", onPrimaryEsvAction);
+  sourceUi.esvForm?.addEventListener("submit", onConnectEsvSource);
   sourceUi.advancedToggle?.addEventListener("click", onToggleAdvancedBibleSetup);
   sourceUi.uploadForm?.addEventListener("submit", onUploadBibleSource);
   sourceUi.apiForm?.addEventListener("submit", onConnectBibleApiSource);
@@ -2227,7 +2353,7 @@ function renderTextSourceOptions() {
   elements.textSourceSelect.innerHTML = options;
   elements.preferredSourceSelect.innerHTML = options;
 
-  const preferredSourceId = state.profile?.preferences?.preferred_translation_source_id || sources[0]?.source_id || "";
+  const preferredSourceId = getEffectivePreferredSourceId(sources);
   const sessionSourceId = state.activeSessionPayload?.session?.text_source_id || preferredSourceId;
 
   if (preferredSourceId) {
@@ -2266,21 +2392,32 @@ function renderBibleSourceManager() {
   const sources = (state.textSources.length ? state.textSources : DEFAULT_TEXT_SOURCES).filter(
     (source) => source.source_id !== "user_api_placeholder",
   );
-  const preferredSourceId = state.profile?.preferences?.preferred_translation_source_id || elements.preferredSourceSelect?.value || "";
+  const preferredSourceId = getEffectivePreferredSourceId(sources);
   const preferredSource = sources.find((source) => source.source_id === preferredSourceId) || null;
-  const starterSource = sources.find((source) => source.source_id === "sample_local") || null;
+  const starterSource = sources.find((source) => source.source_id === STARTER_SOURCE_ID) || null;
+  const esvSource = sources.find((source) => source.source_id === ESV_SOURCE_ID) || null;
 
   sourceUi.copy.textContent = preferredSource
     ? `Current Bible: ${preferredSource.name}. Pick another one any time.`
-    : "Pick a Bible and start studying. You can always change it later.";
+    : "Choose a translation first, then let Emmaus guide you through the easiest setup.";
+
+  renderTranslationTemplates(sources, preferredSourceId);
 
   if (sourceUi.useStarterButton) {
-    const starterActive = preferredSourceId === "sample_local";
+    const starterActive = preferredSourceId === STARTER_SOURCE_ID;
     sourceUi.useStarterButton.disabled = !starterSource || starterActive;
     sourceUi.useStarterButton.textContent = starterActive ? "Using included starter Bible" : "Use included starter Bible";
   }
 
-  const connectedSources = sources.filter((source) => source.source_id !== "sample_local");
+  if (sourceUi.focusEsvButton) {
+    const esvActive = preferredSourceId === ESV_SOURCE_ID;
+    sourceUi.focusEsvButton.disabled = Boolean(esvSource && esvActive);
+    sourceUi.focusEsvButton.textContent = esvSource
+      ? (esvActive ? "Using connected ESV" : "Use connected ESV")
+      : "Connect ESV";
+  }
+
+  const connectedSources = sources.filter((source) => source.source_id !== STARTER_SOURCE_ID);
   if (!connectedSources.length) {
     sourceUi.library.innerHTML = '<p class="empty-state">No other Bibles are connected yet. You can start with the included Bible or upload one from this device.</p>';
     return;
@@ -2289,7 +2426,11 @@ function renderBibleSourceManager() {
   sourceUi.library.innerHTML = connectedSources
     .map((source) => {
       const isPreferred = source.source_id === preferredSourceId;
-      const providerLabel = source.provider_type === "remote_api" ? "Connected provider" : "Uploaded from this device";
+      const providerLabel = source.source_id === ESV_SOURCE_ID || source.metadata?.vendor === "esv"
+        ? "Official ESV API connection"
+        : source.provider_type === "remote_api"
+          ? "Connected provider"
+          : "Uploaded from this device";
       return `
         <article class="action-card ${isPreferred ? "selected" : ""}">
           <div class="action-card-header">
@@ -2308,6 +2449,45 @@ function renderBibleSourceManager() {
     .join("");
 }
 
+async function onTranslationTemplateClick(event) {
+  const button = event.target.closest("[data-template-action]");
+  if (!button) {
+    return;
+  }
+  const setupMode = button.dataset.templateAction;
+  const translationName = button.dataset.templateName || "Bible";
+
+  if (setupMode === "starter") {
+    await onUseStarterBible();
+    return;
+  }
+  if (setupMode === "esv_api") {
+    await onPrimaryEsvAction();
+    return;
+  }
+  if (setupMode === "upload") {
+    const sourceUi = bibleSourceElements();
+    if (sourceUi.uploadName && !sourceUi.uploadName.value) {
+      sourceUi.uploadName.value = translationName;
+    }
+    sourceUi.uploadForm?.scrollIntoView({ behavior: "smooth", block: "center" });
+    sourceUi.uploadFile?.focus();
+    showToast(`Add a ${translationName} JSON file to finish setup.`);
+    return;
+  }
+
+  const sourceUi = bibleSourceElements();
+  if (sourceUi.apiName && !sourceUi.apiName.value) {
+    sourceUi.apiName.value = translationName;
+  }
+  if (sourceUi.advancedPanel?.classList.contains("hidden")) {
+    onToggleAdvancedBibleSetup();
+  }
+  sourceUi.apiForm?.scrollIntoView({ behavior: "smooth", block: "center" });
+  sourceUi.apiUrl?.focus();
+  showToast(`Connect your ${translationName} provider to use it in Emmaus.`);
+}
+
 async function onSourceLibraryClick(event) {
   const button = event.target.closest("[data-source-prefer]");
   if (!button) {
@@ -2317,7 +2497,22 @@ async function onSourceLibraryClick(event) {
 }
 
 async function onUseStarterBible() {
-  await setPreferredBibleSource("sample_local", { successMessage: "The included starter Bible is now your default." });
+  await setPreferredBibleSource(STARTER_SOURCE_ID, { successMessage: "The included starter Bible is now your default." });
+}
+
+function onFocusEsvSource() {
+  const sourceUi = bibleSourceElements();
+  sourceUi.esvForm?.scrollIntoView({ behavior: "smooth", block: "center" });
+  sourceUi.esvKey?.focus();
+}
+
+async function onPrimaryEsvAction() {
+  const esvSource = getSourceById(ESV_SOURCE_ID);
+  if (esvSource) {
+    await setPreferredBibleSource(ESV_SOURCE_ID, { successMessage: "ESV is now your default Bible." });
+    return;
+  }
+  onFocusEsvSource();
 }
 
 function onToggleAdvancedBibleSetup() {
@@ -2329,6 +2524,33 @@ function onToggleAdvancedBibleSetup() {
   sourceUi.advancedPanel.classList.toggle("hidden", !willShow);
   sourceUi.advancedToggle.setAttribute("aria-expanded", willShow ? "true" : "false");
   sourceUi.advancedToggle.textContent = willShow ? "Hide setup options" : "More setup options";
+}
+
+async function onConnectEsvSource(event) {
+  event.preventDefault();
+  if (!ensureLiveMode("Switch to Live to connect a real Bible source.")) {
+    return;
+  }
+
+  const sourceUi = bibleSourceElements();
+  const apiKey = optionalText(sourceUi.esvKey?.value);
+  if (!apiKey) {
+    showToast("Paste your ESV API key first.");
+    return;
+  }
+
+  const descriptor = await fetchJson("/v1/sources/text/esv", {
+    method: "POST",
+    body: {
+      api_key: apiKey,
+      source_id: ESV_SOURCE_ID,
+      name: "ESV",
+    },
+  });
+
+  setStoredOnboardingStep(2);
+  await setPreferredBibleSource(descriptor.source_id, { successMessage: "ESV is now your default Bible." });
+  sourceUi.esvForm?.reset();
 }
 
 async function onUploadBibleSource(event) {

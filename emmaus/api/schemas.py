@@ -20,6 +20,13 @@ class RegisterApiTextSourceRequest(BaseModel):
     license_name: str = "User Supplied"
 
 
+class RegisterESVTextSourceRequest(BaseModel):
+    api_key: str = Field(min_length=1)
+    source_id: str = Field(default="esv", pattern=r"^[a-z0-9_\-]+$")
+    name: str = "ESV"
+    license_name: str = "Crossway API Terms"
+
+
 class RegisterUploadedTextSourceRequest(BaseModel):
     source_id: str = Field(pattern=r"^[a-z0-9_\-]+$")
     name: str

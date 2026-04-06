@@ -1,8 +1,10 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
+import re
 from abc import ABC, abstractmethod
 from pathlib import Path
+from urllib import error, parse, request
 
 from emmaus.domain.models import PassageReference, PassageText, TextSourceDescriptor
 
@@ -101,4 +103,70 @@ class RemoteApiBibleTextProvider(BibleTextProvider):
                 f"Connect your own service at {self.base_url} and fetch '{ref}' through the adapter."
             ),
             copyright_notice="User-supplied API source",
+        )
+
+
+class ESVBibleTextProvider(BibleTextProvider):
+    api_url = "https://api.esv.org/v3/passage/text/"
+
+    def __init__(
+        self,
+        source_id: str = "esv",
+        name: str = "ESV",
+        api_key: str | None = None,
+        license_name: str = "Crossway API Terms",
+    ) -> None:
+        self.api_key = api_key or ""
+        self.descriptor = TextSourceDescriptor(
+            source_id=source_id,
+            name=name,
+            provider_type="remote_api",
+            license_name=license_name,
+            supports_api_key=True,
+            metadata={
+                "base_url": self.api_url,
+                "vendor": "esv",
+                "status": "configured" if self.api_key else "missing_api_key",
+            },
+        )
+
+    def get_passage(self, reference: PassageReference) -> PassageText:
+        if not self.api_key:
+            raise RuntimeError("No ESV API key has been configured for this source.")
+
+        ref = f"{reference.book} {reference.chapter}:{reference.start_verse}"
+        if reference.end_verse:
+            ref = f"{ref}-{reference.end_verse}"
+
+        query = parse.urlencode(
+            {
+                "q": ref,
+                "include-headings": "false",
+                "include-footnotes": "false",
+                "include-verse-numbers": "false",
+                "include-short-copyright": "false",
+                "include-passage-references": "false",
+            }
+        )
+        req = request.Request(
+            f"{self.api_url}?{query}",
+            headers={"Authorization": f"Token {self.api_key}"},
+        )
+        try:
+            with request.urlopen(req, timeout=15) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except (error.URLError, TimeoutError) as exc:
+            raise RuntimeError("Unable to reach the ESV API right now.") from exc
+
+        passages = data.get("passages") or []
+        if not passages:
+            raise KeyError(f"Passage '{ref}' was not returned by the ESV API.")
+
+        text = re.sub(r"\s+", " ", " ".join(segment.strip() for segment in passages if segment.strip())).strip()
+        return PassageText(
+            source_id=self.descriptor.source_id,
+            translation_name=self.descriptor.name,
+            reference=reference,
+            text=text,
+            copyright_notice="English Standard Version (ESV), copyright 2001 by Crossway Bibles. All rights reserved.",
         )

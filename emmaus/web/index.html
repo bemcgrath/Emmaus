@@ -97,9 +97,20 @@
             <p class="micro-copy" id="source-manager-copy">Pick a Bible and start studying. You can always change it later.</p>
             <div class="source-quick-actions">
               <button id="source-use-starter" class="primary-button full-width" type="button">Use included starter Bible</button>
+              <button id="source-focus-esv" class="secondary-button full-width" type="button">Connect ESV</button>
               <button id="source-advanced-toggle" class="secondary-button full-width" type="button" aria-expanded="false">More setup options</button>
             </div>
+            <div id="translation-template-list" class="list-stack"></div>
             <div id="source-library" class="list-stack"></div>
+            <form id="source-esv-form" class="stack-form compact-form">
+              <p class="panel-label">Connect ESV</p>
+              <p class="micro-copy">Use your Crossway ESV API key. Emmaus will connect through the official API without bundling the text in this open-source app.</p>
+              <label>
+                <span>ESV API key</span>
+                <input id="source-esv-key" type="password" placeholder="Paste your ESV API key" />
+              </label>
+              <button class="secondary-button full-width" type="submit">Connect ESV</button>
+            </form>
             <form id="source-upload-form" class="stack-form compact-form">
               <p class="panel-label">Upload from device</p>
               <label>
