@@ -46,6 +46,11 @@ class UserPreferences(BaseModel):
     preferred_guide_mode: Literal["guide", "peer", "challenger", "coach"] = "guide"
     nudge_intensity: Literal["gentle", "balanced", "direct"] = "balanced"
     preferred_study_days: list[str] = Field(default_factory=list)
+    timezone: str = "UTC"
+    preferred_study_window_start: str | None = None
+    preferred_study_window_end: str | None = None
+    quiet_hours_start: str | None = None
+    quiet_hours_end: str | None = None
 
 
 class UserProfile(BaseModel):
@@ -185,6 +190,10 @@ class NudgePreview(BaseModel):
     recommended_minutes: int
     recommended_guide_mode: Literal["guide", "peer", "challenger", "coach"]
     recommendation: StudyRecommendation
+    timing_decision: Literal["now", "later_today", "not_today"]
+    timing_reason: str
+    scheduled_for: datetime | None = None
+    local_timezone: str
 
 
 class AgentStudyResponse(BaseModel):

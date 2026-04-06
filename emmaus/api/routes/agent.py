@@ -1,4 +1,6 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
+﻿from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
 
 from emmaus.api.deps import get_container
 from emmaus.api.schemas import AgentSessionRequest, CompleteAgentSessionRequest, NudgePreviewRequest, RespondAgentSessionRequest, StartAgentSessionRequest
@@ -15,7 +17,8 @@ def get_agent_recommendation(user_id: str, container: Container = Depends(get_co
 
 @router.post("/nudges/preview")
 def preview_nudge(payload: NudgePreviewRequest, container: Container = Depends(get_container)):
-    return container.personalization_service.preview_nudge(payload.user_id)
+    preview_at = datetime.fromisoformat(payload.preview_at) if payload.preview_at else None
+    return container.personalization_service.preview_nudge(payload.user_id, preview_at=preview_at)
 
 
 @router.post("/session")

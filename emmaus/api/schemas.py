@@ -133,6 +133,11 @@ class UpdateUserPreferencesRequest(BaseModel):
     preferred_guide_mode: Literal["guide", "peer", "challenger", "coach"] | None = None
     nudge_intensity: Literal["gentle", "balanced", "direct"] | None = None
     preferred_study_days: list[str] | None = None
+    timezone: str | None = None
+    preferred_study_window_start: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    preferred_study_window_end: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    quiet_hours_start: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    quiet_hours_end: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
 
     def preference_updates(self) -> dict[str, object]:
         return {
@@ -142,6 +147,11 @@ class UpdateUserPreferencesRequest(BaseModel):
             "preferred_guide_mode": self.preferred_guide_mode,
             "nudge_intensity": self.nudge_intensity,
             "preferred_study_days": self.preferred_study_days,
+            "timezone": self.timezone,
+            "preferred_study_window_start": self.preferred_study_window_start,
+            "preferred_study_window_end": self.preferred_study_window_end,
+            "quiet_hours_start": self.quiet_hours_start,
+            "quiet_hours_end": self.quiet_hours_end,
         }
 
 
@@ -158,3 +168,4 @@ class CompleteActionItemRequest(BaseModel):
 
 class NudgePreviewRequest(BaseModel):
     user_id: str
+    preview_at: str | None = None

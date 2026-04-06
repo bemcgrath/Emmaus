@@ -1,8 +1,9 @@
 ﻿from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from emmaus.domain.models import MoodCheckIn, NudgePreview, PassageReference, StudyGapReport, StudyRecommendation
+from emmaus.domain.models import MoodCheckIn, NudgePreview, PassageReference, StudyGapReport, StudyRecommendation, UserProfile
 from emmaus.services.study import StudyService
 
 
@@ -160,7 +161,7 @@ class PersonalizationService:
             gap_report=gap_report,
         )
 
-    def preview_nudge(self, user_id: str) -> NudgePreview:
+    def preview_nudge(self, user_id: str, preview_at: datetime | None = None) -> NudgePreview:
         recommendation = self.build_recommendation(user_id)
         profile = self.study_service.get_profile(user_id)
         latest_mood = self.study_service.get_latest_mood_checkin(user_id)
@@ -187,6 +188,8 @@ class PersonalizationService:
             title = "Return to a meaningful thread"
             message = "A focused session can help you keep growing in the area Emmaus has been tracking for you."
 
+        timing_decision, scheduled_for, timing_reason, local_timezone = self._decide_nudge_timing(profile, preview_at)
+
         return NudgePreview(
             user_id=user_id,
             nudge_type=nudge_type,
@@ -196,4 +199,104 @@ class PersonalizationService:
             recommended_minutes=recommendation.recommended_minutes,
             recommended_guide_mode=recommendation.recommended_guide_mode,
             recommendation=recommendation,
+            timing_decision=timing_decision,
+            timing_reason=timing_reason,
+            scheduled_for=scheduled_for,
+            local_timezone=local_timezone,
         )
+
+    def _decide_nudge_timing(
+        self,
+        profile: UserProfile,
+        preview_at: datetime | None,
+    ) -> tuple[str, datetime | None, str, str]:
+        timezone_name = profile.preferences.timezone or "UTC"
+        try:
+            zone = ZoneInfo(timezone_name)
+        except ZoneInfoNotFoundError:
+            zone = ZoneInfo("UTC")
+            timezone_name = "UTC"
+
+        base_time = preview_at or datetime.now(UTC)
+        if base_time.tzinfo is None:
+            base_time = base_time.replace(tzinfo=UTC)
+        local_now = base_time.astimezone(zone)
+
+        if self._outside_preferred_days(profile, local_now):
+            return "not_today", None, "Today is outside the user's preferred study days.", timezone_name
+
+        quiet_start = self._parse_time(profile.preferences.quiet_hours_start)
+        quiet_end = self._parse_time(profile.preferences.quiet_hours_end)
+        window_start = self._parse_time(profile.preferences.preferred_study_window_start)
+        window_end = self._parse_time(profile.preferences.preferred_study_window_end)
+
+        in_quiet = self._in_window(local_now.timetz().replace(tzinfo=None), quiet_start, quiet_end)
+        if in_quiet:
+            quiet_end_dt = self._next_window_end(local_now, quiet_start, quiet_end)
+            candidate = quiet_end_dt
+            if window_start is not None and window_end is not None:
+                window_start_dt = local_now.replace(hour=window_start.hour, minute=window_start.minute, second=0, microsecond=0)
+                if candidate < window_start_dt:
+                    candidate = window_start_dt
+                if not self._same_local_day(local_now, candidate):
+                    return "not_today", None, "Quiet hours cover the rest of today's available study time.", timezone_name
+                if not self._can_fit_in_window(candidate, window_start, window_end):
+                    return "not_today", None, "Quiet hours push the nudge outside today's preferred study window.", timezone_name
+            if self._same_local_day(local_now, candidate):
+                return "later_today", candidate, "It is currently quiet hours, so the nudge should wait.", timezone_name
+            return "not_today", None, "Quiet hours push the next allowed nudge into another day.", timezone_name
+
+        if window_start is None or window_end is None:
+            return "now", None, "No preferred study window is configured, so the nudge can be sent now.", timezone_name
+
+        current_time = local_now.timetz().replace(tzinfo=None)
+        if self._in_window(current_time, window_start, window_end):
+            return "now", None, "The current time falls inside the user's preferred study window.", timezone_name
+
+        window_start_dt = local_now.replace(hour=window_start.hour, minute=window_start.minute, second=0, microsecond=0)
+        window_end_dt = self._next_window_end(local_now, window_start, window_end)
+        if current_time < window_start and self._same_local_day(local_now, window_start_dt):
+            return "later_today", window_start_dt, "The next preferred study window begins later today.", timezone_name
+        if self._same_local_day(local_now, window_end_dt) and current_time < window_end:
+            return "later_today", window_start_dt, "The preferred study window begins later today.", timezone_name
+        return "not_today", None, "Today's preferred study window has already passed.", timezone_name
+
+    def _outside_preferred_days(self, profile: UserProfile, local_now: datetime) -> bool:
+        preferred_days = profile.preferences.preferred_study_days
+        if not preferred_days:
+            return False
+        normalized = {day.strip().lower() for day in preferred_days}
+        names = {local_now.strftime("%A").lower(), local_now.strftime("%a").lower()}
+        return normalized.isdisjoint(names)
+
+    def _parse_time(self, value: str | None) -> time | None:
+        if value is None:
+            return None
+        hour, minute = value.split(":", 1)
+        return time(hour=int(hour), minute=int(minute))
+
+    def _in_window(self, current: time, start: time | None, end: time | None) -> bool:
+        if start is None or end is None:
+            return False
+        if start == end:
+            return False
+        if start < end:
+            return start <= current < end
+        return current >= start or current < end
+
+    def _next_window_end(self, current_dt: datetime, start: time | None, end: time | None) -> datetime:
+        assert start is not None and end is not None
+        candidate = current_dt.replace(hour=end.hour, minute=end.minute, second=0, microsecond=0)
+        if start < end:
+            return candidate
+        current_time = current_dt.timetz().replace(tzinfo=None)
+        if current_time >= start:
+            return candidate + timedelta(days=1)
+        return candidate
+
+    def _same_local_day(self, current_dt: datetime, candidate: datetime) -> bool:
+        return current_dt.date() == candidate.date()
+
+    def _can_fit_in_window(self, candidate: datetime, start: time, end: time) -> bool:
+        candidate_time = candidate.timetz().replace(tzinfo=None)
+        return self._in_window(candidate_time, start, end) or candidate_time == start

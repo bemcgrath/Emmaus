@@ -29,6 +29,11 @@ def test_update_preferences_and_profile(tmp_path, monkeypatch):
             "preferred_guide_mode": "coach",
             "preferred_difficulty": "gentle",
             "preferred_translation_source_id": "sample_local",
+            "timezone": "America/New_York",
+            "preferred_study_window_start": "08:00",
+            "preferred_study_window_end": "09:00",
+            "quiet_hours_start": "21:00",
+            "quiet_hours_end": "07:00",
         },
     )
     assert update_response.status_code == 200
@@ -36,12 +41,14 @@ def test_update_preferences_and_profile(tmp_path, monkeypatch):
     assert profile["display_name"] == "Brian"
     assert profile["preferences"]["preferred_session_minutes"] == 15
     assert profile["preferences"]["preferred_guide_mode"] == "coach"
+    assert profile["preferences"]["timezone"] == "America/New_York"
 
     profile_response = client.get("/v1/users/demo-user/profile")
     assert profile_response.status_code == 200
     fetched = profile_response.json()
     assert fetched["user_id"] == "demo-user"
     assert fetched["preferences"]["preferred_translation_source_id"] == "sample_local"
+    assert fetched["preferences"]["preferred_study_window_start"] == "08:00"
 
 
 def test_phase_one_guided_session_flow(tmp_path, monkeypatch):
@@ -193,3 +200,54 @@ def test_mood_shapes_recommendation_and_nudge_preview(tmp_path, monkeypatch):
     assert nudge_payload["nudge_type"] == "encouragement"
     assert nudge_payload["recommended_minutes"] <= 10
     assert nudge_payload["recommendation"]["recommended_reference"]["book"] == "Psalm"
+
+
+def test_nudge_timing_respects_windows_and_quiet_hours(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    client.patch(
+        "/v1/users/demo-user/preferences",
+        json={
+            "timezone": "America/New_York",
+            "preferred_study_days": ["monday"],
+            "preferred_study_window_start": "08:00",
+            "preferred_study_window_end": "09:00",
+            "quiet_hours_start": "21:00",
+            "quiet_hours_end": "07:00",
+        },
+    )
+
+    later_today = client.post(
+        "/v1/agent/nudges/preview",
+        json={
+            "user_id": "demo-user",
+            "preview_at": "2026-04-06T10:00:00+00:00"
+        },
+    )
+    assert later_today.status_code == 200
+    later_payload = later_today.json()
+    assert later_payload["timing_decision"] == "later_today"
+    assert later_payload["local_timezone"] == "America/New_York"
+    assert later_payload["scheduled_for"].startswith("2026-04-06T08:00:00")
+
+    now_response = client.post(
+        "/v1/agent/nudges/preview",
+        json={
+            "user_id": "demo-user",
+            "preview_at": "2026-04-06T12:30:00+00:00"
+        },
+    )
+    assert now_response.status_code == 200
+    now_payload = now_response.json()
+    assert now_payload["timing_decision"] == "now"
+
+    not_today = client.post(
+        "/v1/agent/nudges/preview",
+        json={
+            "user_id": "demo-user",
+            "preview_at": "2026-04-07T12:30:00+00:00"
+        },
+    )
+    assert not_today.status_code == 200
+    not_today_payload = not_today.json()
+    assert not_today_payload["timing_decision"] == "not_today"
