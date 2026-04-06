@@ -28,7 +28,11 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["emmaus*"]
 
+[tool.setuptools.package-data]
+"emmaus" = ["web/index.html", "web/static/*.css", "web/static/*.js"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
 

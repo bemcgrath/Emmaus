@@ -1,4 +1,4 @@
-﻿# Emmaus
+# Emmaus
 
 Emmaus is a mobile-first, agentic Bible study app built to help users deepen their relationship with Christ through adaptive, Scripture-centered guidance.
 
@@ -53,9 +53,10 @@ emmaus/
   providers/      Text, commentary, and LLM provider interfaces
   repositories/   Persistence abstractions
   services/       App logic and adaptive agent behavior
+  web/            Mobile-first web client served by FastAPI
 data/             User-supplied or sample local text data
 docs/             Product and objective references
-tests/            API smoke tests
+tests/            API and frontend smoke tests
 ```
 
 ### Separation of concerns
@@ -103,12 +104,16 @@ tests/            API smoke tests
 
 - `POST /v1/study/events`
 - `GET /v1/study/patterns/{user_id}`
+- `POST /v1/study/mood`
+- `GET /v1/study/mood/{user_id}`
 - `GET /v1/study/action-items/{user_id}`
 - `POST /v1/study/action-items`
 - `POST /v1/study/action-items/{action_item_id}/complete`
 
 ### Agentic session lifecycle
 
+- `GET /v1/agent/recommendations/{user_id}`
+- `POST /v1/agent/nudges/preview`
 - `POST /v1/agent/session`
 - `POST /v1/agent/session/start`
 - `POST /v1/agent/session/respond`
@@ -126,6 +131,21 @@ python -m venv .venv
 pip install -e .[dev]
 uvicorn emmaus.main:app --reload
 ```
+
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) to use the mobile-first Emmaus web client.
+
+## Mobile-first frontend surface
+
+Emmaus now includes a lightweight mobile web client served directly from the FastAPI app at `/`.
+
+The first frontend slice includes:
+
+- a mobile-first home screen with recommendation, streak, mood, and identity surfaces
+- a guided session screen for session start, passage reading, question response, and completion
+- an action-item view for follow-through after study
+- a nudge preview screen that shows timing-aware re-engagement guidance
+
+This keeps the interaction model close to the backend while the product surface is still taking shape.
 
 ## Open-source licensing posture
 

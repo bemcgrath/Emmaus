@@ -1,4 +1,4 @@
-﻿import importlib
+import importlib
 
 from fastapi.testclient import TestClient
 
@@ -16,6 +16,19 @@ def test_healthcheck(tmp_path, monkeypatch):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_frontend_shell_and_assets(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Emmaus" in response.text
+
+    asset = client.get("/static/app.js")
+    assert asset.status_code == 200
+    assert "loadDashboard" in asset.text
 
 
 def test_update_preferences_and_profile(tmp_path, monkeypatch):
@@ -221,7 +234,7 @@ def test_nudge_timing_respects_windows_and_quiet_hours(tmp_path, monkeypatch):
         "/v1/agent/nudges/preview",
         json={
             "user_id": "demo-user",
-            "preview_at": "2026-04-06T10:00:00+00:00"
+            "preview_at": "2026-04-06T10:00:00+00:00",
         },
     )
     assert later_today.status_code == 200
@@ -234,7 +247,7 @@ def test_nudge_timing_respects_windows_and_quiet_hours(tmp_path, monkeypatch):
         "/v1/agent/nudges/preview",
         json={
             "user_id": "demo-user",
-            "preview_at": "2026-04-06T12:30:00+00:00"
+            "preview_at": "2026-04-06T12:30:00+00:00",
         },
     )
     assert now_response.status_code == 200
@@ -245,7 +258,7 @@ def test_nudge_timing_respects_windows_and_quiet_hours(tmp_path, monkeypatch):
         "/v1/agent/nudges/preview",
         json={
             "user_id": "demo-user",
-            "preview_at": "2026-04-07T12:30:00+00:00"
+            "preview_at": "2026-04-07T12:30:00+00:00",
         },
     )
     assert not_today.status_code == 200

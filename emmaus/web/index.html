@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Emmaus</title>
+    <meta
+      name="description"
+      content="Emmaus is a mobile-first guide for Christ-centered Bible study, adaptive reflection, and practical action."
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Emmaus</p>
+          <h1 id="hero-title">Your guide for Scripture, reflection, and response.</h1>
+        </div>
+        <button class="ghost-button" id="refresh-button" type="button">Refresh</button>
+      </header>
+
+      <main class="screens">
+        <section class="screen screen-active" data-screen="home">
+          <div class="hero-card glass-card">
+            <p class="hero-kicker">Christ-centered adaptive study</p>
+            <p class="hero-copy" id="hero-copy">
+              Emmaus adapts each session to your habits, understanding, and next step of obedience.
+            </p>
+            <div class="hero-actions">
+              <button class="primary-button" type="button" data-nav-target="session">Start Session</button>
+              <button class="secondary-button" type="button" id="preview-nudge-button">Preview Nudge</button>
+            </div>
+          </div>
+
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Identity</p>
+                <h2>Guide profile</h2>
+              </div>
+            </div>
+            <form id="identity-form" class="stack-form">
+              <label>
+                <span>User ID</span>
+                <input id="user-id-input" name="userId" type="text" placeholder="demo-user" required />
+              </label>
+              <label>
+                <span>Display name</span>
+                <input id="display-name-input" name="displayName" type="text" placeholder="Brian" />
+              </label>
+              <label>
+                <span>Preferred minutes</span>
+                <input id="preferred-minutes-input" name="preferredMinutes" type="number" min="5" max="60" step="5" />
+              </label>
+              <label>
+                <span>Guide mode</span>
+                <select id="guide-mode-select" name="guideMode">
+                  <option value="guide">Guide</option>
+                  <option value="peer">Peer</option>
+                  <option value="challenger">Challenger</option>
+                  <option value="coach">Coach</option>
+                </select>
+              </label>
+              <button class="secondary-button full-width" type="submit">Save preferences</button>
+            </form>
+          </section>
+
+          <section class="dual-grid">
+            <article class="panel stat-card">
+              <p class="panel-label">Today</p>
+              <h2 id="streak-value">0 day streak</h2>
+              <p id="streak-copy">Complete a session to begin building momentum.</p>
+            </article>
+            <article class="panel stat-card">
+              <p class="panel-label">Open action</p>
+              <h2 id="open-action-count">0</h2>
+              <p id="open-action-copy">Your next step will show up here.</p>
+            </article>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Next study</p>
+                <h2>Recommended focus</h2>
+              </div>
+              <span class="status-pill" id="focus-pill">Loading</span>
+            </div>
+            <div id="recommendation-card" class="content-stack"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Check-in</p>
+                <h2>Mood and energy</h2>
+              </div>
+            </div>
+            <form id="mood-form" class="stack-form compact-form">
+              <div class="chip-row" id="mood-chip-row">
+                <button type="button" class="choice-chip" data-value="encouraged">Encouraged</button>
+                <button type="button" class="choice-chip" data-value="peaceful">Peaceful</button>
+                <button type="button" class="choice-chip" data-value="neutral">Neutral</button>
+                <button type="button" class="choice-chip" data-value="anxious">Anxious</button>
+                <button type="button" class="choice-chip" data-value="stressed">Stressed</button>
+                <button type="button" class="choice-chip" data-value="discouraged">Discouraged</button>
+              </div>
+              <label>
+                <span>Energy</span>
+                <select id="energy-select" name="energy">
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+              <label>
+                <span>Notes</span>
+                <textarea id="mood-notes" name="notes" rows="3" placeholder="What is weighing on you or encouraging you today?"></textarea>
+              </label>
+              <button class="secondary-button full-width" type="submit">Save check-in</button>
+              <p class="micro-copy" id="latest-mood-copy">No mood check-in saved yet.</p>
+            </form>
+          </section>
+        </section>
+
+        <section class="screen" data-screen="session">
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Session</p>
+                <h2>Start or continue</h2>
+              </div>
+              <span class="status-pill" id="session-status-pill">Ready</span>
+            </div>
+            <form id="session-form" class="stack-form">
+              <label>
+                <span>Entry point</span>
+                <input id="entry-point-input" name="entryPoint" type="text" value="continue where I left off" />
+              </label>
+              <label>
+                <span>Minutes available</span>
+                <input id="requested-minutes-input" name="requestedMinutes" type="number" min="5" max="60" step="5" placeholder="15" />
+              </label>
+              <label>
+                <span>Guide mode</span>
+                <select id="session-guide-mode" name="guideMode">
+                  <option value="">Use recommendation</option>
+                  <option value="guide">Guide</option>
+                  <option value="peer">Peer</option>
+                  <option value="challenger">Challenger</option>
+                  <option value="coach">Coach</option>
+                </select>
+              </label>
+              <label>
+                <span>Text source</span>
+                <select id="text-source-select" name="textSource"></select>
+              </label>
+              <button class="primary-button full-width" type="submit">Begin guided session</button>
+            </form>
+          </section>
+
+          <section class="panel session-card">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Live study</p>
+                <h2 id="session-reference">No active session yet</h2>
+              </div>
+              <span class="status-pill" id="question-progress-pill">0 / 0</span>
+            </div>
+            <div class="content-stack" id="session-hero"></div>
+            <div class="session-passage" id="passage-text">
+              Start a session to see the passage, plan, and first question.
+            </div>
+            <div class="content-stack" id="session-plan"></div>
+            <div class="commentary-block" id="commentary-block"></div>
+          </section>
+
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Response</p>
+                <h2 id="current-question-heading">Current question</h2>
+              </div>
+            </div>
+            <p class="prompt-card" id="current-question-copy">Emmaus will place the next question here.</p>
+            <form id="response-form" class="stack-form">
+              <label>
+                <span>Your response</span>
+                <textarea id="response-text" name="responseText" rows="5" placeholder="Answer honestly and concretely."></textarea>
+              </label>
+              <label>
+                <span>Engagement</span>
+                <input id="engagement-input" name="engagement" type="range" min="1" max="5" value="4" />
+              </label>
+              <button class="secondary-button full-width" id="submit-response-button" type="submit">Send response</button>
+            </form>
+          </section>
+
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Complete</p>
+                <h2>Turn reflection into action</h2>
+              </div>
+            </div>
+            <form id="complete-form" class="stack-form">
+              <label>
+                <span>Session summary</span>
+                <textarea id="summary-notes" name="summaryNotes" rows="3" placeholder="What is Christ inviting you to understand or obey from this session?"></textarea>
+              </label>
+              <label>
+                <span>Action item title</span>
+                <input id="action-item-title" name="actionTitle" type="text" placeholder="Pray with someone before dinner" />
+              </label>
+              <label>
+                <span>Action item detail</span>
+                <textarea id="action-item-detail" name="actionDetail" rows="3" placeholder="Keep the next step concrete and doable within the next day."></textarea>
+              </label>
+              <button class="primary-button full-width" id="complete-session-button" type="submit">Complete session</button>
+            </form>
+          </section>
+        </section>
+
+        <section class="screen" data-screen="actions">
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Follow-through</p>
+                <h2>Action items</h2>
+              </div>
+              <span class="status-pill" id="action-summary-pill">0 open</span>
+            </div>
+            <p class="micro-copy">Every session should end with a real-world response. Use this space to keep your next step visible.</p>
+            <div id="action-item-list" class="list-stack"></div>
+          </section>
+        </section>
+
+        <section class="screen" data-screen="nudges">
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Re-engagement</p>
+                <h2>Nudge preview</h2>
+              </div>
+              <span class="status-pill" id="nudge-timing-pill">Checking</span>
+            </div>
+            <div id="nudge-card" class="content-stack"></div>
+            <form id="nudge-preview-form" class="stack-form compact-form">
+              <label>
+                <span>Preview at</span>
+                <input id="preview-at-input" type="datetime-local" />
+              </label>
+              <button class="secondary-button full-width" type="submit">Refresh nudge timing</button>
+            </form>
+          </section>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Primary">
+        <button class="nav-pill nav-pill-active" type="button" data-nav-target="home">Home</button>
+        <button class="nav-pill" type="button" data-nav-target="session">Study</button>
+        <button class="nav-pill" type="button" data-nav-target="actions">Actions</button>
+        <button class="nav-pill" type="button" data-nav-target="nudges">Nudges</button>
+      </nav>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
