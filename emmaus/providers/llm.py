@@ -46,11 +46,9 @@ class NullLLMProvider(LLMProvider):
         self.source_id = source_id
 
     def generate_guidance(self, prompt: str) -> str:
-        return (
-            "No external LLM has been configured. The app is using local rule-based guidance, "
-            "and this prompt can be forwarded to a real AI adapter later:\n"
-            f"{prompt}"
-        )
+        if "Return JSON only" in prompt:
+            return ""
+        return "Stay close to the passage, answer honestly, and finish with one practical next step you can carry into today."
 
     def evaluate_response(
         self,
@@ -86,19 +84,18 @@ class OllamaProvider(LLMProvider):
             return False
 
     def generate_guidance(self, prompt: str) -> str:
+        if "Return JSON only" in prompt:
+            return ""
         body = self._post_generate(prompt)
         if body is None:
             return self._fallback_guidance(prompt)
 
         try:
-            data = json.loads(body)
-        except json.JSONDecodeError:
+            outer = json.loads(body)
+            raw_response = str(outer.get("response", "")).strip()
+            return raw_response or self._fallback_guidance(prompt)
+        except (json.JSONDecodeError, TypeError, ValueError):
             return self._fallback_guidance(prompt)
-
-        guidance = str(data.get("response", "")).strip()
-        if guidance:
-            return guidance
-        return self._fallback_guidance(prompt)
 
     def evaluate_response(
         self,
@@ -187,8 +184,7 @@ class OllamaProvider(LLMProvider):
 
     def _fallback_guidance(self, prompt: str) -> str:
         return (
-            f"Ollama model '{self.model}' could not be reached, so Emmaus is falling back to local rule-based guidance. "
-            f"Prompt:\n{prompt}"
+            f"Ollama model '{self.model}' is unavailable, so Emmaus is falling back to local rule-based guidance for this session."
         )
 
 
@@ -301,3 +297,4 @@ def build_encouragement(recommended_focus: str, comprehension: float, applicatio
     if comprehension >= 0.8 and application >= 0.75 and clarity >= 0.75:
         return "That response is clear and grounded, so you're ready for a deeper challenge."
     return "That's a solid response; keep building on it with a little more specificity and follow-through."
+

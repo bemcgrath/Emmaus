@@ -195,3 +195,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .translation-template-grid { display: grid; gap: 0.75rem; }
 .translation-template-card { display: grid; gap: 0.6rem; }
 .template-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.source-preview-card {
+  scroll-margin-top: 1rem;
+}
+.preview-card-active .source-preview-card {
+  border-color: rgba(159, 94, 45, 0.32);
+  box-shadow: 0 10px 22px rgba(159, 94, 45, 0.12);
+}

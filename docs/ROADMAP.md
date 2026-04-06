@@ -1,4 +1,4 @@
-﻿# Emmaus Roadmap
+# Emmaus Roadmap
 
 ## Purpose
 
@@ -15,6 +15,22 @@ The guiding rule is simple:
 - design mobile-first from the beginning
 - add engagement loops only when they support real reflection and real-world response
 
+## Current Phase
+
+Emmaus is currently in late `Phase 1` and early `Phase 2`, with a small head start on `Phase 3`.
+
+Current assessment:
+
+- `Phase 1`: substantially complete
+- `Phase 2`: actively in progress
+- `Phase 3`: lightly started through modular text-source and ESV work
+
+What that means in practice:
+
+- the core personalized guide loop works end to end
+- the app already supports mobile-first study, action steps, reminders, and memory continuity
+- personalization is real, but still needs more refinement to feel consistently pastoral and nuanced
+- content expansion beyond the ESV-first MVP is still intentionally limited
 ## Phase 0: Foundation
 
 Goal:
@@ -192,7 +208,7 @@ Goal:
 Help users return consistently without making the app feel manipulative, shallow, or guilt-driven.
 
 Why this phase matters:
-Emmaus will only be valuable if it becomes part of a person’s ongoing rhythm with Christ in real life.
+Emmaus will only be valuable if it becomes part of a person�s ongoing rhythm with Christ in real life.
 
 Focus areas:
 
@@ -354,3 +370,4 @@ At every phase, ask:
 - does this support a strong mobile-first experience?
 - does this encourage real-world response and action?
 - does this help the user return for the right reasons?
+

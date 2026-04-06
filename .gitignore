@@ -9,3 +9,5 @@ app.db
 data/*.sqlite
 data/*.sqlite3
 data/user_sources/
+.env
+.env.*

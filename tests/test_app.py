@@ -132,7 +132,7 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "Emmaus updated this thread" in asset.text
     assert "lastFollowThroughUpdate" in asset.text
     assert "buildNudgeThreadContext" in asset.text
-    assert "Why this nudge" in asset.text
+    assert "Why Emmaus is reaching out" in asset.text
     assert "Build on what already landed" in asset.text
     assert "startGuidedSession" in asset.text
     assert "source-use-starter" in response.text
@@ -902,3 +902,4 @@ def test_nudge_preview_builds_on_completed_follow_through(tmp_path, monkeypatch)
     assert payload["message"].startswith("You already followed through on")
     assert action_item["title"] in payload["message"]
     assert "Build on the completed step" in payload["message"] or "Christ is inviting next" in payload["message"]
+

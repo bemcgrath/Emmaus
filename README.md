@@ -4,6 +4,24 @@ Emmaus is a mobile-first, agentic Bible study app built to help users deepen the
 
 The app is designed around a personalized guide that helps users read, understand, apply, and return to Scripture in a way that fits their real habits, schedule, and spiritual needs. Bible text, commentary, and AI logic remain modular so the project can stay open-source and avoid bundling proprietary content.
 
+## Current Status
+
+Emmaus is currently in late `Phase 1` and early `Phase 2`.
+
+That means:
+
+- the MVP guide loop is real and usable end to end
+- mobile-first study, action steps, reminders, and ESV-first setup are working
+- personalization is already underway through mood, timing, memory, response evaluation, and adaptive session recommendations
+- content depth is only lightly started through modular text-source work and ESV support
+
+A practical way to think about the project right now:
+
+- `Phase 1`: substantially complete
+- `Phase 2`: actively in progress
+- `Phase 3`: lightly started
+
+The next priority is not foundational scaffolding anymore. It is making the guide feel more consistently pastoral, intelligent, and polished across real user flows.
 ## Core Docs
 
 - [Objective](docs/OBJECTIVE.md)
@@ -13,6 +31,7 @@ The app is designed around a personalized guide that helps users read, understan
 - [ESV Setup](docs/ESV_SETUP.md)
 - [Licensed Translation Guide](docs/LICENSED_TRANSLATIONS.md)
 - [Translation Provider Strategy](docs/TRANSLATION_PROVIDER_STRATEGY.md)
+- [iPhone Prototyping Guide](docs/IPHONE_PROTOTYPING.md)
 
 ## Core Product Direction
 
@@ -210,4 +229,5 @@ Emmaus now includes a built-in demo mode for the mobile web client.
 - The codebase is MIT licensed.
 - No proprietary Bible texts or commentary are bundled.
 - Users are expected to connect their own licensed or public-domain content through provider adapters.
+
 

@@ -29,7 +29,7 @@
             </p>
             <div class="hero-actions">
               <button class="primary-button" type="button" id="hero-primary-button">Start Today's Plan</button>
-              <button class="secondary-button" type="button" id="preview-nudge-button">Preview Nudge</button>
+              <button class="secondary-button" type="button" id="preview-nudge-button">Preview Reminder</button>
             </div>
           </div>
 
@@ -60,7 +60,7 @@
               <span class="status-pill" id="onboarding-step-pill">Step 1 of 4</span>
             </div>
             <p id="onboarding-copy" class="hero-copy">
-              Emmaus will help you choose a Bible, set a realistic rhythm, and start today?s first guided session.
+              Emmaus will help you choose a Bible, set a realistic rhythm, and start today's first guided session.
             </p>
             <div id="onboarding-flow" class="content-stack"></div>
           </section>
@@ -69,7 +69,7 @@
             <div class="panel-heading">
               <div>
                 <p class="panel-label">Today</p>
-                <h2>Return to today�s plan</h2>
+                <h2>Return to today's plan</h2>
               </div>
               <span class="status-pill" id="today-plan-pill">Loading</span>
             </div>
@@ -186,11 +186,11 @@
                 <input id="display-name-input" name="displayName" type="text" placeholder="Brian" />
               </label>
               <label>
-                <span>Preferred minutes</span>
+                <span>Usual session length</span>
                 <input id="preferred-minutes-input" name="preferredMinutes" type="number" min="5" max="60" step="5" />
               </label>
               <label>
-                <span>Guide mode</span>
+                <span>Guide style</span>
                 <select id="guide-mode-select" name="guideMode">
                   <option value="guide">Guide</option>
                   <option value="peer">Peer</option>
@@ -199,7 +199,7 @@
                 </select>
               </label>
               <label>
-                <span>Preferred text source</span>
+                <span>Preferred Bible</span>
                 <select id="preferred-source-select" name="preferredSource"></select>
               </label>
               <label>
@@ -296,7 +296,7 @@
             <p class="micro-copy" id="session-form-copy">Start a fresh guided session when you are ready.</p>
             <form id="session-form" class="stack-form">
               <label>
-                <span>Entry point</span>
+                <span>Start this session with</span>
                 <input id="entry-point-input" name="entryPoint" type="text" value="continue where I left off" />
               </label>
               <label>
@@ -304,7 +304,7 @@
                 <input id="requested-minutes-input" name="requestedMinutes" type="number" min="5" max="60" step="5" placeholder="15" />
               </label>
               <label>
-                <span>Guide mode</span>
+                <span>Guide style</span>
                 <select id="session-guide-mode" name="guideMode">
                   <option value="">Use recommendation</option>
                   <option value="guide">Guide</option>
@@ -314,7 +314,7 @@
                 </select>
               </label>
               <label>
-                <span>Text source</span>
+                <span>Bible</span>
                 <select id="text-source-select" name="textSource"></select>
               </label>
               <button class="primary-button full-width" id="session-form-button" type="submit">Begin guided session</button>
@@ -371,11 +371,11 @@
                 <textarea id="summary-notes" name="summaryNotes" rows="3" placeholder="What is Christ inviting you to understand or obey from this session?"></textarea>
               </label>
               <label>
-                <span>Action item title</span>
+                <span>Next step title</span>
                 <input id="action-item-title" name="actionTitle" type="text" placeholder="Pray with someone before dinner" />
               </label>
               <label>
-                <span>Action item detail</span>
+                <span>Next step detail</span>
                 <textarea id="action-item-detail" name="actionDetail" rows="3" placeholder="Keep the next step concrete and doable within the next day."></textarea>
               </label>
               <button class="primary-button full-width" id="complete-session-button" type="submit">Complete session</button>
@@ -399,7 +399,7 @@
             <div class="panel-heading">
               <div>
                 <p class="panel-label">Follow-through</p>
-                <h2>Action items</h2>
+                <h2>Next steps</h2>
               </div>
               <span class="status-pill" id="action-summary-pill">0 open</span>
             </div>
@@ -415,7 +415,7 @@
               </div>
             </div>
             <form id="action-follow-up-form" class="stack-form">
-              <p id="follow-up-target-copy" class="hero-copy">Select an open action item above to complete it with a short reflection.</p>
+              <p id="follow-up-target-copy" class="hero-copy">Choose an open next step above and note what happened.</p>
               <label>
                 <span>Outcome</span>
                 <select id="follow-up-outcome-select" name="followUpOutcome">
@@ -439,7 +439,7 @@
             <div class="panel-heading">
               <div>
                 <p class="panel-label">Re-engagement</p>
-                <h2>Nudge preview</h2>
+                <h2>Reminder preview</h2>
               </div>
               <span class="status-pill" id="nudge-timing-pill">Checking</span>
             </div>
@@ -450,7 +450,7 @@
                 <span>Preview at</span>
                 <input id="preview-at-input" type="datetime-local" />
               </label>
-              <button class="secondary-button full-width" type="submit">Refresh nudge timing</button>
+              <button class="secondary-button full-width" type="submit">Refresh reminder timing</button>
             </form>
           </section>
         </section>
@@ -460,7 +460,7 @@
         <button class="nav-pill nav-pill-active" type="button" data-nav-target="home">Home</button>
         <button class="nav-pill" type="button" data-nav-target="session">Study</button>
         <button class="nav-pill" type="button" data-nav-target="actions">Actions</button>
-        <button class="nav-pill" type="button" data-nav-target="nudges">Nudges</button>
+        <button class="nav-pill" type="button" data-nav-target="nudges">Reminders</button>
       </nav>
     </div>
 
@@ -468,3 +468,6 @@
     <script src="/static/app.js" defer></script>
   </body>
 </html>
+
+
+

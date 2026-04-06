@@ -17,7 +17,7 @@ const DEMO_SCENARIO_LABELS = {
   live: "Live data",
   first_visit: "First visit",
   in_progress: "In progress session",
-  overdue_action: "Overdue action item",
+  overdue_action: "Overdue next step",
   scheduled_nudge: "Scheduled nudge",
 };
 
@@ -341,7 +341,7 @@ function getInitialDemoScenario() {
     localStorage.setItem("emmaus.demoScenario", fromUrl);
     return fromUrl;
   }
-  return normalizeDemoScenario(localStorage.getItem("emmaus.demoScenario")) || "first_visit";
+  return "live";
 }
 
 function normalizeDemoScenario(value) {
@@ -395,7 +395,7 @@ function buildDemoScenarioData(scenario) {
       focus_area: "application",
       observed_patterns: [
         "Application responses have been sincere but not always specific.",
-        "Open action items suggest follow-through needs a little reinforcement.",
+        "Open next steps suggest follow-through needs a little reinforcement.",
       ],
     },
   };
@@ -758,7 +758,7 @@ function buildDemoScenarioData(scenario) {
       memorySummary: {
         ...baseMemorySummary,
         latest_summary: "Emmaus is carrying forward a recent encouragement step that still needs follow-through.",
-        growth_areas: ["closing the loop on action items", "restarting gently after missing a few days"],
+        growth_areas: ["closing the loop on next steps", "restarting gently after missing a few days"],
         carry_forward_prompt: "Follow through on the encouragement Emmaus already surfaced before you begin something new.",
       },
       nudge: {
@@ -767,7 +767,7 @@ function buildDemoScenarioData(scenario) {
         title: "Follow through on your last step",
         message: "Before starting something new, finish what your last session already surfaced.",
         timing_decision: "now",
-        timing_reason: "The user is in a valid study window and an unfinished action item is waiting.",
+        timing_reason: "You are in a good study window, and one unfinished next step is still waiting.",
         scheduled_for: null,
       },
       nudgePlan: {
@@ -776,7 +776,7 @@ function buildDemoScenarioData(scenario) {
         deliver_at: "2026-04-05T12:30:00-04:00",
         fallback_at: "2026-04-05T12:30:00-04:00",
         idempotency_key: "demo-user:follow_through:continue where I left off:2026-04-05T12:30:00-04:00",
-        reason: "A follow-through reminder can be sent immediately because the action item is overdue and the user is available.",
+        reason: "A follow-through reminder can go out now because this next step is overdue and the user is available.",
       },
     };
   }
@@ -945,8 +945,8 @@ function renderHero(profile, recommendation, activeSession, actionItems) {
   const openAction = actionItems.find((item) => item.status === "open");
   if (openAction) {
     elements.heroTitle.textContent = "Carry what you studied into your day.";
-    elements.heroCopy.textContent = "Emmaus is surfacing your unfinished action item first so reflection becomes real follow-through.";
-    elements.heroPrimaryButton.textContent = "Review Action Item";
+    elements.heroCopy.textContent = "Emmaus is surfacing your unfinished next step first so reflection becomes real follow-through.";
+    elements.heroPrimaryButton.textContent = "Review Next Step";
     return;
   }
 
@@ -959,7 +959,7 @@ function renderHero(profile, recommendation, activeSession, actionItems) {
 
   elements.heroTitle.textContent = "Your guide for Scripture, reflection, and response.";
   elements.heroCopy.textContent = recommendation
-    ? `Emmaus is steering today's session toward ${recommendation.focus_area} so the next study meets your real pattern, not a generic plan.`
+    ? `Emmaus is shaping today's session around ${humanizeFocusArea(recommendation.focus_area).toLowerCase()} so the next step fits your real needs, not a generic plan.`
     : "Emmaus adapts each session to your habits, understanding, and next step of obedience.";
   elements.heroPrimaryButton.textContent = "Start Today's Plan";
 }
@@ -1039,7 +1039,7 @@ function renderSourcePreview(preview) {
   elements.sourcePreviewCard.innerHTML = `
     <div class="action-card source-preview-card">
       <p class="panel-label">Sample preview</p>
-      <p><strong>${escapeHtml(preview.translation_name)}</strong> ? ${escapeHtml(formatReference(preview.reference))}</p>
+      <p><strong>${escapeHtml(preview.translation_name)}</strong> - ${escapeHtml(formatReference(preview.reference))}</p>
       <p>${escapeHtml(preview.text)}</p>
       ${preview.copyright_notice ? `<p class="micro-copy">${escapeHtml(preview.copyright_notice)}</p>` : ""}
     </div>
@@ -1051,31 +1051,47 @@ async function previewBibleSource(sourceId) {
     return;
   }
 
-  if (isDemoMode()) {
-    const demoPassage = state.activeSessionPayload?.passage || {
-      source_id: STARTER_SOURCE_ID,
-      translation_name: "Included Starter Bible",
-      reference: { book: "John", chapter: 3, start_verse: 16, end_verse: 17 },
-      text: "For God so loved the world, that he gave his only begotten Son, that whoever believes in him should not perish, but have everlasting life.",
-      copyright_notice: "Public Domain",
-    };
-    state.sourcePreview = { ...demoPassage, source_id: sourceId };
-    renderSourcePreview(state.sourcePreview);
-    return;
-  }
+  try {
+    if (isDemoMode()) {
+      const demoPassage = state.activeSessionPayload?.passage || {
+        source_id: STARTER_SOURCE_ID,
+        translation_name: "Included Starter Bible",
+        reference: { book: "John", chapter: 3, start_verse: 16, end_verse: 17 },
+        text: "For God so loved the world, that he gave his only begotten Son, that whoever believes in him should not perish, but have everlasting life.",
+        copyright_notice: "Public Domain",
+      };
+      state.sourcePreview = { ...demoPassage, source_id: sourceId };
+      renderSourcePreview(state.sourcePreview);
+    } else {
+      const preview = await fetchJson("/v1/texts/passage", {
+        method: "POST",
+        body: {
+          source_id: sourceId,
+          book: "John",
+          chapter: 3,
+          start_verse: 16,
+          end_verse: 17,
+        },
+      });
+      state.sourcePreview = preview;
+      renderSourcePreview(preview);
+    }
 
-  const preview = await fetchJson("/v1/texts/passage", {
-    method: "POST",
-    body: {
-      source_id: sourceId,
-      book: "John",
-      chapter: 3,
-      start_verse: 16,
-      end_verse: 17,
-    },
-  });
-  state.sourcePreview = preview;
-  renderSourcePreview(preview);
+    if (elements.sourcePreviewCard) {
+      elements.sourcePreviewCard.classList.remove("preview-card-active");
+      void elements.sourcePreviewCard.offsetWidth;
+      elements.sourcePreviewCard.classList.add("preview-card-active");
+      elements.sourcePreviewCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      window.setTimeout(() => {
+        elements.sourcePreviewCard?.classList.remove("preview-card-active");
+      }, 1400);
+    }
+
+    const previewName = getSourceById(sourceId)?.name || state.sourcePreview?.translation_name || "this Bible";
+    showToast(`Showing a sample from ${previewName}.`);
+  } catch (error) {
+    handleError(error);
+  }
 }
 
 function renderProfile(profile) {
@@ -1109,7 +1125,7 @@ function renderRecommendation(recommendation) {
     return;
   }
 
-  elements.focusPill.textContent = sentenceCase(recommendation.focus_area);
+  elements.focusPill.textContent = humanizeFocusArea(recommendation.focus_area);
   const patterns = safeArray(recommendation.gap_report?.observed_patterns)
     .map((pattern) => `<span class="meta-pill">${escapeHtml(pattern)}</span>`)
     .join("");
@@ -1119,11 +1135,11 @@ function renderRecommendation(recommendation) {
       <p><strong>${escapeHtml(formatReference(recommendation.recommended_reference))}</strong></p>
       <p>${escapeHtml(recommendation.reason)}</p>
       <div class="recommendation-meta">
-        <span class="meta-pill">${escapeHtml(sentenceCase(recommendation.recommended_guide_mode))}</span>
+        <span class="meta-pill">${escapeHtml(humanizeGuideMode(recommendation.recommended_guide_mode))}</span>
         <span class="meta-pill">${escapeHtml(String(recommendation.recommended_minutes))} min</span>
-        <span class="meta-pill">${escapeHtml(recommendation.recommended_entry_point)}</span>
+        <span class="meta-pill">${escapeHtml(humanizeEntryPoint(recommendation.recommended_entry_point))}</span>
       </div>
-      <p><strong>Suggested application:</strong> ${escapeHtml(recommendation.suggested_action)}</p>
+      <p><strong>A simple next step:</strong> ${escapeHtml(recommendation.suggested_action)}</p>
       ${patterns ? `<div class="content-stack">${patterns}</div>` : ""}
     </div>
   `;
@@ -1135,7 +1151,7 @@ function renderMemorySummary(memorySummary) {
     elements.memoryThreadCard.innerHTML = `
       <div class="memory-card">
         <p><strong>Emmaus will start tracking your growth here.</strong></p>
-        <p class="today-plan-copy">Complete a session and Emmaus will carry forward the themes, growth edges, and next thread to revisit.</p>
+        <p class="today-plan-copy">Complete a session and Emmaus will carry forward the themes, areas to keep strengthening, and next thread to revisit.</p>
       </div>
     `;
     return;
@@ -1156,7 +1172,7 @@ function renderMemorySummary(memorySummary) {
     <div class="memory-card">
       <p><strong>${escapeHtml(memorySummary.latest_summary || "Emmaus is carrying a recent thread forward.")}</strong></p>
       ${themes ? `<div class="memory-theme-list">${themes}</div>` : ""}
-      ${growthAreas ? `<p><strong>Growth edges:</strong> ${growthAreas}</p>` : ""}
+      ${growthAreas ? `<p><strong>Areas to keep strengthening:</strong> ${growthAreas}</p>` : ""}
       ${memorySummary.carry_forward_prompt ? `<p class="memory-prompt">${escapeHtml(memorySummary.carry_forward_prompt)}</p>` : ""}
       ${references ? `<div class="today-plan-actions">${references}</div>` : ""}
     </div>
@@ -1242,7 +1258,7 @@ function renderOnboarding(profile, streaks, activeSession, actionItems) {
   }
 
   if (step === 3) {
-    elements.onboardingCopy.textContent = "Tell Emmaus the best time of day to reach you so today?s plan and future nudges fit your rhythm.";
+    elements.onboardingCopy.textContent = "Tell Emmaus the best time of day to reach you so today's plan and future reminders fit your rhythm.";
     elements.onboardingFlow.innerHTML = `
       <div class="today-plan-card onboarding-step-card">
         <p><strong>When do you usually study best?</strong></p>
@@ -1257,7 +1273,7 @@ function renderOnboarding(profile, streaks, activeSession, actionItems) {
     return;
   }
 
-  elements.onboardingCopy.textContent = "Your starter rhythm is ready. Emmaus can launch today?s first guided session now.";
+  elements.onboardingCopy.textContent = "Your starter rhythm is ready. Emmaus can launch today's first guided session now.";
   const recommendation = state.recommendation;
   elements.onboardingFlow.innerHTML = `
     <div class="today-plan-card onboarding-step-card">
@@ -1265,7 +1281,7 @@ function renderOnboarding(profile, streaks, activeSession, actionItems) {
       <p class="today-plan-copy">${escapeHtml(recommendation ? recommendation.reason : "Emmaus is ready with a first guided session.")}</p>
       <div class="today-plan-actions">
         <span class="meta-pill">${escapeHtml(String(recommendation?.recommended_minutes || state.profile?.preferences?.preferred_session_minutes || 15))} min</span>
-        <span class="meta-pill">${escapeHtml(sentenceCase(recommendation?.recommended_guide_mode || "guide"))}</span>
+        <span class="meta-pill">${escapeHtml(humanizeGuideMode(recommendation?.recommended_guide_mode || "guide"))}</span>
       </div>
       <div class="source-quick-actions">
         <button class="primary-button full-width" type="button" data-action="onboarding-start-session">Start today's first session</button>
@@ -1344,24 +1360,34 @@ async function saveOnboardingPreferences(updates, { successMessage, nextStep } =
   return true;
 }
 
+function setSessionEntryFormLocked(locked) {
+  elements.entryPointInput.readOnly = locked;
+  elements.requestedMinutesInput.disabled = locked;
+  elements.sessionGuideMode.disabled = locked;
+  elements.textSourceSelect.disabled = locked;
+}
+
 function updateSessionEntryState(activeSession) {
   if (activeSession) {
     const session = activeSession.session;
+    const sessionSourceName = getSourceById(session.text_source_id)?.name || "the Bible chosen for this session";
     elements.sessionStatusPill.textContent = "Active";
-    elements.sessionFormCopy.textContent = `You already have an active session in ${formatReference(session.reference)}. Continue it below.`;
-    elements.sessionFormButton.textContent = "Continue current session";
-    elements.entryPointInput.value = session.entry_point || state.recommendation?.recommended_entry_point || "continue where I left off";
+    elements.sessionFormCopy.textContent = `You already have an active session in ${formatReference(session.reference)}. This session is still using ${sessionSourceName}. Finish it before changing your Bible or guide settings.`;
+    elements.sessionFormButton.textContent = "Resume active session";
+    elements.entryPointInput.value = humanizeEntryPoint(session.entry_point || state.recommendation?.recommended_entry_point || "continue where I left off");
     elements.requestedMinutesInput.value = session.requested_minutes || state.recommendation?.recommended_minutes || "";
     elements.sessionGuideMode.value = session.guide_mode || "";
     if (session.text_source_id) {
       elements.textSourceSelect.value = session.text_source_id;
     }
+    setSessionEntryFormLocked(true);
     return;
   }
 
+  setSessionEntryFormLocked(false);
   elements.sessionStatusPill.textContent = "Ready";
   elements.sessionFormCopy.textContent = state.recommendation
-    ? `Emmaus suggests ${state.recommendation.recommended_minutes} minutes focused on ${state.recommendation.focus_area}.`
+    ? `Emmaus suggests ${state.recommendation.recommended_minutes} minutes centered on ${humanizeFocusArea(state.recommendation.focus_area).toLowerCase()}.`
     : "Start a fresh guided session when you are ready.";
   elements.sessionFormButton.textContent = "Begin guided session";
   elements.entryPointInput.value = state.recommendation?.recommended_entry_point || "continue where I left off";
@@ -1378,16 +1404,22 @@ function renderTodayPlan(recommendation, activeSession, actionItems, memorySumma
 
   if (activeSession) {
     const session = activeSession.session;
+    const nextQuestion = activeSession.current_question || session.questions?.[session.current_question_index] || null;
+    const guideLabel = humanizeGuideMode(session.guide_mode).toLowerCase();
+    const nextQuestionLabel = nextQuestion ? sentenceCase(nextQuestion.type).toLowerCase() : "next";
+    const sessionSummary = nextQuestion
+      ? `Pick up where you left off in ${formatReference(session.reference)}. Emmaus is guiding you in ${guideLabel} mode, and your next step is a ${nextQuestionLabel} question.`
+      : `Pick up where you left off in ${formatReference(session.reference)}. Emmaus is guiding you in ${guideLabel} mode and helping you finish this session with focus.`;
     elements.todayPlanPill.textContent = "Resume";
     elements.todayPlanCard.dataset.action = "resume_session";
     elements.todayPlanCard.innerHTML = `
       <div class="today-plan-card">
         <p><strong>${escapeHtml(formatReference(session.reference))}</strong></p>
-        <p class="today-plan-copy">${escapeHtml(session.latest_message)}</p>
+        <p class="today-plan-copy">${escapeHtml(sessionSummary)}</p>
         ${carryForwardPrompt ? `<p class="memory-prompt">${escapeHtml(carryForwardPrompt)}</p>` : ""}
         <div class="today-plan-actions">
           <span class="meta-pill">${escapeHtml(buildQuestionProgress(session))}</span>
-          <span class="meta-pill">${escapeHtml(sentenceCase(session.guide_mode))}</span>
+          <span class="meta-pill">${escapeHtml(humanizeGuideMode(session.guide_mode))}</span>
         </div>
         <button class="primary-button full-width" type="button">Resume session</button>
       </div>
@@ -1405,24 +1437,24 @@ function renderTodayPlan(recommendation, activeSession, actionItems, memorySumma
         ${carryForwardPrompt ? `<p class="memory-prompt">${escapeHtml(carryForwardPrompt)}</p>` : ""}
         <div class="today-plan-actions">
           <span class="meta-pill">Created ${escapeHtml(formatDateTime(openAction.created_at))}</span>
-          <span class="meta-pill">Action item</span>
+          <span class="meta-pill">Next step</span>
         </div>
-        <button class="primary-button full-width" type="button">Record follow-through</button>
+        <button class="primary-button full-width" type="button">Record what happened</button>
       </div>
     `;
     return;
   }
 
   if (recommendation) {
-    elements.todayPlanPill.textContent = sentenceCase(recommendation.focus_area);
+    elements.todayPlanPill.textContent = humanizeFocusArea(recommendation.focus_area);
     elements.todayPlanCard.dataset.action = "start_session";
     elements.todayPlanCard.innerHTML = `
       <div class="today-plan-card">
         <p><strong>${escapeHtml(formatReference(recommendation.recommended_reference))}</strong></p>
         <p class="today-plan-copy">${escapeHtml(recommendation.reason)}</p>
-        ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Continue this thread:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
+        ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Keep building here:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
         <div class="today-plan-actions">
-          <span class="meta-pill">${escapeHtml(sentenceCase(recommendation.recommended_guide_mode))}</span>
+          <span class="meta-pill">${escapeHtml(humanizeGuideMode(recommendation.recommended_guide_mode))}</span>
           <span class="meta-pill">${escapeHtml(String(recommendation.recommended_minutes))} min</span>
         </div>
         <p><strong>End with:</strong> ${escapeHtml(recommendation.suggested_action)}</p>
@@ -1482,7 +1514,7 @@ function renderCompletionSummary(memorySummary, actionItems) {
       <p><strong>${followThroughUpdate ? "Emmaus updated this thread" : "What Emmaus noticed"}</strong></p>
       <p class="today-plan-copy">${escapeHtml(latestSummary)}</p>
       ${changeSummary}
-      ${growthArea ? `<p><strong>Growth edge:</strong> ${escapeHtml(growthArea)}</p>` : ""}
+      ${growthArea ? `<p><strong>Area to keep strengthening:</strong> ${escapeHtml(growthArea)}</p>` : ""}
       ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Emmaus will carry forward:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
       ${changePrompt}
       ${followThroughNote}
@@ -1507,7 +1539,7 @@ function renderActionItems(actionItems) {
   syncSelectedActionItem(actionItems);
 
   if (!actionItems.length) {
-    elements.actionItemList.innerHTML = '<p class="empty-state">No action items yet. Complete a session and Emmaus will place your next step here.</p>';
+    elements.actionItemList.innerHTML = '<p class="empty-state">No next steps yet. Complete a session and Emmaus will place your next step here.</p>';
     return;
   }
 
@@ -1516,7 +1548,7 @@ function renderActionItems(actionItems) {
       const isSelected = item.action_item_id === state.selectedActionItemId;
       const completed = item.status === "completed";
       const footer = completed
-        ? `<p class="micro-copy">Completed ${escapeHtml(formatDateTime(item.completed_at))}${item.follow_up_outcome ? ` � ${escapeHtml(sentenceCase(item.follow_up_outcome.replaceAll("_", " ")) )}` : ""}</p>${item.follow_up_note ? `<p>${escapeHtml(item.follow_up_note)}</p>` : ""}`
+        ? `<p class="micro-copy">Completed ${escapeHtml(formatDateTime(item.completed_at))}${item.follow_up_outcome ? ` - ${escapeHtml(sentenceCase(item.follow_up_outcome.replaceAll("_", " ")) )}` : ""}</p>${item.follow_up_note ? `<p>${escapeHtml(item.follow_up_note)}</p>` : ""}`
         : `<button class="action-button" type="button" data-action-item-select="${escapeHtml(item.action_item_id)}">${isSelected ? "Selected for follow-up" : "Complete follow-through"}</button>`;
       return `
         <article class="action-card ${completed ? "completed" : ""} ${isSelected ? "selected" : ""}">
@@ -1541,7 +1573,7 @@ function syncSelectedActionItem(actionItems) {
   state.selectedActionItemId = selected?.action_item_id || null;
 
   if (!selected) {
-    elements.followUpTargetCopy.textContent = "Select an open action item above to complete it with a short reflection.";
+    elements.followUpTargetCopy.textContent = "Choose an open next step above and note what happened.";
     elements.followUpSubmitButton.disabled = true;
     elements.followUpOutcomeSelect.value = "completed";
     elements.followUpNoteInput.value = "";
@@ -1557,12 +1589,12 @@ function syncSelectedActionItem(actionItems) {
 function buildSessionContextCard(payload) {
   const recommendation = payload.recommendation || state.recommendation;
   const memorySummary = state.memorySummary;
-  const reason = recommendation?.reason || "Emmaus has shaped this session around what seems most helpful for your next step with Christ.";
+  const reason = polishGuideCopy(recommendation?.reason) || "Emmaus has shaped this session around what seems most helpful for your next step with Christ.";
   const carryForwardPrompt = memorySummary?.carry_forward_prompt || null;
   const leadingPattern = safeArray(recommendation?.gap_report?.observed_patterns)[0] || null;
   const meta = [
     recommendation?.focus_area ? `<span class="meta-pill">${escapeHtml(sentenceCase(recommendation.focus_area))}</span>` : "",
-    recommendation?.recommended_guide_mode ? `<span class="meta-pill">${escapeHtml(sentenceCase(recommendation.recommended_guide_mode))}</span>` : "",
+    recommendation?.recommended_guide_mode ? `<span class="meta-pill">${escapeHtml(humanizeGuideMode(recommendation.recommended_guide_mode))}</span>` : "",
     recommendation?.recommended_minutes ? `<span class="meta-pill">${escapeHtml(String(recommendation.recommended_minutes))} min</span>` : "",
   ].filter(Boolean).join("");
 
@@ -1570,8 +1602,8 @@ function buildSessionContextCard(payload) {
     <div class="session-context-card">
       <p><strong>Why Emmaus brought you here today</strong></p>
       <p class="session-context-copy">${escapeHtml(reason)}</p>
-      ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Continuing thread:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
-      ${leadingPattern ? `<p class="session-context-copy"><strong>Watching for:</strong> ${escapeHtml(leadingPattern)}</p>` : ""}
+      ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Still carrying forward:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
+      ${leadingPattern ? `<p class="session-context-copy"><strong>Paying attention to:</strong> ${escapeHtml(polishGuideCopy(leadingPattern))}</p>` : ""}
       ${meta ? `<div class="session-meta">${meta}</div>` : ""}
     </div>
   `;
@@ -1582,17 +1614,28 @@ function renderSessionStart(payload, { navigate = true } = {}) {
   state.currentQuestion = payload.current_question || null;
 
   const session = payload.session;
+  const nextQuestionLabel = state.currentQuestion ? sentenceCase(state.currentQuestion.type).toLowerCase() : "next";
+  const guideIntro = state.currentQuestion
+    ? `Emmaus will guide this session one question at a time to help you ${humanizeQuestionType(state.currentQuestion.type).toLowerCase()}.`
+    : "Emmaus is ready to guide this session one step at a time as you read and respond.";
+  const guideLabelMap = {
+    guide: "Guided study",
+    peer: "Conversation guide",
+    challenger: "Deeper challenge",
+    coach: "Coaching guide",
+  };
+  const guideLabel = guideLabelMap[session.guide_mode] || sentenceCase(session.guide_mode);
   elements.sessionStatusPill.textContent = sentenceCase(session.status);
   elements.sessionReference.textContent = formatReference(session.reference);
   elements.questionProgressPill.textContent = buildQuestionProgress(session);
   elements.sessionHero.innerHTML = `
     ${buildSessionContextCard(payload)}
     <div class="inline-card">
-      <p><strong>${escapeHtml(sentenceCase(session.guide_mode))} mode</strong></p>
-      <p>${escapeHtml(session.latest_message || "Emmaus is ready to guide this session.")}</p>
+      <p><strong>${escapeHtml(guideLabel)}</strong></p>
+      <p>${escapeHtml(guideIntro)}</p>
       <div class="session-meta">
         <span class="meta-pill">${escapeHtml(String(session.requested_minutes))} min</span>
-        <span class="meta-pill">${escapeHtml(session.entry_point)}</span>
+        <span class="meta-pill">${escapeHtml(humanizeEntryPoint(session.entry_point))}</span>
       </div>
     </div>
   `;
@@ -1624,7 +1667,7 @@ function renderSessionStart(payload, { navigate = true } = {}) {
     : "";
 
   if (state.currentQuestion) {
-    elements.currentQuestionHeading.textContent = `${sentenceCase(state.currentQuestion.type)} question`;
+    elements.currentQuestionHeading.textContent = humanizeQuestionType(state.currentQuestion.type);
     elements.currentQuestionCopy.textContent = state.currentQuestion.question;
     elements.responseText.disabled = false;
     elements.engagementInput.disabled = false;
@@ -1637,12 +1680,7 @@ function renderSessionStart(payload, { navigate = true } = {}) {
     elements.submitResponseButton.disabled = true;
   }
 
-  elements.entryPointInput.value = session.entry_point || state.recommendation?.recommended_entry_point || "continue where I left off";
-  elements.requestedMinutesInput.value = session.requested_minutes || state.recommendation?.recommended_minutes || "";
-  elements.sessionGuideMode.value = session.guide_mode || "";
-  if (session.text_source_id) {
-    elements.textSourceSelect.value = session.text_source_id;
-  }
+  updateSessionEntryState(payload);
 
   if (navigate) {
     showScreen("session");
@@ -1707,7 +1745,7 @@ function renderNudge(nudge, nudgePlan) {
   elements.nudgeTimingPill.textContent = statusCopy;
 
   if (!nudge) {
-    elements.nudgeCard.innerHTML = '<p class="empty-state">No nudge preview is available right now.</p>';
+    elements.nudgeCard.innerHTML = '<p class="empty-state">No reminder preview is available right now.</p>';
     elements.nudgePlanCard.innerHTML = '<p class="empty-state">Delivery planning will appear here after the preview is generated.</p>';
     return;
   }
@@ -1719,9 +1757,9 @@ function renderNudge(nudge, nudgePlan) {
       <p>${escapeHtml(nudge.message)}</p>
       ${threadContext}
       <div class="nudge-meta">
-        <span class="meta-pill">${escapeHtml(sentenceCase(nudge.nudge_type.replaceAll("_", " ")) )}</span>
+        <span class="meta-pill">${escapeHtml(humanizeNudgeType(nudge.nudge_type))}</span>
         <span class="meta-pill">${escapeHtml(String(nudge.recommended_minutes))} min</span>
-        <span class="meta-pill">${escapeHtml(sentenceCase(nudge.recommended_guide_mode))}</span>
+        <span class="meta-pill">${escapeHtml(humanizeGuideMode(nudge.recommended_guide_mode))}</span>
       </div>
       <p><strong>Timing:</strong> ${escapeHtml(nudge.timing_reason)}</p>
       ${nudge.scheduled_for ? `<p><strong>Scheduled for:</strong> ${escapeHtml(formatDateTime(nudge.scheduled_for, nudge.local_timezone))}</p>` : ""}
@@ -1771,7 +1809,7 @@ function buildNudgeThreadContext(nudge) {
 
   return `
     <div class="nudge-thread-card">
-      <p class="panel-label">Why this nudge</p>
+      <p class="panel-label">Why Emmaus is reaching out</p>
       <p>${reasonLine}</p>
       ${followThroughLine}
       ${promptLine}
@@ -2084,7 +2122,7 @@ async function onCompleteSession(event) {
   elements.actionItemDetail.value = "";
   await refreshExperience({ restoreScreen: false });
   showScreen("actions");
-  showToast("Session completed. Your action item is ready.");
+  showToast("Session completed. Your next step is ready.");
 }
 
 async function onSubmitActionFollowUp(event) {
@@ -2093,7 +2131,7 @@ async function onSubmitActionFollowUp(event) {
     return;
   }
   if (!state.selectedActionItemId) {
-    showToast("Select an action item first.");
+    showToast("Choose a next step first.");
     return;
   }
 
@@ -2116,7 +2154,7 @@ async function onSubmitActionFollowUp(event) {
   };
   renderCompletionSummary(state.memorySummary, state.actionItems);
   showScreen("actions");
-  showToast("Follow-through saved. Emmaus updated your thread.");
+  showToast("You saved what happened, and Emmaus updated your thread.");
 }
 
 async function onPreviewNudgeAtTime(event) {
@@ -2128,7 +2166,7 @@ async function onPreviewNudgeAtTime(event) {
     return;
   }
   await loadNudgeArtifacts(previewAt);
-  showToast(previewAt ? "Nudge timing refreshed for the selected time." : "Nudge timing refreshed.");
+  showToast(previewAt ? "Reminder timing refreshed for the selected time." : "Reminder timing refreshed.");
 }
 
 function selectMood(mood) {
@@ -2290,6 +2328,78 @@ function sentenceCase(value) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
+
+function humanizeGuideMode(value) {
+  const labels = {
+    guide: "Guided study",
+    peer: "Conversation guide",
+    challenger: "Deeper challenge",
+    coach: "Coaching guide",
+  };
+  return labels[value] || sentenceCase(value);
+}
+
+function humanizeFocusArea(value) {
+  const labels = {
+    comprehension: "Understanding the passage",
+    application: "Living it out",
+    consistency: "Steady rhythm",
+    growth: "Deeper growth",
+  };
+  return labels[value] || sentenceCase(value);
+}
+
+function humanizeQuestionType(value) {
+  const labels = {
+    observation: "Notice what stands out",
+    interpretation: "Understand the meaning",
+    application: "Live it out",
+    reflection: "Reflect honestly",
+  };
+  return labels[value] || sentenceCase(value);
+}
+
+function humanizeEntryPoint(value) {
+  const labels = {
+    "continue where I left off": "Pick up where I left off",
+    "I need clarity before application": "Help me understand before I apply this",
+    "I want to begin gently": "Ease me in gently",
+  };
+  return labels[value] || polishGuideCopy(value || "");
+}
+
+function humanizeNudgeType(value) {
+  const labels = {
+    momentum: "Momentum",
+    restart: "Restart",
+    follow_through: "Follow-through",
+    encouragement: "Encouragement",
+    theme: "Carry-forward",
+  };
+  return labels[value] || sentenceCase(value);
+}
+
+function setupModeLabel(value) {
+  const labels = {
+    starter: "Starter",
+    esv_api: "ESV connection",
+    upload: "Upload",
+    generic_api: "Provider connection",
+  };
+  return labels[value] || sentenceCase(value);
+}
+
+function polishGuideCopy(value) {
+  if (!value) {
+    return "";
+  }
+  return String(value)
+    .replaceAll("A gentle restart will help rebuild rhythm without overwhelming the user.", "A gentle restart can help you rebuild a steady rhythm without feeling overwhelmed.")
+    .replaceAll("The user is still building an initial study rhythm.", "You're still building a steady study rhythm.")
+    .replaceAll("The user is still building a study rhythm.", "You're still building a study rhythm.")
+    .replaceAll("The user ", "You ")
+    .replaceAll(" the user ", " you ");
+}
 function formatReference(reference) {
   if (!reference) {
     return "Unknown reference";
@@ -2720,3 +2830,7 @@ function buildSourceIdCandidate(value) {
 function buildGeneratedSourceId(value) {
   return `${buildSourceIdCandidate(value)}_${Date.now()}`;
 }
+
+
+
+
