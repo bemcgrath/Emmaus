@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from emmaus.domain.models import PassageReference, StudyGapReport, StudyRecommendation
+from emmaus.domain.models import MoodCheckIn, NudgePreview, PassageReference, StudyGapReport, StudyRecommendation
 from emmaus.services.study import StudyService
 
 
@@ -16,6 +16,7 @@ class PersonalizationService:
         recent_responses = self.study_service.list_recent_responses(user_id)
         open_action_items = self.study_service.list_action_items(user_id, status="open")
         events = self.study_service.list_events(user_id)
+        latest_mood = self.study_service.get_latest_mood_checkin(user_id)
 
         observed_patterns: list[str] = []
 
@@ -59,11 +60,19 @@ class PersonalizationService:
                 consistency_gap = min(1.0, consistency_gap + 0.25)
                 observed_patterns.append("Several days have passed since the last completed session.")
 
-        low_engagement_events = [event for event in events if event.engagement_score <= 2]
+        low_engagement_events = [event for event in events if event.engagement_score <= 2 and event.event_type != "mood_logged"]
         if low_engagement_events:
             comprehension_gap = min(1.0, comprehension_gap + 0.1)
             consistency_gap = min(1.0, consistency_gap + 0.1)
             observed_patterns.append("Low-engagement sessions suggest the plan should be simpler or more focused.")
+
+        if latest_mood is not None:
+            if latest_mood.mood in {"anxious", "stressed", "discouraged"}:
+                consistency_gap = min(1.0, consistency_gap + 0.15)
+                application_gap = min(1.0, application_gap + 0.1)
+                observed_patterns.append(f"Recent mood check-in shows the user feels {latest_mood.mood}.")
+            elif latest_mood.mood in {"encouraged", "peaceful"} and pattern_summary.average_engagement >= 4:
+                observed_patterns.append("Recent mood check-in suggests the user may be ready for a deeper challenge.")
 
         comprehension_gap = round(min(1.0, comprehension_gap), 2)
         application_gap = round(min(1.0, application_gap), 2)
@@ -92,6 +101,7 @@ class PersonalizationService:
         profile = self.study_service.get_profile(user_id)
         pattern_summary = self.study_service.summarize_patterns(user_id)
         gap_report = self.build_gap_report(user_id)
+        latest_mood = self.study_service.get_latest_mood_checkin(user_id)
 
         focus = gap_report.focus_area
         if focus == "consistency":
@@ -126,6 +136,18 @@ class PersonalizationService:
         if profile.preferences.preferred_guide_mode == "peer" and focus in {"consistency", "application"}:
             guide_mode = "peer"
 
+        if latest_mood is not None:
+            if latest_mood.mood in {"anxious", "stressed", "discouraged"}:
+                reference = PassageReference(book="Psalm", chapter=23, start_verse=1, end_verse=3)
+                guide_mode = "peer" if profile.preferences.preferred_guide_mode == "peer" else "guide"
+                entry_point = "I need encouragement"
+                reason = "Recent mood signals suggest the next session should steady and encourage the user before pressing harder."
+                suggested_action = "Keep the next session gentle, grounded, and prayerful."
+            if latest_mood.energy == "low":
+                minutes = max(5, min(minutes, 10))
+            elif latest_mood.energy == "high" and focus == "growth":
+                minutes = min(30, minutes + 5)
+
         return StudyRecommendation(
             user_id=user_id,
             focus_area=focus,
@@ -136,4 +158,42 @@ class PersonalizationService:
             reason=reason,
             suggested_action=suggested_action,
             gap_report=gap_report,
+        )
+
+    def preview_nudge(self, user_id: str) -> NudgePreview:
+        recommendation = self.build_recommendation(user_id)
+        profile = self.study_service.get_profile(user_id)
+        latest_mood = self.study_service.get_latest_mood_checkin(user_id)
+        open_action_items = self.study_service.list_action_items(user_id, status="open")
+
+        if latest_mood is not None and latest_mood.mood in {"anxious", "stressed", "discouraged"}:
+            nudge_type = "encouragement"
+            title = "A gentle moment with Scripture"
+            message = "A short, steady session may help you reconnect with Christ without adding pressure today."
+        elif open_action_items:
+            nudge_type = "follow_through"
+            title = "Follow through on your last step"
+            message = "Your last session already surfaced a practical next step. Review it and take one small action today."
+        elif profile.current_streak == 0:
+            nudge_type = "restart"
+            title = "Begin again today"
+            message = "You do not need to catch up. Start with one small session and let the rhythm begin again."
+        elif profile.current_streak >= 1:
+            nudge_type = "momentum"
+            title = "Keep your rhythm going"
+            message = "You already have momentum. A short session today will keep the pattern alive."
+        else:
+            nudge_type = "theme"
+            title = "Return to a meaningful thread"
+            message = "A focused session can help you keep growing in the area Emmaus has been tracking for you."
+
+        return NudgePreview(
+            user_id=user_id,
+            nudge_type=nudge_type,
+            title=title,
+            message=message,
+            recommended_entry_point=recommendation.recommended_entry_point,
+            recommended_minutes=recommendation.recommended_minutes,
+            recommended_guide_mode=recommendation.recommended_guide_mode,
+            recommendation=recommendation,
         )

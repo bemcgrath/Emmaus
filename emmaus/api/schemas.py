@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field, HttpUrl
 
-from emmaus.domain.models import PassageReference, StudyEvent
+from emmaus.domain.models import MoodCheckIn, PassageReference, StudyEvent
 
 
 class RegisterLocalTextSourceRequest(BaseModel):
@@ -45,6 +45,7 @@ class StudyEventRequest(BaseModel):
         "passage_viewed",
         "session_completed",
         "action_item_completed",
+        "mood_logged",
     ]
     book: str | None = None
     chapter: int | None = None
@@ -69,6 +70,21 @@ class StudyEventRequest(BaseModel):
             reference=reference,
             difficulty=self.difficulty,
             engagement_score=self.engagement_score,
+            notes=self.notes,
+        )
+
+
+class MoodCheckInRequest(BaseModel):
+    user_id: str
+    mood: Literal["encouraged", "peaceful", "neutral", "anxious", "stressed", "discouraged"]
+    energy: Literal["low", "medium", "high"] = "medium"
+    notes: str | None = None
+
+    def to_model(self) -> MoodCheckIn:
+        return MoodCheckIn(
+            user_id=self.user_id,
+            mood=self.mood,
+            energy=self.energy,
             notes=self.notes,
         )
 
@@ -137,4 +153,8 @@ class CreateActionItemRequest(BaseModel):
 
 
 class CompleteActionItemRequest(BaseModel):
+    user_id: str
+
+
+class NudgePreviewRequest(BaseModel):
     user_id: str

@@ -7,6 +7,7 @@ from typing import Any
 from emmaus.domain.models import (
     ActionItem,
     EngagementSummary,
+    MoodCheckIn,
     SessionResponse,
     StudyEvent,
     StudyPatternSummary,
@@ -55,6 +56,22 @@ class StudyService:
         events = self.repository.list_events(user_id)
         return events[-self.history_limit :]
 
+    def record_mood_checkin(self, mood_checkin: MoodCheckIn) -> MoodCheckIn:
+        self.get_or_create_profile(mood_checkin.user_id)
+        saved = self.repository.add_mood_checkin(mood_checkin)
+        self.record_event(
+            StudyEvent(
+                user_id=mood_checkin.user_id,
+                event_type="mood_logged",
+                engagement_score=3,
+                notes=f"{mood_checkin.mood}:{mood_checkin.energy}",
+            )
+        )
+        return saved
+
+    def get_latest_mood_checkin(self, user_id: str) -> MoodCheckIn | None:
+        return self.repository.get_latest_mood_checkin(user_id)
+
     def summarize_patterns(self, user_id: str) -> StudyPatternSummary:
         profile = self.get_profile(user_id)
         events = self.list_events(user_id)
@@ -68,7 +85,8 @@ class StudyService:
             )
 
         average_engagement = round(sum(event.engagement_score for event in events) / len(events), 2)
-        preferred_difficulty = Counter(event.difficulty for event in events).most_common(1)[0][0]
+        preferred_difficulty = Counter(event.difficulty for event in events if event.event_type != "mood_logged").most_common(1)
+        difficulty = preferred_difficulty[0][0] if preferred_difficulty else profile.preferences.preferred_difficulty
         topics = [
             f"{event.reference.book} {event.reference.chapter}"
             for event in events
@@ -81,10 +99,17 @@ class StudyService:
         elif average_engagement >= 4:
             recommended_minutes = min(40, recommended_minutes + 5)
 
+        latest_mood = self.get_latest_mood_checkin(user_id)
+        if latest_mood is not None:
+            if latest_mood.energy == "low":
+                recommended_minutes = max(5, recommended_minutes - 5)
+            elif latest_mood.energy == "high":
+                recommended_minutes = min(40, recommended_minutes + 5)
+
         return StudyPatternSummary(
             user_id=user_id,
             average_engagement=average_engagement,
-            preferred_difficulty=preferred_difficulty,
+            preferred_difficulty=difficulty,
             recent_topics=topics[-5:],
             recommended_session_minutes=recommended_minutes,
         )

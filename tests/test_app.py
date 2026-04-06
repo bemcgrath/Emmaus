@@ -159,3 +159,37 @@ def test_recommendation_targets_application_gaps(tmp_path, monkeypatch):
     next_payload = next_start.json()
     assert next_payload["recommendation"]["focus_area"] == "application"
     assert next_payload["session"]["guide_mode"] in {"coach", "peer"}
+
+
+def test_mood_shapes_recommendation_and_nudge_preview(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    mood = client.post(
+        "/v1/study/mood",
+        json={
+            "user_id": "demo-user",
+            "mood": "stressed",
+            "energy": "low",
+            "notes": "Feeling overwhelmed today",
+        },
+    )
+    assert mood.status_code == 201
+    assert mood.json()["mood"] == "stressed"
+
+    latest_mood = client.get("/v1/study/mood/demo-user")
+    assert latest_mood.status_code == 200
+    assert latest_mood.json()["energy"] == "low"
+
+    recommendation = client.get("/v1/agent/recommendations/demo-user")
+    assert recommendation.status_code == 200
+    recommendation_payload = recommendation.json()
+    assert recommendation_payload["recommended_reference"]["book"] == "Psalm"
+    assert recommendation_payload["recommended_minutes"] <= 10
+    assert recommendation_payload["recommended_entry_point"] == "I need encouragement"
+
+    nudge = client.post("/v1/agent/nudges/preview", json={"user_id": "demo-user"})
+    assert nudge.status_code == 200
+    nudge_payload = nudge.json()
+    assert nudge_payload["nudge_type"] == "encouragement"
+    assert nudge_payload["recommended_minutes"] <= 10
+    assert nudge_payload["recommendation"]["recommended_reference"]["book"] == "Psalm"

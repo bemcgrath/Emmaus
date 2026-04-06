@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from emmaus.api.deps import get_container
-from emmaus.api.schemas import CompleteActionItemRequest, CreateActionItemRequest, StudyEventRequest
+from emmaus.api.schemas import CompleteActionItemRequest, CreateActionItemRequest, MoodCheckInRequest, StudyEventRequest
 from emmaus.core.bootstrap import Container
 from emmaus.domain.models import ActionItem
 
@@ -19,6 +19,16 @@ def record_event(payload: StudyEventRequest, container: Container = Depends(get_
 @router.get("/patterns/{user_id}")
 def get_patterns(user_id: str, container: Container = Depends(get_container)):
     return container.study_service.summarize_patterns(user_id)
+
+
+@router.post("/mood", status_code=201)
+def record_mood_checkin(payload: MoodCheckInRequest, container: Container = Depends(get_container)):
+    return container.study_service.record_mood_checkin(payload.to_model())
+
+
+@router.get("/mood/{user_id}")
+def get_latest_mood(user_id: str, container: Container = Depends(get_container)):
+    return container.study_service.get_latest_mood_checkin(user_id)
 
 
 @router.get("/action-items/{user_id}")

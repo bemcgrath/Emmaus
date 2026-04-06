@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-from emmaus.domain.models import ActionItem, SessionResponse, StudyEvent, StudySession, UserPreferences, UserProfile
+from emmaus.domain.models import ActionItem, MoodCheckIn, SessionResponse, StudyEvent, StudySession, UserPreferences, UserProfile
 
 
 class SQLiteStudyRepository:
@@ -83,6 +83,15 @@ class SQLiteStudyRepository:
                     status TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     completed_at TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS mood_checkins (
+                    mood_checkin_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    mood TEXT NOT NULL,
+                    energy TEXT NOT NULL,
+                    notes TEXT,
+                    created_at TEXT NOT NULL
                 );
                 """
             )
@@ -184,6 +193,39 @@ class SQLiteStudyRepository:
                 )
             )
         return events
+
+    def add_mood_checkin(self, mood_checkin: MoodCheckIn) -> MoodCheckIn:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO mood_checkins (user_id, mood, energy, notes, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    mood_checkin.user_id,
+                    mood_checkin.mood,
+                    mood_checkin.energy,
+                    mood_checkin.notes,
+                    mood_checkin.created_at.isoformat(),
+                ),
+            )
+        return mood_checkin
+
+    def get_latest_mood_checkin(self, user_id: str) -> MoodCheckIn | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT user_id, mood, energy, notes, created_at FROM mood_checkins WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+                (user_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return MoodCheckIn(
+            user_id=row["user_id"],
+            mood=row["mood"],
+            energy=row["energy"],
+            notes=row["notes"],
+            created_at=self._parse_datetime(row["created_at"]),
+        )
 
     def create_session(self, session: StudySession) -> StudySession:
         with self._connect() as connection:

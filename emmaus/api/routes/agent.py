@@ -1,7 +1,7 @@
 ﻿from fastapi import APIRouter, Depends, HTTPException
 
 from emmaus.api.deps import get_container
-from emmaus.api.schemas import AgentSessionRequest, CompleteAgentSessionRequest, RespondAgentSessionRequest, StartAgentSessionRequest
+from emmaus.api.schemas import AgentSessionRequest, CompleteAgentSessionRequest, NudgePreviewRequest, RespondAgentSessionRequest, StartAgentSessionRequest
 from emmaus.core.bootstrap import Container
 
 
@@ -11,6 +11,11 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 @router.get("/recommendations/{user_id}")
 def get_agent_recommendation(user_id: str, container: Container = Depends(get_container)):
     return container.agent_service.recommend_next_session(user_id)
+
+
+@router.post("/nudges/preview")
+def preview_nudge(payload: NudgePreviewRequest, container: Container = Depends(get_container)):
+    return container.personalization_service.preview_nudge(payload.user_id)
 
 
 @router.post("/session")

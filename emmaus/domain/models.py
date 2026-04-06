@@ -70,11 +70,20 @@ class StudyEvent(BaseModel):
         "passage_viewed",
         "session_completed",
         "action_item_completed",
+        "mood_logged",
     ]
     reference: PassageReference | None = None
     difficulty: Literal["gentle", "balanced", "challenging"] = "balanced"
     engagement_score: int = 3
     notes: str | None = None
+
+
+class MoodCheckIn(BaseModel):
+    user_id: str
+    mood: Literal["encouraged", "peaceful", "neutral", "anxious", "stressed", "discouraged"]
+    energy: Literal["low", "medium", "high"] = "medium"
+    notes: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class StudyPatternSummary(BaseModel):
@@ -165,6 +174,17 @@ class StudyRecommendation(BaseModel):
     reason: str
     suggested_action: str
     gap_report: StudyGapReport
+
+
+class NudgePreview(BaseModel):
+    user_id: str
+    nudge_type: Literal["momentum", "restart", "follow_through", "encouragement", "theme"]
+    title: str
+    message: str
+    recommended_entry_point: str
+    recommended_minutes: int
+    recommended_guide_mode: Literal["guide", "peer", "challenger", "coach"]
+    recommendation: StudyRecommendation
 
 
 class AgentStudyResponse(BaseModel):
