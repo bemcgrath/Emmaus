@@ -9,6 +9,8 @@ from emmaus.domain.models import (
     EngagementSummary,
     MoodCheckIn,
     SessionResponse,
+    SpiritualMemoryEntry,
+    SpiritualMemorySummary,
     StudyEvent,
     StudyPatternSummary,
     StudySession,
@@ -147,6 +149,43 @@ class StudyService:
             responses.extend(self.list_session_responses(session.session_id))
         return responses
 
+    def record_spiritual_memory(self, memory: SpiritualMemoryEntry) -> SpiritualMemoryEntry:
+        self.get_or_create_profile(memory.user_id)
+        return self.repository.add_spiritual_memory(memory)
+
+    def list_spiritual_memories(self, user_id: str, limit: int = 5) -> list[SpiritualMemoryEntry]:
+        return self.repository.list_spiritual_memories(user_id, limit=limit)
+
+    def summarize_spiritual_memory(self, user_id: str, limit: int = 5) -> SpiritualMemorySummary:
+        memories = self.list_spiritual_memories(user_id, limit=limit)
+        if not memories:
+            return SpiritualMemorySummary(user_id=user_id)
+
+        latest = memories[0]
+        recurring_themes = self._dedupe_preserve_order(
+            theme
+            for memory in memories
+            for theme in memory.recurring_themes
+        )
+        growth_areas = self._dedupe_preserve_order(
+            area
+            for memory in memories
+            for area in memory.growth_areas
+        )
+        recent_references = self._dedupe_preserve_order(
+            self._format_reference(memory)
+            for memory in memories
+        )
+        return SpiritualMemorySummary(
+            user_id=user_id,
+            latest_summary=latest.summary,
+            recurring_themes=recurring_themes[:5],
+            growth_areas=growth_areas[:5],
+            carry_forward_prompt=latest.carry_forward_prompt,
+            recent_references=recent_references[:5],
+            memory_count=len(memories),
+        )
+
     def create_action_item(self, action_item: ActionItem) -> ActionItem:
         return self.repository.create_action_item(action_item)
 
@@ -191,3 +230,19 @@ class StudyService:
             longest_streak=profile.longest_streak,
             last_completed_on=profile.last_completed_on,
         )
+
+    def _dedupe_preserve_order(self, values: Any) -> list[str]:
+        seen: set[str] = set()
+        ordered: list[str] = []
+        for value in values:
+            normalized = str(value).strip()
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                ordered.append(normalized)
+        return ordered
+
+    def _format_reference(self, memory: SpiritualMemoryEntry) -> str:
+        reference = memory.reference
+        if reference.end_verse and reference.end_verse != reference.start_verse:
+            return f"{reference.book} {reference.chapter}:{reference.start_verse}-{reference.end_verse}"
+        return f"{reference.book} {reference.chapter}:{reference.start_verse}"

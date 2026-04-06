@@ -14,6 +14,7 @@ from emmaus.domain.models import (
     PassageReference,
     PassageText,
     SessionResponse,
+    SpiritualMemoryEntry,
     StudyEvent,
     StudyPatternSummary,
     StudyPlanStep,
@@ -273,12 +274,21 @@ class AdaptiveStudyAgent:
             }
         )
         completed_session = self.study_service.save_session(completed_session)
+        memory_entry = self._create_spiritual_memory(
+            session=completed_session,
+            responses=responses,
+            summary_notes=summary_notes,
+            action_item=created_action_item,
+        )
+        self.study_service.record_spiritual_memory(memory_entry)
+
+        preferred_difficulty = self.study_service.summarize_patterns(user_id).preferred_difficulty
         self.study_service.record_event(
             StudyEvent(
                 user_id=user_id,
                 event_type="session_completed",
                 reference=session.reference,
-                difficulty=self.study_service.summarize_patterns(user_id).preferred_difficulty,
+                difficulty=preferred_difficulty,
                 engagement_score=engagement_score,
                 notes=summary_notes,
             )
@@ -289,7 +299,7 @@ class AdaptiveStudyAgent:
                     user_id=user_id,
                     event_type="reflection_saved",
                     reference=session.reference,
-                    difficulty=self.study_service.summarize_patterns(user_id).preferred_difficulty,
+                    difficulty=preferred_difficulty,
                     engagement_score=engagement_score,
                     notes=summary_notes,
                 )
@@ -633,6 +643,9 @@ class AdaptiveStudyAgent:
         except (json.JSONDecodeError, ValueError, TypeError):
             return self._fallback_action_item_content(session.reference, passage.text, last_response)
 
+        if not isinstance(payload, dict):
+            return self._fallback_action_item_content(session.reference, passage.text, last_response)
+
         title = str(payload.get("title", "")).strip()
         detail = str(payload.get("detail", "")).strip()
         if not title or not detail:
@@ -661,6 +674,130 @@ class AdaptiveStudyAgent:
             f"Live out {primary_theme}"[:80],
             f"Before your next session, choose one concrete act of obedience, encouragement, or prayer that flows from {reference.book} {reference.chapter} and complete it in the next 24 hours."[:280],
         )
+
+    def _create_spiritual_memory(
+        self,
+        session: StudySession,
+        responses: list[SessionResponse],
+        summary_notes: str | None,
+        action_item: ActionItem,
+    ) -> SpiritualMemoryEntry:
+        passage = self.text_service.get_passage(session.reference, session.text_source_id)
+        summary, recurring_themes, growth_areas, carry_forward_prompt = self._generate_spiritual_memory_content(
+            session=session,
+            passage=passage,
+            responses=responses,
+            summary_notes=summary_notes,
+            action_item=action_item,
+        )
+        return SpiritualMemoryEntry(
+            memory_id=str(uuid4()),
+            user_id=session.user_id,
+            session_id=session.session_id,
+            reference=session.reference,
+            summary=summary,
+            recurring_themes=recurring_themes,
+            growth_areas=growth_areas,
+            carry_forward_prompt=carry_forward_prompt,
+        )
+
+    def _generate_spiritual_memory_content(
+        self,
+        session: StudySession,
+        passage: PassageText,
+        responses: list[SessionResponse],
+        summary_notes: str | None,
+        action_item: ActionItem,
+    ) -> tuple[str, list[str], list[str], str]:
+        response_snippets = [
+            f"{response.question_type}: {response.response_text.strip().replace(chr(10), ' ')[:160]}"
+            for response in responses
+            if response.response_text.strip()
+        ]
+        prompt = (
+            "You are Emmaus, creating a compact spiritual memory after a Bible study session. "
+            "Return JSON only with keys summary, recurring_themes, growth_areas, carry_forward_prompt. "
+            "summary should be one short paragraph in plain language. "
+            "recurring_themes and growth_areas should each be arrays of 1 to 3 short phrases. "
+            "carry_forward_prompt should be one concise sentence Emmaus can use to reconnect the user next time. "
+            "Keep everything Christ-centered, grounded in the passage, and easy to display on mobile.\n\n"
+            f"Passage reference: {self._format_reference(session.reference)}\n"
+            f"Passage text: {passage.text}\n"
+            f"Guide mode: {session.guide_mode}\n"
+            f"Session summary notes: {summary_notes or 'None'}\n"
+            f"Action item title: {action_item.title}\n"
+            f"Action item detail: {action_item.detail}\n"
+            f"User responses: {json.dumps(response_snippets)}\n"
+        )
+        raw = self.llm_registry.get(session.llm_source_id).generate_guidance(prompt)
+        try:
+            payload = json.loads(self._extract_json_payload(raw))
+        except (json.JSONDecodeError, ValueError, TypeError):
+            return self._fallback_spiritual_memory_content(session.reference, passage.text, responses, summary_notes, action_item)
+
+        if not isinstance(payload, dict):
+            return self._fallback_spiritual_memory_content(session.reference, passage.text, responses, summary_notes, action_item)
+
+        summary = str(payload.get("summary", "")).strip()
+        recurring_themes = self._normalize_short_list(payload.get("recurring_themes"))
+        growth_areas = self._normalize_short_list(payload.get("growth_areas"))
+        carry_forward_prompt = str(payload.get("carry_forward_prompt", "")).strip()
+        if not summary or not recurring_themes or not growth_areas or not carry_forward_prompt:
+            return self._fallback_spiritual_memory_content(session.reference, passage.text, responses, summary_notes, action_item)
+        return summary[:320], recurring_themes[:3], growth_areas[:3], carry_forward_prompt[:180]
+
+    def _fallback_spiritual_memory_content(
+        self,
+        reference: PassageReference,
+        passage_text: str,
+        responses: list[SessionResponse],
+        summary_notes: str | None,
+        action_item: ActionItem,
+    ) -> tuple[str, list[str], list[str], str]:
+        primary_theme = self._primary_theme_label(passage_text)
+        last_response = responses[-1].response_text.strip().replace("\n", " ")[:160] if responses else ""
+        summary_seed = summary_notes.strip() if summary_notes else last_response
+        if summary_seed:
+            summary = (
+                f"In {reference.book} {reference.chapter}, Emmaus saw the user returning to {primary_theme} while reflecting on this response: {summary_seed}."
+            )[:320]
+        else:
+            summary = (
+                f"In {reference.book} {reference.chapter}, Emmaus saw the user engaging {primary_theme} and moving toward a concrete response."
+            )[:320]
+
+        recurring_themes = [primary_theme]
+        if any("encour" in response.response_text.lower() for response in responses):
+            recurring_themes.append("encouraging others")
+        elif any("pray" in response.response_text.lower() for response in responses):
+            recurring_themes.append("prayerful dependence")
+        else:
+            recurring_themes.append("responding to Scripture personally")
+
+        growth_areas = []
+        if any(response.question_type == "interpretation" for response in responses):
+            growth_areas.append("slowing down to understand the passage")
+        if any(response.question_type in {"application", "reflection"} for response in responses):
+            growth_areas.append("turning insight into concrete follow-through")
+        if not growth_areas:
+            growth_areas.append("carrying Scripture into daily life")
+
+        carry_forward_prompt = (
+            f"Return to {primary_theme} and follow through on '{action_item.title}' before moving on to something new."
+        )[:180]
+        return summary, recurring_themes[:3], growth_areas[:3], carry_forward_prompt
+
+    def _normalize_short_list(self, value: object) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            text = str(item).strip()
+            if text and text not in seen:
+                seen.add(text)
+                normalized.append(text[:80])
+        return normalized
 
     def _event_note(self, response_text: str, evaluation: StudyResponseEvaluation) -> str:
         snippet = response_text.strip().replace("\n", " ")[:140]

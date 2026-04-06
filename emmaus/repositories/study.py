@@ -6,7 +6,16 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-from emmaus.domain.models import ActionItem, MoodCheckIn, SessionResponse, StudyEvent, StudySession, UserPreferences, UserProfile
+from emmaus.domain.models import (
+    ActionItem,
+    MoodCheckIn,
+    SessionResponse,
+    SpiritualMemoryEntry,
+    StudyEvent,
+    StudySession,
+    UserPreferences,
+    UserProfile,
+)
 
 
 class SQLiteStudyRepository:
@@ -93,6 +102,18 @@ class SQLiteStudyRepository:
                     mood TEXT NOT NULL,
                     energy TEXT NOT NULL,
                     notes TEXT,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS spiritual_memories (
+                    memory_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    session_id TEXT NOT NULL,
+                    reference_json TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    recurring_themes_json TEXT NOT NULL,
+                    growth_areas_json TEXT NOT NULL,
+                    carry_forward_prompt TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
                 """
@@ -404,6 +425,39 @@ class SQLiteStudyRepository:
             )
         return self.get_action_item(action_item_id)
 
+    def add_spiritual_memory(self, memory: SpiritualMemoryEntry) -> SpiritualMemoryEntry:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO spiritual_memories (
+                    memory_id, user_id, session_id, reference_json, summary, recurring_themes_json,
+                    growth_areas_json, carry_forward_prompt, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    memory.memory_id,
+                    memory.user_id,
+                    memory.session_id,
+                    json.dumps(memory.reference.model_dump()),
+                    memory.summary,
+                    json.dumps(memory.recurring_themes),
+                    json.dumps(memory.growth_areas),
+                    memory.carry_forward_prompt,
+                    memory.created_at.isoformat(),
+                ),
+            )
+        return memory
+
+    def list_spiritual_memories(self, user_id: str, limit: int | None = None) -> list[SpiritualMemoryEntry]:
+        query = "SELECT * FROM spiritual_memories WHERE user_id = ? ORDER BY created_at DESC"
+        params: list[object] = [user_id]
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+        with self._connect() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [self._row_to_memory(row) for row in rows]
+
     def list_completed_session_dates(self, user_id: str) -> Sequence[date]:
         with self._connect() as connection:
             rows = connection.execute(
@@ -465,6 +519,19 @@ class SQLiteStudyRepository:
             completed_at=self._parse_datetime(row["completed_at"]),
             follow_up_note=row["follow_up_note"] if "follow_up_note" in row.keys() else None,
             follow_up_outcome=row["follow_up_outcome"] if "follow_up_outcome" in row.keys() else None,
+        )
+
+    def _row_to_memory(self, row: sqlite3.Row) -> SpiritualMemoryEntry:
+        return SpiritualMemoryEntry(
+            memory_id=row["memory_id"],
+            user_id=row["user_id"],
+            session_id=row["session_id"],
+            reference=json.loads(row["reference_json"]),
+            summary=row["summary"],
+            recurring_themes=json.loads(row["recurring_themes_json"]),
+            growth_areas=json.loads(row["growth_areas_json"]),
+            carry_forward_prompt=row["carry_forward_prompt"],
+            created_at=self._parse_datetime(row["created_at"]),
         )
 
     def _compute_streaks(self, completed_dates: Sequence[date]) -> tuple[int, int]:

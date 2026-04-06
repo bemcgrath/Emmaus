@@ -5,7 +5,6 @@ from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from emmaus.domain.models import (
-    MoodCheckIn,
     NudgeDeliveryPlan,
     NudgePreview,
     PassageReference,
@@ -39,6 +38,7 @@ class PersonalizationService:
         open_action_items = self.study_service.list_action_items(user_id, status="open")
         events = self.study_service.list_events(user_id)
         latest_mood = self.study_service.get_latest_mood_checkin(user_id)
+        memory_summary = self.study_service.summarize_spiritual_memory(user_id)
 
         observed_patterns: list[str] = []
         focus_votes: Counter[str] = Counter()
@@ -120,6 +120,14 @@ class PersonalizationService:
             elif latest_mood.mood in {"encouraged", "peaceful"} and pattern_summary.average_engagement >= 4:
                 self._append_pattern(observed_patterns, "Recent mood check-in suggests the user may be ready for a deeper challenge.")
 
+        if memory_summary.memory_count > 0:
+            if memory_summary.latest_summary:
+                self._append_pattern(observed_patterns, f"Recent spiritual thread: {memory_summary.latest_summary}")
+            for area in memory_summary.growth_areas[:2]:
+                self._append_pattern(observed_patterns, f"Emmaus has been tracking growth in {area}.")
+            for theme in memory_summary.recurring_themes[:2]:
+                self._append_pattern(observed_patterns, f"Recurring theme in recent sessions: {theme}.")
+
         if focus_votes["comprehension"] > focus_votes["application"]:
             comprehension_gap = min(1.0, comprehension_gap + 0.05)
         elif focus_votes["application"] > focus_votes["comprehension"]:
@@ -157,6 +165,7 @@ class PersonalizationService:
         pattern_summary = self.study_service.summarize_patterns(user_id)
         gap_report = self.build_gap_report(user_id)
         latest_mood = self.study_service.get_latest_mood_checkin(user_id)
+        memory_summary = self.study_service.summarize_spiritual_memory(user_id)
 
         focus = gap_report.focus_area
         lead_pattern = gap_report.observed_patterns[0] if gap_report.observed_patterns else None
@@ -192,6 +201,14 @@ class PersonalizationService:
         if lead_pattern is not None:
             reason = f"{reason} {lead_pattern}"
 
+        if memory_summary.memory_count > 0:
+            if focus in {"application", "comprehension", "growth"} and memory_summary.carry_forward_prompt:
+                entry_point = memory_summary.carry_forward_prompt[:120]
+            if memory_summary.latest_summary:
+                reason = f"{reason} Building on a recent thread: {memory_summary.latest_summary}"
+            if memory_summary.growth_areas and focus != "consistency":
+                suggested_action = f"Return to this growth edge next: {memory_summary.growth_areas[0]}."
+
         if profile.preferences.preferred_guide_mode == "peer" and focus in {"consistency", "application"}:
             guide_mode = "peer"
 
@@ -224,6 +241,7 @@ class PersonalizationService:
         profile = self.study_service.get_profile(user_id)
         latest_mood = self.study_service.get_latest_mood_checkin(user_id)
         open_action_items = self.study_service.list_action_items(user_id, status="open")
+        memory_summary = self.study_service.summarize_spiritual_memory(user_id)
 
         if latest_mood is not None and latest_mood.mood in {"anxious", "stressed", "discouraged"}:
             nudge_type = "encouragement"
@@ -237,6 +255,10 @@ class PersonalizationService:
             nudge_type = "restart"
             title = "Begin again today"
             message = "You do not need to catch up. Start with one small session and let the rhythm begin again."
+        elif memory_summary.memory_count > 0 and memory_summary.recurring_themes:
+            nudge_type = "theme"
+            title = "Return to what Christ has been surfacing"
+            message = f"Emmaus has noticed a recurring thread around {memory_summary.recurring_themes[0]}. Revisit it with one focused session today."
         elif profile.current_streak >= 1:
             nudge_type = "momentum"
             title = "Keep your rhythm going"

@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends
 
 from emmaus.api.deps import get_container
 from emmaus.api.schemas import UpdateUserPreferencesRequest
@@ -11,6 +11,11 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("/{user_id}/profile")
 def get_user_profile(user_id: str, container: Container = Depends(get_container)):
     return container.study_service.get_profile(user_id)
+
+
+@router.get("/{user_id}/memory")
+def get_user_memory(user_id: str, container: Container = Depends(get_container)):
+    return container.study_service.summarize_spiritual_memory(user_id)
 
 
 @router.patch("/{user_id}/preferences")

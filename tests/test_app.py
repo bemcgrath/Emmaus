@@ -540,6 +540,63 @@ def test_strong_llm_evaluation_allows_growth_recommendation(tmp_path, monkeypatc
 
 
 
+def test_completed_session_creates_spiritual_memory(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    client.app.state.container.llm_registry.register(StrongResponseProvider())
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "requested_minutes": 15,
+        },
+    )
+    session_id = start.json()["session"]["session_id"]
+
+    for answer in [
+        "I notice Christ draws near to discouraged people and reorients them through Scripture.",
+        "This passage shows Jesus patiently explaining what was already there and inviting deeper trust.",
+        "I need to follow through by encouraging someone who feels confused or discouraged this week.",
+    ]:
+        client.post(
+            "/v1/agent/session/respond",
+            json={
+                "session_id": session_id,
+                "user_id": "demo-user",
+                "response_text": answer,
+                "engagement_score": 4,
+            },
+        )
+
+    complete = client.post(
+        "/v1/agent/session/complete",
+        json={
+            "session_id": session_id,
+            "user_id": "demo-user",
+            "summary_notes": "Christ meets confused people patiently and I want to keep responding that way.",
+        },
+    )
+    assert complete.status_code == 200
+
+    memory = client.get("/v1/users/demo-user/memory")
+    assert memory.status_code == 200
+    memory_payload = memory.json()
+    assert memory_payload["memory_count"] >= 1
+    assert memory_payload["latest_summary"]
+    assert memory_payload["carry_forward_prompt"]
+    assert memory_payload["recurring_themes"]
+    assert memory_payload["growth_areas"]
+    assert memory_payload["recent_references"]
+
+    recommendation = client.get("/v1/agent/recommendations/demo-user")
+    assert recommendation.status_code == 200
+    recommendation_payload = recommendation.json()
+    assert "recent thread" in recommendation_payload["reason"].lower()
+    assert recommendation_payload["recommended_entry_point"]
+
+
+
 def test_nudge_delivery_plan_is_notification_ready(tmp_path, monkeypatch):
     client = build_client(tmp_path, monkeypatch)
 

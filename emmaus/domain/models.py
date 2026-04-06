@@ -144,6 +144,28 @@ class StudyResponseEvaluation(BaseModel):
     observed_patterns: list[str] = Field(default_factory=list)
 
 
+class SpiritualMemoryEntry(BaseModel):
+    memory_id: str
+    user_id: str
+    session_id: str
+    reference: PassageReference
+    summary: str
+    recurring_themes: list[str] = Field(default_factory=list)
+    growth_areas: list[str] = Field(default_factory=list)
+    carry_forward_prompt: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class SpiritualMemorySummary(BaseModel):
+    user_id: str
+    latest_summary: str | None = None
+    recurring_themes: list[str] = Field(default_factory=list)
+    growth_areas: list[str] = Field(default_factory=list)
+    carry_forward_prompt: str | None = None
+    recent_references: list[str] = Field(default_factory=list)
+    memory_count: int = 0
+
+
 class StudySession(BaseModel):
     session_id: str
     user_id: str
