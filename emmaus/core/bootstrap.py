@@ -1,5 +1,5 @@
 from emmaus.core.config import Settings
-from emmaus.providers.commentary import CommentaryProviderRegistry, NotesPlaceholderCommentaryProvider
+from emmaus.providers.commentary import CommentaryProviderRegistry, ESVPassageHelpsProvider, NotesPlaceholderCommentaryProvider
 from emmaus.providers.llm import LLMProviderRegistry, NullLLMProvider, OllamaProvider
 from emmaus.providers.text import ESVBibleTextProvider, LocalJsonBibleTextProvider, RemoteApiBibleTextProvider, TextProviderRegistry
 from emmaus.repositories.study import SQLiteStudyRepository
@@ -71,6 +71,13 @@ def build_container() -> Container:
                 license_name="Crossway API Terms",
             )
         )
+        container.commentary_registry.register(
+            ESVPassageHelpsProvider(
+                source_id="esv_passage_helps",
+                name="ESV Passage Helps",
+                api_key=container.settings.esv_api_key,
+            )
+        )
 
     container.text_registry.register(
         RemoteApiBibleTextProvider(
@@ -104,3 +111,4 @@ def build_container() -> Container:
     else:
         container.llm_registry.register(NullLLMProvider(source_id="local_rules"))
     return container
+

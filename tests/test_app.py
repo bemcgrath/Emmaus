@@ -110,6 +110,10 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "completion-summary-pill" in response.text
     assert "follow-up-target-copy" in response.text
     assert "nudge-plan-card" in response.text
+    assert response.text.count('id="identity-form"') == 1
+    assert response.text.count('id="mood-form"') == 1
+    assert 'data-nav-target="profile"' in response.text
+    assert 'data-nav-target="nudges"' not in response.text
 
     asset = client.get("/static/app.js")
     assert asset.status_code == 200
@@ -252,6 +256,60 @@ def test_esv_text_source_can_be_registered_and_used(tmp_path, monkeypatch):
     assert "Crossway" in payload["copyright_notice"]
 
 
+
+def test_esv_session_includes_passage_helps(tmp_path, monkeypatch):
+    def fake_text_urlopen(req, timeout=15):
+        class DummyResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                url = req.full_url if hasattr(req, "full_url") else str(req)
+                if "passage/html" in url:
+                    return json.dumps({
+                        "canonical": "John 3:16-17",
+                        "passages": [
+                            "<h2>The New Birth</h2><p>For God so loved the world<sup class=\"footnote\">a</sup>.</p><div class=\"footnotes\"><p>a Or This is a clarifying footnote.</p></div><div class=\"crossrefs\"><p>See Rom. 5:8; 1 John 4:9.</p></div>"
+                        ],
+                    }).encode("utf-8")
+                return json.dumps({
+                    "canonical": "John 3:16-17",
+                    "passages": ["For God so loved the world, that he gave his only Son, that whoever believes in him should not perish but have eternal life."],
+                }).encode("utf-8")
+
+        return DummyResponse()
+
+    monkeypatch.setenv("EMMAUS_ESV_API_KEY", "configured-esv-key")
+    monkeypatch.setattr("emmaus.providers.text.request.urlopen", fake_text_urlopen)
+    monkeypatch.setattr("emmaus.providers.commentary.request.urlopen", fake_text_urlopen)
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "esv",
+            "reference": {
+                "book": "John",
+                "chapter": 3,
+                "start_verse": 16,
+                "end_verse": 17,
+            },
+            "requested_minutes": 15,
+        },
+    )
+    assert start.status_code == 200
+    payload = start.json()
+    assert payload["session"]["commentary_source_id"] == "esv_passage_helps"
+    assert payload["commentary"]
+    assert any(note["metadata"].get("kind") == "passage_helps" for note in payload["commentary"])
+    combined = " ".join(f"{note['title']} {note['body']}" for note in payload["commentary"])
+    assert "footnote" in combined.lower() or "cross-reference" in combined.lower() or "section headings" in combined.lower()
 def test_configured_esv_becomes_effective_default_source(tmp_path, monkeypatch):
     def fake_urlopen(req, timeout=15):
         class DummyResponse:
@@ -902,4 +960,6 @@ def test_nudge_preview_builds_on_completed_follow_through(tmp_path, monkeypatch)
     assert payload["message"].startswith("You already followed through on")
     assert action_item["title"] in payload["message"]
     assert "Build on the completed step" in payload["message"] or "Christ is inviting next" in payload["message"]
+
+
 

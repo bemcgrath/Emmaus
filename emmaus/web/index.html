@@ -17,7 +17,6 @@
           <p class="eyebrow">Emmaus</p>
           <h1 id="hero-title">Your guide for Scripture, reflection, and response.</h1>
         </div>
-        <button class="ghost-button" id="refresh-button" type="button">Refresh</button>
       </header>
 
       <main class="screens">
@@ -91,57 +90,72 @@
             <div class="panel-heading">
               <div>
                 <p class="panel-label">Bible</p>
-                <h2>Choose your Bible</h2>
+                <h2>Your Bible</h2>
               </div>
             </div>
-            <p class="micro-copy" id="source-manager-copy">Pick a Bible and start studying. You can always change it later.</p>
-            <div class="source-quick-actions">
-              <button id="source-use-starter" class="primary-button full-width" type="button">Use included starter Bible</button>
-              <button id="source-focus-esv" class="secondary-button full-width" type="button">Connect ESV</button>
-              <button id="source-advanced-toggle" class="secondary-button full-width" type="button" aria-expanded="false">More setup options</button>
+            <p class="micro-copy" id="source-manager-copy">Emmaus will use your current Bible for new sessions.</p>
+            <div class="inline-card current-bible-card">
+              <div class="content-stack compact-gap">
+                <p><strong id="source-current-name">Current Bible</strong></p>
+                <p class="micro-copy" id="source-current-detail">Choose the Bible Emmaus should use for new sessions.</p>
+                <div id="source-current-meta" class="source-current-meta"></div>
+              </div>
+              <div class="source-card-actions current-bible-actions">
+                <button id="source-preview-current" class="action-button" type="button">Preview sample</button>
+                <button id="source-manage-toggle" class="secondary-button" type="button" aria-expanded="false">Manage Bible</button>
+              </div>
             </div>
-            <div id="translation-template-list" class="list-stack"></div>
-            <div id="source-preview-card" class="content-stack"></div>
-            <div id="source-library" class="list-stack"></div>
-            <form id="source-esv-form" class="stack-form compact-form">
-              <p class="panel-label">Connect ESV</p>
-              <p class="micro-copy">Use your Crossway ESV API key. Emmaus will connect through the official API without bundling the text in this open-source app.</p>
-              <label>
-                <span>ESV API key</span>
-                <input id="source-esv-key" type="password" placeholder="Paste your ESV API key" />
-              </label>
-              <button class="secondary-button full-width" type="submit">Connect ESV</button>
-            </form>
-            <form id="source-upload-form" class="stack-form compact-form">
-              <p class="panel-label">Upload from device</p>
-              <label>
-                <span>Bible name</span>
-                <input id="source-upload-name" type="text" placeholder="My Bible" />
-              </label>
-              <label>
-                <span>Bible JSON file</span>
-                <input id="source-upload-file" type="file" accept=".json,application/json" />
-              </label>
-              <button class="secondary-button full-width" type="submit">Upload Bible file</button>
-            </form>
-            <section id="source-advanced-panel" class="stack-form compact-form hidden">
-              <p class="panel-label">Advanced setup</p>
-              <p class="micro-copy">Use this only if your Bible provider gave you an API URL and key.</p>
-              <form id="source-api-form" class="stack-form compact-form no-top-gap">
-                <label>
-                  <span>Provider name</span>
-                  <input id="source-api-name" type="text" placeholder="Licensed Bible provider" />
-                </label>
-                <label>
-                  <span>Base URL</span>
-                  <input id="source-api-url" type="url" placeholder="https://example.com/bible" />
-                </label>
-                <label>
-                  <span>API key</span>
-                  <input id="source-api-key" type="password" placeholder="Optional" />
-                </label>
-                <button class="secondary-button full-width" type="submit">Connect provider</button>
-              </form>
+            <section id="source-manager-details" class="content-stack hidden">
+              <div class="source-quick-actions">
+                <button id="source-use-starter" class="primary-button full-width" type="button">Use included starter Bible</button>
+                <button id="source-focus-esv" class="secondary-button full-width" type="button">Connect ESV</button>
+                <button id="source-advanced-toggle" class="secondary-button full-width" type="button" aria-expanded="false">More setup options</button>
+              </div>
+              <section id="source-setup-options" class="content-stack hidden">
+                <div id="translation-template-list" class="list-stack"></div>
+                <div id="source-preview-card" class="content-stack"></div>
+                <div id="source-library" class="list-stack"></div>
+                <form id="source-esv-form" class="stack-form compact-form">
+                  <p class="panel-label">Connect ESV</p>
+                  <p class="micro-copy">Use your Crossway ESV API key. Emmaus will connect through the official API without bundling the text in this open-source app.</p>
+                  <label>
+                    <span>ESV API key</span>
+                    <input id="source-esv-key" type="password" placeholder="Paste your ESV API key" />
+                  </label>
+                  <button class="secondary-button full-width" type="submit">Connect ESV</button>
+                </form>
+                <form id="source-upload-form" class="stack-form compact-form">
+                  <p class="panel-label">Upload from device</p>
+                  <label>
+                    <span>Bible name</span>
+                    <input id="source-upload-name" type="text" placeholder="My Bible" />
+                  </label>
+                  <label>
+                    <span>Bible JSON file</span>
+                    <input id="source-upload-file" type="file" accept=".json,application/json" />
+                  </label>
+                  <button class="secondary-button full-width" type="submit">Upload Bible file</button>
+                </form>
+                <section id="source-advanced-panel" class="stack-form compact-form">
+                  <p class="panel-label">Advanced setup</p>
+                  <p class="micro-copy">Use this only if your Bible provider gave you an API URL and key.</p>
+                  <form id="source-api-form" class="stack-form compact-form no-top-gap">
+                    <label>
+                      <span>Provider name</span>
+                      <input id="source-api-name" type="text" placeholder="Licensed Bible provider" />
+                    </label>
+                    <label>
+                      <span>Base URL</span>
+                      <input id="source-api-url" type="url" placeholder="https://example.com/bible" />
+                    </label>
+                    <label>
+                      <span>API key</span>
+                      <input id="source-api-key" type="password" placeholder="Optional" />
+                    </label>
+                    <button class="secondary-button full-width" type="submit">Connect provider</button>
+                  </form>
+                </section>
+              </section>
             </section>
           </section>
 
@@ -158,6 +172,16 @@
             </article>
           </section>
 
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Check-in</p>
+                <h2>How are you arriving today?</h2>
+              </div>
+            </div>
+            <p class="micro-copy">A quick check-in helps Emmaus shape today's study with the right tone and pace.</p>
+          </section>
+
           <section class="panel">
             <div class="panel-heading">
               <div>
@@ -167,120 +191,6 @@
               <span class="status-pill" id="focus-pill">Loading</span>
             </div>
             <div id="recommendation-card" class="content-stack"></div>
-          </section>
-
-          <section class="panel stack-panel">
-            <div class="panel-heading">
-              <div>
-                <p class="panel-label">Identity</p>
-                <h2>Guide profile and rhythm</h2>
-              </div>
-            </div>
-            <form id="identity-form" class="stack-form">
-              <label>
-                <span>User ID</span>
-                <input id="user-id-input" name="userId" type="text" placeholder="demo-user" required />
-              </label>
-              <label>
-                <span>Display name</span>
-                <input id="display-name-input" name="displayName" type="text" placeholder="Brian" />
-              </label>
-              <label>
-                <span>Usual session length</span>
-                <input id="preferred-minutes-input" name="preferredMinutes" type="number" min="5" max="60" step="5" />
-              </label>
-              <label>
-                <span>Guide style</span>
-                <select id="guide-mode-select" name="guideMode">
-                  <option value="guide">Guide</option>
-                  <option value="peer">Peer</option>
-                  <option value="challenger">Challenger</option>
-                  <option value="coach">Coach</option>
-                </select>
-              </label>
-              <label>
-                <span>Preferred Bible</span>
-                <select id="preferred-source-select" name="preferredSource"></select>
-              </label>
-              <label>
-                <span>Nudge tone</span>
-                <select id="nudge-intensity-select" name="nudgeIntensity">
-                  <option value="gentle">Gentle</option>
-                  <option value="balanced">Balanced</option>
-                  <option value="direct">Direct</option>
-                </select>
-              </label>
-              <label>
-                <span>Timezone</span>
-                <input id="timezone-input" name="timezone" type="text" placeholder="America/New_York" />
-              </label>
-              <div class="stack-form compact-form">
-                <p class="panel-label">Preferred study days</p>
-                <div class="chip-row" id="study-days-row">
-                  <button type="button" class="choice-chip" data-day="mon">Mon</button>
-                  <button type="button" class="choice-chip" data-day="tue">Tue</button>
-                  <button type="button" class="choice-chip" data-day="wed">Wed</button>
-                  <button type="button" class="choice-chip" data-day="thu">Thu</button>
-                  <button type="button" class="choice-chip" data-day="fri">Fri</button>
-                  <button type="button" class="choice-chip" data-day="sat">Sat</button>
-                  <button type="button" class="choice-chip" data-day="sun">Sun</button>
-                </div>
-              </div>
-              <div class="inline-inputs">
-                <label>
-                  <span>Study window start</span>
-                  <input id="study-window-start-input" name="studyWindowStart" type="time" />
-                </label>
-                <label>
-                  <span>Study window end</span>
-                  <input id="study-window-end-input" name="studyWindowEnd" type="time" />
-                </label>
-              </div>
-              <div class="inline-inputs">
-                <label>
-                  <span>Quiet hours start</span>
-                  <input id="quiet-hours-start-input" name="quietHoursStart" type="time" />
-                </label>
-                <label>
-                  <span>Quiet hours end</span>
-                  <input id="quiet-hours-end-input" name="quietHoursEnd" type="time" />
-                </label>
-              </div>
-              <button class="secondary-button full-width" type="submit">Save preferences</button>
-            </form>
-          </section>
-
-          <section class="panel">
-            <div class="panel-heading">
-              <div>
-                <p class="panel-label">Check-in</p>
-                <h2>Mood and energy</h2>
-              </div>
-            </div>
-            <form id="mood-form" class="stack-form compact-form">
-              <div class="chip-row" id="mood-chip-row">
-                <button type="button" class="choice-chip" data-value="encouraged">Encouraged</button>
-                <button type="button" class="choice-chip" data-value="peaceful">Peaceful</button>
-                <button type="button" class="choice-chip" data-value="neutral">Neutral</button>
-                <button type="button" class="choice-chip" data-value="anxious">Anxious</button>
-                <button type="button" class="choice-chip" data-value="stressed">Stressed</button>
-                <button type="button" class="choice-chip" data-value="discouraged">Discouraged</button>
-              </div>
-              <label>
-                <span>Energy</span>
-                <select id="energy-select" name="energy">
-                  <option value="low">Low</option>
-                  <option value="medium" selected>Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </label>
-              <label>
-                <span>Notes</span>
-                <textarea id="mood-notes" name="notes" rows="3" placeholder="What is weighing on you or encouraging you today?"></textarea>
-              </label>
-              <button class="secondary-button full-width" type="submit">Save check-in</button>
-              <p class="micro-copy" id="latest-mood-copy">No mood check-in saved yet.</p>
-            </form>
           </section>
         </section>
 
@@ -434,6 +344,122 @@
           </section>
         </section>
 
+        <section class="screen" data-screen="profile">
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Profile</p>
+                <h2>Guide profile and rhythm</h2>
+              </div>
+            </div>
+            <p class="micro-copy">Adjust your study rhythm, Bible preference, reminder tone, and time windows here. Your daily check-in now lives on Home.</p>
+            <form id="identity-form" class="stack-form">
+              <label>
+                <span>User ID</span>
+                <input id="user-id-input" name="userId" type="text" placeholder="demo-user" required />
+              </label>
+              <label>
+                <span>Display name</span>
+                <input id="display-name-input" name="displayName" type="text" placeholder="Brian" />
+              </label>
+              <label>
+                <span>Usual session length</span>
+                <input id="preferred-minutes-input" name="preferredMinutes" type="number" min="5" max="60" step="5" />
+              </label>
+              <label>
+                <span>Guide style</span>
+                <select id="guide-mode-select" name="guideMode">
+                  <option value="guide">Guide</option>
+                  <option value="peer">Peer</option>
+                  <option value="challenger">Challenger</option>
+                  <option value="coach">Coach</option>
+                </select>
+              </label>
+              <label>
+                <span>Preferred Bible</span>
+                <select id="preferred-source-select" name="preferredSource"></select>
+              </label>
+              <label>
+                <span>Nudge tone</span>
+                <select id="nudge-intensity-select" name="nudgeIntensity">
+                  <option value="gentle">Gentle</option>
+                  <option value="balanced">Balanced</option>
+                  <option value="direct">Direct</option>
+                </select>
+              </label>
+              <label>
+                <span>Timezone</span>
+                <input id="timezone-input" name="timezone" type="text" placeholder="America/New_York" />
+              </label>
+              <div class="stack-form compact-form">
+                <p class="panel-label">Preferred study days</p>
+                <div class="chip-row" id="study-days-row">
+                  <button type="button" class="choice-chip" data-day="mon">Mon</button>
+                  <button type="button" class="choice-chip" data-day="tue">Tue</button>
+                  <button type="button" class="choice-chip" data-day="wed">Wed</button>
+                  <button type="button" class="choice-chip" data-day="thu">Thu</button>
+                  <button type="button" class="choice-chip" data-day="fri">Fri</button>
+                  <button type="button" class="choice-chip" data-day="sat">Sat</button>
+                  <button type="button" class="choice-chip" data-day="sun">Sun</button>
+                </div>
+              </div>
+              <div class="inline-inputs">
+                <label>
+                  <span>Study window start</span>
+                  <input id="study-window-start-input" name="studyWindowStart" type="time" />
+                </label>
+                <label>
+                  <span>Study window end</span>
+                  <input id="study-window-end-input" name="studyWindowEnd" type="time" />
+                </label>
+              </div>
+              <div class="inline-inputs">
+                <label>
+                  <span>Quiet hours start</span>
+                  <input id="quiet-hours-start-input" name="quietHoursStart" type="time" />
+                </label>
+                <label>
+                  <span>Quiet hours end</span>
+                  <input id="quiet-hours-end-input" name="quietHoursEnd" type="time" />
+                </label>
+              </div>
+              <button class="secondary-button full-width" type="submit">Save preferences</button>
+            </form>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Check-in</p>
+                <h2>Mood and energy</h2>
+              </div>
+            </div>
+            <form id="mood-form" class="stack-form compact-form">
+              <div class="chip-row" id="mood-chip-row">
+                <button type="button" class="choice-chip" data-value="encouraged">Encouraged</button>
+                <button type="button" class="choice-chip" data-value="peaceful">Peaceful</button>
+                <button type="button" class="choice-chip" data-value="neutral">Neutral</button>
+                <button type="button" class="choice-chip" data-value="anxious">Anxious</button>
+                <button type="button" class="choice-chip" data-value="stressed">Stressed</button>
+                <button type="button" class="choice-chip" data-value="discouraged">Discouraged</button>
+              </div>
+              <label>
+                <span>Energy</span>
+                <select id="energy-select" name="energy">
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+              <label>
+                <span>Notes</span>
+                <textarea id="mood-notes" name="notes" rows="3" placeholder="What is weighing on you or encouraging you today?"></textarea>
+              </label>
+              <button class="secondary-button full-width" type="submit">Save check-in</button>
+              <p class="micro-copy" id="latest-mood-copy">No mood check-in saved yet.</p>
+            </form>
+          </section>
+        </section>
         <section class="screen" data-screen="nudges">
           <section class="panel stack-panel">
             <div class="panel-heading">
@@ -460,7 +486,7 @@
         <button class="nav-pill nav-pill-active" type="button" data-nav-target="home">Home</button>
         <button class="nav-pill" type="button" data-nav-target="session">Study</button>
         <button class="nav-pill" type="button" data-nav-target="actions">Actions</button>
-        <button class="nav-pill" type="button" data-nav-target="nudges">Reminders</button>
+        <button class="nav-pill" type="button" data-nav-target="profile">Profile</button>
       </nav>
     </div>
 
@@ -468,6 +494,10 @@
     <script src="/static/app.js" defer></script>
   </body>
 </html>
+
+
+
+
 
 
 

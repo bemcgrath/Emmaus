@@ -101,7 +101,7 @@ class AdaptiveStudyAgent:
         resolved_text_source = (
             text_source_id or profile.preferences.preferred_translation_source_id or self.text_service.default_source
         )
-        resolved_commentary_source = commentary_source_id or self.default_commentary_source
+        resolved_commentary_source = self._resolve_commentary_source(commentary_source_id, resolved_text_source)
         resolved_mode = guide_mode or recommendation.recommended_guide_mode or profile.preferences.preferred_guide_mode
         resolved_minutes = requested_minutes or recommendation.recommended_minutes or pattern_summary.recommended_session_minutes
         resolved_entry_point = entry_point if entry_point != "continue" else recommendation.recommended_entry_point
@@ -309,6 +309,13 @@ class AdaptiveStudyAgent:
             action_item=created_action_item,
             engagement=self.study_service.get_engagement_summary(user_id),
         )
+
+    def _resolve_commentary_source(self, requested_commentary_source: str | None, text_source_id: str) -> str:
+        if requested_commentary_source:
+            return requested_commentary_source
+        if text_source_id == "esv" and self.commentary_registry.has("esv_passage_helps"):
+            return "esv_passage_helps"
+        return self.default_commentary_source
 
     def _build_session_response(
         self,
@@ -809,3 +816,4 @@ class AdaptiveStudyAgent:
     def _format_reference(self, reference: PassageReference) -> str:
         ending = f"-{reference.end_verse}" if reference.end_verse else ""
         return f"{reference.book} {reference.chapter}:{reference.start_verse}{ending}"
+

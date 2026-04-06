@@ -43,6 +43,8 @@ const state = {
   textSources: [],
   translationTemplates: [],
   sourcePreview: null,
+  bibleManagerExpanded: false,
+  bibleSetupExpanded: false,
 };
 
 const elements = {};
@@ -72,6 +74,12 @@ function cacheElements() {
     todayPlanCard: document.getElementById("today-plan-card"),
     memoryThreadPill: document.getElementById("memory-thread-pill"),
     memoryThreadCard: document.getElementById("memory-thread-card"),
+    sourceCurrentName: document.getElementById("source-current-name"),
+    sourceCurrentDetail: document.getElementById("source-current-detail"),
+    sourceCurrentMeta: document.getElementById("source-current-meta"),
+    sourcePreviewCurrent: document.getElementById("source-preview-current"),
+    sourceManageToggle: document.getElementById("source-manage-toggle"),
+    sourceManagerDetails: document.getElementById("source-manager-details"),
     sourcePreviewCard: document.getElementById("source-preview-card"),
     identityForm: document.getElementById("identity-form"),
     userIdInput: document.getElementById("user-id-input"),
@@ -141,11 +149,13 @@ function cacheElements() {
 }
 
 function bindEvents() {
+  elements.sourcePreviewCurrent?.addEventListener("click", onPreviewCurrentBible);
+  elements.sourceManageToggle?.addEventListener("click", onToggleBibleManager);
   elements.navButtons.forEach((button) => {
     button.addEventListener("click", () => showScreen(button.dataset.navTarget));
   });
   elements.demoSceneRow.addEventListener("click", onDemoScenarioSelect);
-  elements.refreshButton.addEventListener("click", () => refreshExperience({ restoreScreen: false }).catch(handleError));
+  elements.refreshButton?.addEventListener("click", onRefreshClick);
   elements.heroPrimaryButton.addEventListener("click", onHeroPrimaryAction);
   elements.previewNudgeButton.addEventListener("click", () => {
     showScreen("nudges");
@@ -163,6 +173,21 @@ function bindEvents() {
   elements.actionItemList.addEventListener("click", onActionListClick);
   elements.moodChipRow.querySelectorAll(".choice-chip").forEach((chip) => chip.addEventListener("click", () => selectMood(chip.dataset.value)));
   elements.studyDaysRow.querySelectorAll(".choice-chip").forEach((chip) => chip.addEventListener("click", () => toggleStudyDay(chip.dataset.day)));
+}
+
+async function onRefreshClick() {
+  const originalLabel = elements.refreshButton.textContent;
+  elements.refreshButton.disabled = true;
+  elements.refreshButton.textContent = "Refreshing...";
+  try {
+    await refreshExperience({ restoreScreen: false });
+    showToast("Emmaus refreshed your current view.");
+  } catch (error) {
+    handleError(error);
+  } finally {
+    elements.refreshButton.disabled = false;
+    elements.refreshButton.textContent = originalLabel;
+  }
 }
 
 function initializeDefaults() {
@@ -247,11 +272,30 @@ function buildPassageMarkup(passage) {
 }
 
 function renderTextSourceOptions() {
-  const options = (state.textSources.length ? state.textSources : DEFAULT_TEXT_SOURCES)
+  const sources = state.textSources.length ? state.textSources : DEFAULT_TEXT_SOURCES;
+  const options = sources
     .map((source) => `<option value="${escapeHtml(source.source_id)}">${escapeHtml(source.name)}</option>`)
     .join("");
-  elements.textSourceSelect.innerHTML = options;
-  elements.preferredSourceSelect.innerHTML = options;
+
+  if (elements.textSourceSelect) {
+    elements.textSourceSelect.innerHTML = options;
+  }
+  if (elements.preferredSourceSelect) {
+    elements.preferredSourceSelect.innerHTML = options;
+  }
+
+  const preferredSourceId = getEffectivePreferredSourceId(sources);
+  const activeSessionSourceId = state.activeSessionPayload?.session?.text_source_id || "";
+  const sessionSourceId = activeSessionSourceId || preferredSourceId;
+
+  if (preferredSourceId && elements.preferredSourceSelect) {
+    elements.preferredSourceSelect.value = preferredSourceId;
+  }
+  if (sessionSourceId && elements.textSourceSelect) {
+    elements.textSourceSelect.value = sessionSourceId;
+  }
+
+  renderBibleSourceManager();
 }
 
 async function loadLiveDashboard({ restoreScreen = false } = {}) {
@@ -831,18 +875,25 @@ function renderTextSourceOptions() {
     .map((source) => `<option value="${escapeHtml(source.source_id)}">${escapeHtml(source.name)}</option>`)
     .join("");
 
-  elements.textSourceSelect.innerHTML = options;
-  elements.preferredSourceSelect.innerHTML = options;
-
-  const preferredSource = state.profile?.preferences?.preferred_translation_source_id || sources[0]?.source_id || "";
-  const sessionSource = state.activeSessionPayload?.session?.text_source_id || preferredSource;
-
-  if (preferredSource) {
-    elements.preferredSourceSelect.value = preferredSource;
+  if (elements.textSourceSelect) {
+    elements.textSourceSelect.innerHTML = options;
   }
-  if (sessionSource) {
-    elements.textSourceSelect.value = sessionSource;
+  if (elements.preferredSourceSelect) {
+    elements.preferredSourceSelect.innerHTML = options;
   }
+
+  const preferredSourceId = getEffectivePreferredSourceId(sources);
+  const activeSessionSourceId = state.activeSessionPayload?.session?.text_source_id || "";
+  const sessionSourceId = activeSessionSourceId || preferredSourceId;
+
+  if (preferredSourceId && elements.preferredSourceSelect) {
+    elements.preferredSourceSelect.value = preferredSourceId;
+  }
+  if (sessionSourceId && elements.textSourceSelect) {
+    elements.textSourceSelect.value = sessionSourceId;
+  }
+
+  renderBibleSourceManager();
 }
 
 async function loadLiveDashboard({ restoreScreen = false } = {}) {
@@ -1025,6 +1076,45 @@ function buildTranslationTemplateCard(template, sources, preferredSourceId) {
       </div>
     </article>
   `;
+}
+
+function setBibleManagerExpanded(expanded) {
+  state.bibleManagerExpanded = expanded;
+  const sourceUi = bibleSourceElements();
+  sourceUi.details?.classList.toggle("hidden", !expanded);
+  if (!expanded) {
+    setBibleSetupExpanded(false);
+  }
+  if (sourceUi.manageToggle) {
+    sourceUi.manageToggle.textContent = expanded ? "Hide Bible options" : "Manage Bible";
+    sourceUi.manageToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+  }
+}
+
+function setBibleSetupExpanded(expanded) {
+  state.bibleSetupExpanded = expanded;
+  const sourceUi = bibleSourceElements();
+  sourceUi.setupOptions?.classList.toggle("hidden", !expanded);
+  if (sourceUi.advancedToggle) {
+    sourceUi.advancedToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    sourceUi.advancedToggle.textContent = expanded ? "Hide setup options" : "More setup options";
+  }
+}
+
+function onToggleBibleManager() {
+  setBibleManagerExpanded(!state.bibleManagerExpanded);
+}
+
+async function onPreviewCurrentBible() {
+  const preferredSourceId = getEffectivePreferredSourceId(state.textSources.length ? state.textSources : DEFAULT_TEXT_SOURCES);
+  if (!preferredSourceId) {
+    showToast("Choose a Bible first.");
+    return;
+  }
+  if (!state.bibleManagerExpanded) {
+    setBibleManagerExpanded(true);
+  }
+  await previewBibleSource(preferredSourceId);
 }
 
 function renderSourcePreview(preview) {
@@ -1398,6 +1488,40 @@ function updateSessionEntryState(activeSession) {
     elements.textSourceSelect.value = preferredSource;
   }
 }
+function buildTodayReasonSummary(recommendation) {
+  if (!recommendation) {
+    return "Emmaus is ready to guide you through a fresh session.";
+  }
+
+  const focusLabel = humanizeFocusArea(recommendation.focus_area).toLowerCase();
+  const baseReason = truncateGuideCopy(polishGuideCopy(recommendation.reason), 150);
+  const pattern = truncateGuideCopy(polishGuideCopy(safeArray(recommendation.gap_report?.observed_patterns)[0] || ""), 110);
+
+  if (focusLabel === "living it out") {
+    return `Today Emmaus is helping you turn what you've studied into a clear next step.`;
+  }
+  if (focusLabel === "understanding the passage") {
+    return `Today Emmaus is helping you slow down and understand the passage more clearly before moving on.`;
+  }
+  if (focusLabel === "steady rhythm") {
+    return `Today Emmaus is helping you keep a steady study rhythm with one focused session.`;
+  }
+  if (baseReason) {
+    return baseReason;
+  }
+  if (pattern) {
+    return pattern;
+  }
+  return `Today Emmaus is helping you grow in ${focusLabel}.`;
+}
+
+function buildTodayCarryForwardCopy(memorySummary) {
+  const carryForwardPrompt = memorySummary?.carry_forward_prompt;
+  if (!carryForwardPrompt) {
+    return "";
+  }
+  return truncateGuideCopy(polishGuideCopy(carryForwardPrompt), 135);
+}
 function renderTodayPlan(recommendation, activeSession, actionItems, memorySummary) {
   const openAction = actionItems.find((item) => item.status === "open");
   const carryForwardPrompt = memorySummary?.carry_forward_prompt || null;
@@ -1592,8 +1716,11 @@ function buildSessionContextCard(payload) {
   const reason = polishGuideCopy(recommendation?.reason) || "Emmaus has shaped this session around what seems most helpful for your next step with Christ.";
   const carryForwardPrompt = memorySummary?.carry_forward_prompt || null;
   const leadingPattern = safeArray(recommendation?.gap_report?.observed_patterns)[0] || null;
+  const shortReason = truncateGuideCopy(reason, 170);
+  const shortCarryForward = carryForwardPrompt ? truncateGuideCopy(carryForwardPrompt, 120) : null;
+  const shortPattern = leadingPattern ? truncateGuideCopy(polishGuideCopy(leadingPattern), 110) : null;
   const meta = [
-    recommendation?.focus_area ? `<span class="meta-pill">${escapeHtml(sentenceCase(recommendation.focus_area))}</span>` : "",
+    recommendation?.focus_area ? `<span class="meta-pill">${escapeHtml(humanizeFocusArea(recommendation.focus_area))}</span>` : "",
     recommendation?.recommended_guide_mode ? `<span class="meta-pill">${escapeHtml(humanizeGuideMode(recommendation.recommended_guide_mode))}</span>` : "",
     recommendation?.recommended_minutes ? `<span class="meta-pill">${escapeHtml(String(recommendation.recommended_minutes))} min</span>` : "",
   ].filter(Boolean).join("");
@@ -1601,9 +1728,9 @@ function buildSessionContextCard(payload) {
   return `
     <div class="session-context-card">
       <p><strong>Why Emmaus brought you here today</strong></p>
-      <p class="session-context-copy">${escapeHtml(reason)}</p>
-      ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Still carrying forward:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
-      ${leadingPattern ? `<p class="session-context-copy"><strong>Paying attention to:</strong> ${escapeHtml(polishGuideCopy(leadingPattern))}</p>` : ""}
+      <p class="session-context-copy">${escapeHtml(shortReason)}</p>
+      ${shortCarryForward ? `<p class="memory-prompt"><strong>Building on:</strong> ${escapeHtml(shortCarryForward)}</p>` : ""}
+      ${shortPattern ? `<p class="session-context-copy"><strong>Today's focus:</strong> ${escapeHtml(shortPattern)}</p>` : ""}
       ${meta ? `<div class="session-meta">${meta}</div>` : ""}
     </div>
   `;
@@ -1653,17 +1780,26 @@ function renderSessionStart(payload, { navigate = true } = {}) {
         )
         .join("")
     : '<p class="empty-state">No study plan is available yet.</p>';
-  elements.commentaryBlock.innerHTML = safeArray(payload.commentary).length
-    ? safeArray(payload.commentary)
-        .map(
-          (note) => `
-            <div class="commentary-note">
-              <p><strong>${escapeHtml(note.title)}</strong></p>
-              <p>${escapeHtml(note.body)}</p>
-            </div>
-          `,
-        )
-        .join("")
+  const commentaryNotes = safeArray(payload.commentary);
+  const showsPassageHelps = commentaryNotes.some((note) => note?.metadata?.kind === "passage_helps");
+  elements.commentaryBlock.innerHTML = commentaryNotes.length
+    ? `
+        <div class="inline-card">
+          <p><strong>${showsPassageHelps ? "Passage helps" : "Commentary"}</strong></p>
+          <p class="micro-copy">${showsPassageHelps ? "Emmaus is showing ESV passage helps here. Full commentary can be plugged in separately." : "Emmaus can layer in modular commentary notes here as you connect them."}</p>
+        </div>
+        ${commentaryNotes
+          .map(
+            (note) => `
+              <div class="commentary-note">
+                <p><strong>${escapeHtml(note.title)}</strong></p>
+                <p>${escapeHtml(note.body)}</p>
+                ${note?.metadata?.section ? `<span class="meta-pill">${escapeHtml(sentenceCase(String(note.metadata.section).replaceAll("_", " ")))}</span>` : ""}
+              </div>
+            `,
+          )
+          .join("")}
+      `
     : "";
 
   if (state.currentQuestion) {
@@ -1691,7 +1827,7 @@ function clearSessionView() {
   state.activeSessionPayload = null;
   state.currentQuestion = null;
   elements.sessionReference.textContent = "No active session yet";
-  elements.questionProgressPill.textContent = "0 / 0";
+  elements.questionProgressPill.textContent = "Questions unavailable";
   elements.sessionHero.innerHTML = '<p class="empty-state">Start a session to see the passage, plan, and first question.</p>';
   elements.passageText.innerHTML = "Start a session to see the passage, plan, and first question.";
   elements.sessionPlan.innerHTML = '<p class="empty-state">Your study plan will appear here once a session starts.</p>';
@@ -1847,11 +1983,11 @@ async function onDemoScenarioSelect(event) {
   showToast(isDemoMode() ? `Previewing ${DEMO_SCENARIO_LABELS[scenario]}.` : "Switched back to live data.");
 }
 
-function onHeroPrimaryAction() {
-  onTodayPlanAction();
+async function onHeroPrimaryAction() {
+  await onTodayPlanAction();
 }
 
-function onTodayPlanAction() {
+async function onTodayPlanAction() {
   const action = elements.todayPlanCard.dataset.action;
   if (action === "resume_session") {
     showScreen("session");
@@ -1863,6 +1999,10 @@ function onTodayPlanAction() {
   }
   if (action === "focus_identity") {
     focusIdentityForm();
+    return;
+  }
+  if (action === "start_session") {
+    await startGuidedSession();
     return;
   }
   showScreen("session");
@@ -1901,14 +2041,14 @@ async function onOnboardingAction(event) {
     return;
   }
   if (action === "onboarding-focus-advanced") {
-    const sourceUi = bibleSourceElements();
-    if (sourceUi.advancedPanel?.classList.contains("hidden")) {
-      onToggleAdvancedBibleSetup();
+      const sourceUi = bibleSourceElements();
+      if (!state.bibleSetupExpanded) {
+        onToggleAdvancedBibleSetup();
+      }
+      sourceUi.advancedPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
+      sourceUi.apiName?.focus();
+      return;
     }
-    sourceUi.advancedPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
-    sourceUi.apiName?.focus();
-    return;
-  }
   if (action === "onboarding-set-minutes") {
     const minutes = optionalNumber(button.dataset.minutes);
     if (!minutes) {
@@ -2215,7 +2355,7 @@ function showScreen(screenName) {
 }
 
 function focusIdentityForm() {
-  showScreen("home");
+  showScreen("profile");
   if (!elements.onboardingPanel.classList.contains("hidden")) {
     elements.onboardingPanel.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
@@ -2408,6 +2548,20 @@ function formatReference(reference) {
   return `${reference.book} ${reference.chapter}:${reference.start_verse}${endVerse}`;
 }
 
+function truncateGuideCopy(value, maxLength = 150) {
+  if (!value) {
+    return "";
+  }
+  const trimmed = String(value).trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+  const shortened = trimmed.slice(0, Math.max(0, maxLength - 1));
+  const lastSpace = shortened.lastIndexOf(" ");
+  const safeCut = lastSpace > 60 ? shortened.slice(0, lastSpace) : shortened;
+  return `${safeCut}…`;
+}
+
 function formatDateTime(value, timezone = undefined) {
   if (!value) {
     return "";
@@ -2437,10 +2591,10 @@ function formatDateOnly(value) {
 function buildQuestionProgress(session) {
   const total = safeArray(session?.questions).length;
   if (!total) {
-    return "0 / 0";
+    return "Questions unavailable";
   }
   const current = Math.min(session.current_question_index + 1, total);
-  return `${current} / ${total}`;
+  return `Question ${current} of ${total}`;
 }
 
 function escapeHtml(value) {
@@ -2479,6 +2633,7 @@ function bibleSourceElements() {
     esvKey: document.getElementById("source-esv-key"),
     advancedToggle: document.getElementById("source-advanced-toggle"),
     advancedPanel: document.getElementById("source-advanced-panel"),
+    setupOptions: document.getElementById("source-setup-options"),
     uploadForm: document.getElementById("source-upload-form"),
     uploadName: document.getElementById("source-upload-name"),
     uploadFile: document.getElementById("source-upload-file"),
@@ -2486,6 +2641,12 @@ function bibleSourceElements() {
     apiName: document.getElementById("source-api-name"),
     apiUrl: document.getElementById("source-api-url"),
     apiKey: document.getElementById("source-api-key"),
+    currentName: document.getElementById("source-current-name"),
+    currentDetail: document.getElementById("source-current-detail"),
+    currentMeta: document.getElementById("source-current-meta"),
+    previewCurrent: document.getElementById("source-preview-current"),
+    manageToggle: document.getElementById("source-manage-toggle"),
+    details: document.getElementById("source-manager-details"),
   };
 }
 
@@ -2501,59 +2662,6 @@ document.addEventListener("DOMContentLoaded", () => {
   sourceUi.apiForm?.addEventListener("submit", onConnectBibleApiSource);
 });
 
-async function loadTextSources() {
-  if (isDemoMode()) {
-    state.textSources = DEFAULT_TEXT_SOURCES;
-    renderTextSourceOptions();
-    return;
-  }
-  try {
-    const response = await fetchJson("/v1/sources/text");
-    state.textSources = response.items || response.sources || response || [];
-  } catch {
-    state.textSources = DEFAULT_TEXT_SOURCES;
-  }
-  renderTextSourceOptions();
-}
-
-function renderTextSourceOptions() {
-  const sources = state.textSources.length ? state.textSources : DEFAULT_TEXT_SOURCES;
-  const options = sources
-    .map((source) => `<option value="${escapeHtml(source.source_id)}">${escapeHtml(source.name)}</option>`)
-    .join("");
-  elements.textSourceSelect.innerHTML = options;
-  elements.preferredSourceSelect.innerHTML = options;
-
-  const preferredSourceId = getEffectivePreferredSourceId(sources);
-  const sessionSourceId = state.activeSessionPayload?.session?.text_source_id || preferredSourceId;
-
-  if (preferredSourceId) {
-    elements.preferredSourceSelect.value = preferredSourceId;
-  }
-  if (sessionSourceId) {
-    elements.textSourceSelect.value = sessionSourceId;
-  }
-
-  renderBibleSourceManager();
-}
-
-function renderProfile(profile) {
-  const preferences = profile?.preferences || {};
-  elements.userIdInput.value = profile?.user_id || state.userId;
-  elements.displayNameInput.value = profile?.display_name || "";
-  elements.preferredMinutesInput.value = preferences.preferred_session_minutes || "";
-  elements.guideModeSelect.value = preferences.preferred_guide_mode || "guide";
-  elements.nudgeIntensitySelect.value = preferences.nudge_intensity || "balanced";
-  elements.timezoneInput.value = preferences.timezone || "";
-  elements.studyWindowStartInput.value = preferences.preferred_study_window_start || "";
-  elements.studyWindowEndInput.value = preferences.preferred_study_window_end || "";
-  elements.quietHoursStartInput.value = preferences.quiet_hours_start || "";
-  elements.quietHoursEndInput.value = preferences.quiet_hours_end || "";
-  state.selectedStudyDays = Array.isArray(preferences.preferred_study_days) ? [...preferences.preferred_study_days] : [];
-  updateStudyDayChips();
-  renderTextSourceOptions();
-}
-
 function renderBibleSourceManager() {
   const sourceUi = bibleSourceElements();
   if (!sourceUi.library || !sourceUi.copy) {
@@ -2567,10 +2675,40 @@ function renderBibleSourceManager() {
   const preferredSource = sources.find((source) => source.source_id === preferredSourceId) || null;
   const starterSource = sources.find((source) => source.source_id === STARTER_SOURCE_ID) || null;
   const esvSource = sources.find((source) => source.source_id === ESV_SOURCE_ID) || null;
+  const currentProviderLabel = !preferredSource
+    ? "Choose the Bible Emmaus should use for new sessions."
+    : preferredSource.source_id === ESV_SOURCE_ID || preferredSource.metadata?.vendor === "esv"
+      ? "Official ESV API connection"
+      : preferredSource.provider_type === "remote_api"
+        ? "Connected provider"
+        : preferredSource.source_id === STARTER_SOURCE_ID
+          ? "Included with Emmaus"
+          : "Uploaded from this device";
 
   sourceUi.copy.textContent = preferredSource
-    ? `Current Bible: ${preferredSource.name}. Pick another one any time.`
-    : "Choose a translation first, then let Emmaus guide you through the easiest setup.";
+    ? `Emmaus will use ${preferredSource.name} for new sessions. You can change it any time.`
+    : "Choose a Bible and Emmaus will use it for new sessions.";
+
+  if (sourceUi.currentName) {
+    sourceUi.currentName.textContent = preferredSource?.name || "Choose your Bible";
+  }
+  if (sourceUi.currentDetail) {
+    sourceUi.currentDetail.textContent = preferredSource
+      ? `${preferredSource.name} is your current Bible for new sessions. Active sessions keep the Bible they started with.`
+      : currentProviderLabel;
+  }
+  if (sourceUi.currentMeta) {
+    sourceUi.currentMeta.innerHTML = preferredSource
+      ? `<span class="meta-pill">Current</span><span class="meta-pill">${escapeHtml(currentProviderLabel)}</span>`
+      : "";
+  }
+  if (sourceUi.previewCurrent) {
+    sourceUi.previewCurrent.disabled = !preferredSource;
+  }
+
+  const shouldExpand = state.bibleManagerExpanded || !preferredSourceId;
+  setBibleManagerExpanded(shouldExpand);
+  setBibleSetupExpanded(shouldExpand && state.bibleSetupExpanded);
 
   renderTranslationTemplates(sources, preferredSourceId);
   renderSourcePreview(state.sourcePreview);
@@ -2633,19 +2771,24 @@ async function onTranslationTemplateClick(event) {
   if (!button) {
     return;
   }
-  const setupMode = button.dataset.templateAction;
-  const translationName = button.dataset.templateName || "Bible";
 
-  if (setupMode === "starter") {
+  const action = button.dataset.templateAction;
+  const translationName = button.dataset.templateName || "this Bible";
+  if (action === "starter") {
     await onUseStarterBible();
     return;
   }
-  if (setupMode === "esv_api") {
+  if (action === "esv_api") {
     await onPrimaryEsvAction();
     return;
   }
-  if (setupMode === "upload") {
-    const sourceUi = bibleSourceElements();
+
+  if (!state.bibleManagerExpanded) {
+    setBibleManagerExpanded(true);
+  }
+
+  const sourceUi = bibleSourceElements();
+  if (action === "upload") {
     if (sourceUi.uploadName && !sourceUi.uploadName.value) {
       sourceUi.uploadName.value = translationName;
     }
@@ -2655,11 +2798,10 @@ async function onTranslationTemplateClick(event) {
     return;
   }
 
-  const sourceUi = bibleSourceElements();
   if (sourceUi.apiName && !sourceUi.apiName.value) {
     sourceUi.apiName.value = translationName;
   }
-  if (sourceUi.advancedPanel?.classList.contains("hidden")) {
+  if (!state.bibleSetupExpanded) {
     onToggleAdvancedBibleSetup();
   }
   sourceUi.apiForm?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -2686,6 +2828,12 @@ async function onUseStarterBible() {
 }
 
 function onFocusEsvSource() {
+  if (!state.bibleManagerExpanded) {
+    setBibleManagerExpanded(true);
+  }
+  if (!state.bibleSetupExpanded) {
+    setBibleSetupExpanded(true);
+  }
   const sourceUi = bibleSourceElements();
   sourceUi.esvForm?.scrollIntoView({ behavior: "smooth", block: "center" });
   sourceUi.esvKey?.focus();
@@ -2701,14 +2849,10 @@ async function onPrimaryEsvAction() {
 }
 
 function onToggleAdvancedBibleSetup() {
-  const sourceUi = bibleSourceElements();
-  if (!sourceUi.advancedPanel || !sourceUi.advancedToggle) {
-    return;
+  if (!state.bibleManagerExpanded) {
+    setBibleManagerExpanded(true);
   }
-  const willShow = sourceUi.advancedPanel.classList.contains("hidden");
-  sourceUi.advancedPanel.classList.toggle("hidden", !willShow);
-  sourceUi.advancedToggle.setAttribute("aria-expanded", willShow ? "true" : "false");
-  sourceUi.advancedToggle.textContent = willShow ? "Hide setup options" : "More setup options";
+  setBibleSetupExpanded(!state.bibleSetupExpanded);
 }
 
 async function onConnectEsvSource(event) {
@@ -2830,6 +2974,20 @@ function buildSourceIdCandidate(value) {
 function buildGeneratedSourceId(value) {
   return `${buildSourceIdCandidate(value)}_${Date.now()}`;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

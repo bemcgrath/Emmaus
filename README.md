@@ -113,6 +113,8 @@ For now, `NIV` and `NASB` should remain documented licensing targets rather than
 - `GET /v1/commentary/sources`
 - `POST /v1/commentary/lookup`
 
+Emmaus can also surface ESV-backed passage helps on the Study screen through the commentary/provider layer without bundling proprietary notes in the repo.
+
 ### Study and action items
 
 - `POST /v1/study/events`
@@ -209,7 +211,7 @@ Current supported source types:
 
 Once registered, the source appears in `GET /v1/sources/text`, and the user can reference it by `source_id` either as `preferred_translation_source_id` on the profile or `text_source_id` when starting a session.
 
-The current web client now includes a mobile-friendly, translation-first Bible source manager. Users can choose a translation card first, then Emmaus routes them into the right setup path: included starter Bible, ESV API key, upload, or another provider.
+The current web client now includes a mobile-friendly, translation-first Bible source manager. The Home tab stays compact by default, showing the current Bible plus `Manage Bible`, and the fuller setup options stay hidden until the user asks for them. From there, Emmaus routes users into the right setup path: included starter Bible, ESV API key, upload, or another provider.
 
 If `EMMAUS_ESV_API_KEY` is configured for a deployment, Emmaus registers ESV automatically at startup and uses it as the effective default source unless another default is explicitly configured.
 
