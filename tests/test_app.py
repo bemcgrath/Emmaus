@@ -266,6 +266,55 @@ def test_active_session_can_be_resumed(tmp_path, monkeypatch):
 
 
 
+def test_action_item_is_passage_aware(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "reference": {
+                "book": "John",
+                "chapter": 3,
+                "start_verse": 16,
+                "end_verse": 17,
+            },
+            "requested_minutes": 10,
+        },
+    )
+    session_id = start.json()["session"]["session_id"]
+
+    for answer in [
+        "I notice God's love reaching toward the world.",
+        "This passage shows mercy instead of condemnation.",
+        "I will encourage one discouraged friend today because God moved toward me first.",
+    ]:
+        client.post(
+            "/v1/agent/session/respond",
+            json={
+                "session_id": session_id,
+                "user_id": "demo-user",
+                "response_text": answer,
+                "engagement_score": 4,
+            },
+        )
+
+    complete = client.post(
+        "/v1/agent/session/complete",
+        json={
+            "session_id": session_id,
+            "user_id": "demo-user",
+        },
+    )
+    assert complete.status_code == 200
+    action_item = complete.json()["action_item"]
+    combined = f"{action_item['title']} {action_item['detail']}".lower()
+    assert any(keyword in combined for keyword in ["love", "mercy", "encourage", "john 3"])
+    assert "next 24 hours" in combined or "today" in combined
+
+
+
 def test_action_item_follow_up_is_saved(tmp_path, monkeypatch):
     client = build_client(tmp_path, monkeypatch)
 

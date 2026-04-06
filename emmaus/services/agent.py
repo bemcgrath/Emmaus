@@ -596,27 +596,70 @@ class AdaptiveStudyAgent:
         title: str | None,
         detail: str | None,
     ) -> ActionItem:
+        passage = self.text_service.get_passage(session.reference, session.text_source_id)
         last_response = responses[-1].response_text if responses else None
-        generated_title = title or f"Live out {session.reference.book} {session.reference.chapter} today"
-        generated_detail = detail or self._action_detail_from_response(session.reference, last_response)
+        generated_title, generated_detail = self._generate_action_item_content(
+            session=session,
+            passage=passage,
+            last_response=last_response,
+        )
         return ActionItem(
             action_item_id=str(uuid4()),
             user_id=session.user_id,
             session_id=session.session_id,
-            title=generated_title,
-            detail=generated_detail,
+            title=title or generated_title,
+            detail=detail or generated_detail,
         )
 
-    def _action_detail_from_response(self, reference: PassageReference, response_text: str | None) -> str:
-        if response_text:
-            snippet = response_text.strip().replace("\n", " ")[:180]
+    def _generate_action_item_content(
+        self,
+        session: StudySession,
+        passage: PassageText,
+        last_response: str | None,
+    ) -> tuple[str, str]:
+        prompt = (
+            "You are Emmaus, creating a single practical Bible study action item for a mobile user. "
+            "Return JSON only with keys title and detail. Title should be 4 to 8 words. "
+            "Detail should be one short paragraph with one concrete, realistic next step in the next 24 hours. "
+            "Keep it Christ-centered, specific, and tied to the passage.\n\n"
+            f"Passage reference: {self._format_reference(session.reference)}\n"
+            f"Passage text: {passage.text}\n"
+            f"Guide mode: {session.guide_mode}\n"
+            f"Last user response: {last_response or 'None'}\n"
+        )
+        raw = self.llm_registry.get(session.llm_source_id).generate_guidance(prompt)
+        try:
+            payload = json.loads(self._extract_json_payload(raw))
+        except (json.JSONDecodeError, ValueError, TypeError):
+            return self._fallback_action_item_content(session.reference, passage.text, last_response)
+
+        title = str(payload.get("title", "")).strip()
+        detail = str(payload.get("detail", "")).strip()
+        if not title or not detail:
+            return self._fallback_action_item_content(session.reference, passage.text, last_response)
+        return title[:80], detail[:280]
+
+    def _fallback_action_item_content(
+        self,
+        reference: PassageReference,
+        passage_text: str,
+        response_text: str | None,
+    ) -> tuple[str, str]:
+        primary_theme = self._primary_theme_label(passage_text)
+        response_snippet = response_text.strip().replace("\n", " ")[:140] if response_text else None
+        if response_snippet:
+            if any(keyword in response_snippet.lower() for keyword in ["encourage", "text", "call", "friend", "someone"]):
+                return (
+                    f"Practice {primary_theme} today"[:80],
+                    f"Before your next session, act on what you wrote from {reference.book} {reference.chapter}. Reach out to one person today and follow through on this step: {response_snippet}"[:280],
+                )
             return (
-                f"Before your next session, act on what you wrote in response to {reference.book} {reference.chapter}. "
-                f"Start here: {snippet}"
+                f"Respond to {primary_theme}"[:80],
+                f"Before your next session, turn your reflection from {reference.book} {reference.chapter} into one concrete action in the next 24 hours. Start here: {response_snippet}"[:280],
             )
         return (
-            f"Before your next session, choose one concrete act of obedience, encouragement, or conversation that flows from "
-            f"{reference.book} {reference.chapter}."
+            f"Live out {primary_theme}"[:80],
+            f"Before your next session, choose one concrete act of obedience, encouragement, or prayer that flows from {reference.book} {reference.chapter} and complete it in the next 24 hours."[:280],
         )
 
     def _event_note(self, response_text: str, evaluation: StudyResponseEvaluation) -> str:
