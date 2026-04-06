@@ -156,6 +156,9 @@ class StudyService:
     def list_spiritual_memories(self, user_id: str, limit: int = 5) -> list[SpiritualMemoryEntry]:
         return self.repository.list_spiritual_memories(user_id, limit=limit)
 
+    def get_latest_spiritual_memory_for_session(self, session_id: str) -> SpiritualMemoryEntry | None:
+        return self.repository.get_latest_spiritual_memory_for_session(session_id)
+
     def summarize_spiritual_memory(self, user_id: str, limit: int = 5) -> SpiritualMemorySummary:
         memories = self.list_spiritual_memories(user_id, limit=limit)
         if not memories:
@@ -219,7 +222,78 @@ class StudyService:
                 notes=" | ".join(summary_bits),
             )
         )
+        self._refresh_spiritual_memory_from_action_follow_up(action_item)
         return action_item
+
+    def _refresh_spiritual_memory_from_action_follow_up(self, action_item: ActionItem) -> None:
+        memory = self.get_latest_spiritual_memory_for_session(action_item.session_id)
+        if memory is None:
+            return
+
+        updated_summary = self._update_memory_summary(memory.summary, action_item)
+        updated_themes = self._update_memory_themes(memory.recurring_themes, action_item)
+        updated_growth_areas = self._update_memory_growth_areas(memory.growth_areas, action_item)
+        updated_prompt = self._update_carry_forward_prompt(memory.carry_forward_prompt, action_item)
+        updated_memory = memory.model_copy(
+            update={
+                "summary": updated_summary,
+                "recurring_themes": updated_themes,
+                "growth_areas": updated_growth_areas,
+                "carry_forward_prompt": updated_prompt,
+            }
+        )
+        self.record_spiritual_memory(updated_memory)
+
+    def _update_memory_summary(self, summary: str, action_item: ActionItem) -> str:
+        note = (action_item.follow_up_note or "").strip()
+        outcome = action_item.follow_up_outcome or "completed"
+        if outcome == "completed":
+            addition = f" The action step was completed: {note or action_item.title}."
+        elif outcome == "prayed_through":
+            addition = f" The user carried this forward through prayer: {note or action_item.title}."
+        elif outcome == "discussed_with_someone":
+            addition = f" The user processed this with someone else: {note or action_item.title}."
+        else:
+            addition = f" The user made partial progress and still has unfinished follow-through: {note or action_item.title}."
+        return (summary.rstrip() + addition)[:320]
+
+    def _update_memory_themes(self, themes: list[str], action_item: ActionItem) -> list[str]:
+        updated = list(themes)
+        outcome = action_item.follow_up_outcome or "completed"
+        theme_map = {
+            "completed": "completed follow-through",
+            "partially_completed": "unfinished obedience that still needs revisiting",
+            "prayed_through": "prayerful follow-through",
+            "discussed_with_someone": "shared reflection with someone else",
+        }
+        updated.append(theme_map.get(outcome, "continued response"))
+        return self._dedupe_preserve_order(updated)[:5]
+
+    def _update_memory_growth_areas(self, growth_areas: list[str], action_item: ActionItem) -> list[str]:
+        updated = [area for area in growth_areas if area != "turning insight into concrete follow-through"]
+        outcome = action_item.follow_up_outcome or "completed"
+        if outcome == "completed":
+            updated.insert(0, "building on completed obedience")
+        elif outcome == "partially_completed":
+            updated.insert(0, "finishing what the passage has already surfaced")
+        elif outcome == "prayed_through":
+            updated.insert(0, "turning prayer into concrete obedience")
+        elif outcome == "discussed_with_someone":
+            updated.insert(0, "carrying reflection into honest conversation")
+        return self._dedupe_preserve_order(updated)[:5]
+
+    def _update_carry_forward_prompt(self, existing_prompt: str, action_item: ActionItem) -> str:
+        outcome = action_item.follow_up_outcome or "completed"
+        title = action_item.title
+        if outcome == "completed":
+            return f"Build on the completed step '{title}' and ask what fresh obedience Christ is inviting next."[:180]
+        if outcome == "partially_completed":
+            return f"Return to '{title}' and finish the part that still feels resisted or unfinished."[:180]
+        if outcome == "prayed_through":
+            return f"Keep praying through '{title}', then move toward one concrete act that matches those prayers."[:180]
+        if outcome == "discussed_with_someone":
+            return f"Revisit what surfaced in '{title}' and decide what personal follow-through should come after that conversation."[:180]
+        return existing_prompt[:180]
 
     def get_engagement_summary(self, user_id: str) -> EngagementSummary:
         profile = self.get_profile(user_id)

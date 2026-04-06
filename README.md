@@ -147,6 +147,8 @@ The current frontend emphasizes:
 - a return-to-today�s-plan home screen that highlights the next best step
 - session persistence that restores an in-progress study flow after refresh or return
 - action-item follow-up that captures what happened when the user actually applied the session
+- a session context block that explains why Emmaus chose the current focus, passage, and thread before the user starts responding
+- a completion summary card that closes the session with what Emmaus noticed, what it will carry forward, and the action item to practice next
 - a nudge preview plus delivery-plan surface that is ready to feed future mobile notifications
 
 ## How Bible connection works

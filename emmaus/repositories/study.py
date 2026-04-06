@@ -433,6 +433,15 @@ class SQLiteStudyRepository:
                     memory_id, user_id, session_id, reference_json, summary, recurring_themes_json,
                     growth_areas_json, carry_forward_prompt, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(memory_id) DO UPDATE SET
+                    user_id = excluded.user_id,
+                    session_id = excluded.session_id,
+                    reference_json = excluded.reference_json,
+                    summary = excluded.summary,
+                    recurring_themes_json = excluded.recurring_themes_json,
+                    growth_areas_json = excluded.growth_areas_json,
+                    carry_forward_prompt = excluded.carry_forward_prompt,
+                    created_at = excluded.created_at
                 """,
                 (
                     memory.memory_id,
@@ -447,6 +456,16 @@ class SQLiteStudyRepository:
                 ),
             )
         return memory
+
+    def get_latest_spiritual_memory_for_session(self, session_id: str) -> SpiritualMemoryEntry | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM spiritual_memories WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
+                (session_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_memory(row)
 
     def list_spiritual_memories(self, user_id: str, limit: int | None = None) -> list[SpiritualMemoryEntry]:
         query = "SELECT * FROM spiritual_memories WHERE user_id = ? ORDER BY created_at DESC"

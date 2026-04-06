@@ -241,7 +241,9 @@ class PersonalizationService:
         profile = self.study_service.get_profile(user_id)
         latest_mood = self.study_service.get_latest_mood_checkin(user_id)
         open_action_items = self.study_service.list_action_items(user_id, status="open")
+        recent_action_items = self.study_service.list_action_items(user_id)
         memory_summary = self.study_service.summarize_spiritual_memory(user_id)
+        recent_follow_through = self._latest_completed_follow_through(recent_action_items)
 
         if latest_mood is not None and latest_mood.mood in {"anxious", "stressed", "discouraged"}:
             nudge_type = "encouragement"
@@ -251,6 +253,14 @@ class PersonalizationService:
             nudge_type = "follow_through"
             title = "Follow through on your last step"
             message = "Your last session already surfaced a practical next step. Review it and take one small action today."
+        elif recent_follow_through is not None and memory_summary.memory_count > 0:
+            nudge_type = "theme"
+            title = "Build on what already landed"
+            message = self._build_completed_follow_through_nudge(
+                recent_follow_through,
+                memory_summary.carry_forward_prompt,
+                recommendation.suggested_action,
+            )
         elif profile.current_streak == 0:
             nudge_type = "restart"
             title = "Begin again today"
@@ -284,6 +294,35 @@ class PersonalizationService:
             scheduled_for=scheduled_for,
             local_timezone=local_timezone,
         )
+
+    def _latest_completed_follow_through(self, action_items):
+        return next(
+            (
+                item
+                for item in action_items
+                if item.status == "completed" and (item.follow_up_outcome or item.completed_at is not None)
+            ),
+            None,
+        )
+
+    def _build_completed_follow_through_nudge(
+        self,
+        action_item,
+        carry_forward_prompt: str | None,
+        suggested_action: str,
+    ) -> str:
+        outcome = action_item.follow_up_outcome or "completed"
+        if outcome == "prayed_through":
+            lead = f"You already carried '{action_item.title}' into prayer."
+        elif outcome == "discussed_with_someone":
+            lead = f"You already talked through '{action_item.title}' with someone else."
+        elif outcome == "partially_completed":
+            lead = f"You already started '{action_item.title}'."
+        else:
+            lead = f"You already followed through on '{action_item.title}'."
+
+        next_step = carry_forward_prompt or suggested_action or "Return to that same thread and ask what Christ is inviting next."
+        return f"{lead} {next_step}"
 
     def build_nudge_delivery_plan(self, user_id: str, preview_at: datetime | None = None) -> NudgeDeliveryPlan:
         preview = self.preview_nudge(user_id, preview_at=preview_at)

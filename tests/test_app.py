@@ -103,6 +103,8 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "onboarding-flow" in response.text
     assert "memory-thread-card" in response.text
     assert "memory-thread-pill" in response.text
+    assert "completion-summary-card" in response.text
+    assert "completion-summary-pill" in response.text
     assert "follow-up-target-copy" in response.text
     assert "nudge-plan-card" in response.text
 
@@ -115,6 +117,14 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "buildGeneratedSourceId" in asset.text
     assert "deriveOnboardingStep" in asset.text
     assert "renderMemorySummary" in asset.text
+    assert "buildSessionContextCard" in asset.text
+    assert "Why Emmaus brought you here today" in asset.text
+    assert "renderCompletionSummary" in asset.text
+    assert "Emmaus updated this thread" in asset.text
+    assert "lastFollowThroughUpdate" in asset.text
+    assert "buildNudgeThreadContext" in asset.text
+    assert "Why this nudge" in asset.text
+    assert "Build on what already landed" in asset.text
     assert "startGuidedSession" in asset.text
     assert "source-use-starter" in response.text
     assert "source-upload-file" in asset.text
@@ -368,6 +378,65 @@ def test_action_item_follow_up_is_saved(tmp_path, monkeypatch):
     assert payload["status"] == "completed"
     assert payload["follow_up_note"].startswith("I sent the encouragement text")
     assert payload["follow_up_outcome"] == "completed"
+
+
+
+def test_action_item_follow_up_refreshes_spiritual_memory(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "requested_minutes": 10,
+        },
+    )
+    session_id = start.json()["session"]["session_id"]
+
+    for answer in [
+        "God is reaching toward people with mercy.",
+        "This passage shows Christ moves first instead of condemning people.",
+        "I should encourage one discouraged friend tonight.",
+    ]:
+        client.post(
+            "/v1/agent/session/respond",
+            json={
+                "session_id": session_id,
+                "user_id": "demo-user",
+                "response_text": answer,
+                "engagement_score": 4,
+            },
+        )
+
+    complete = client.post(
+        "/v1/agent/session/complete",
+        json={
+            "session_id": session_id,
+            "user_id": "demo-user",
+        },
+    )
+    action_item_id = complete.json()["action_item"]["action_item_id"]
+
+    before_memory = client.get("/v1/users/demo-user/memory")
+    before_payload = before_memory.json()
+
+    follow_up = client.post(
+        f"/v1/study/action-items/{action_item_id}/complete",
+        json={
+            "user_id": "demo-user",
+            "follow_up_note": "I sent the text and then prayed for him by name.",
+            "follow_up_outcome": "completed",
+        },
+    )
+    assert follow_up.status_code == 200
+
+    after_memory = client.get("/v1/users/demo-user/memory")
+    after_payload = after_memory.json()
+    assert after_payload["latest_summary"] != before_payload["latest_summary"]
+    assert "completed" in after_payload["latest_summary"].lower() or "prayer" in after_payload["latest_summary"].lower()
+    assert after_payload["carry_forward_prompt"] != before_payload["carry_forward_prompt"]
+    assert any("completed" in theme.lower() or "follow-through" in theme.lower() for theme in after_payload["recurring_themes"])
 
 
 
@@ -667,3 +736,62 @@ def test_mood_shapes_recommendation_and_nudge_preview(tmp_path, monkeypatch):
     nudge_payload = nudge.json()
     assert nudge_payload["nudge_type"] == "encouragement"
     assert nudge_payload["recommended_minutes"] <= 10
+
+
+def test_nudge_preview_builds_on_completed_follow_through(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    client.app.state.container.llm_registry.register(StrongResponseProvider())
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "requested_minutes": 15,
+        },
+    )
+    session_id = start.json()["session"]["session_id"]
+
+    for answer in [
+        "I notice Christ patiently meets discouraged disciples and reframes their understanding through Scripture.",
+        "This means Jesus does not shame confusion but redirects it toward hope and trust in him.",
+        "I will encourage one discouraged friend this week and pray with him if the moment opens.",
+    ]:
+        client.post(
+            "/v1/agent/session/respond",
+            json={
+                "session_id": session_id,
+                "user_id": "demo-user",
+                "response_text": answer,
+                "engagement_score": 4,
+            },
+        )
+
+    complete = client.post(
+        "/v1/agent/session/complete",
+        json={
+            "session_id": session_id,
+            "user_id": "demo-user",
+            "summary_notes": "I want to keep following through when Christ surfaces someone to encourage.",
+            "engagement_score": 4,
+        },
+    )
+    action_item = complete.json()["action_item"]
+
+    follow_up = client.post(
+        f"/v1/study/action-items/{action_item['action_item_id']}/complete",
+        json={
+            "user_id": "demo-user",
+            "follow_up_note": "I sent the text and prayed for him afterward.",
+            "follow_up_outcome": "completed",
+        },
+    )
+    assert follow_up.status_code == 200
+
+    nudge = client.post("/v1/agent/nudges/preview", json={"user_id": "demo-user"})
+    assert nudge.status_code == 200
+    payload = nudge.json()
+    assert payload["title"] == "Build on what already landed"
+    assert payload["message"].startswith("You already followed through on")
+    assert action_item["title"] in payload["message"]
+    assert "Build on the completed step" in payload["message"] or "Christ is inviting next" in payload["message"]

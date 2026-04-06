@@ -26,6 +26,8 @@ const state = {
   profile: null,
   streaks: null,
   memorySummary: null,
+  lastCompletion: null,
+  lastFollowThroughUpdate: null,
   actionItems: [],
   onboardingStep: 1,
   textSources: [],
@@ -106,6 +108,8 @@ function cacheElements() {
     summaryNotes: document.getElementById("summary-notes"),
     actionItemTitle: document.getElementById("action-item-title"),
     actionItemDetail: document.getElementById("action-item-detail"),
+    completionSummaryPill: document.getElementById("completion-summary-pill"),
+    completionSummaryCard: document.getElementById("completion-summary-card"),
     actionSummaryPill: document.getElementById("action-summary-pill"),
     actionItemList: document.getElementById("action-item-list"),
     actionFollowUpForm: document.getElementById("action-follow-up-form"),
@@ -260,6 +264,7 @@ function renderDashboardShell({ profile, recommendation, streaks, actionItems, l
   renderMemorySummary(memorySummary);
   renderStreaks(streaks);
   renderActionItems(actionItems);
+  renderCompletionSummary(memorySummary, actionItems);
   renderLatestMood(latestMood);
   renderOnboarding(profile, streaks, activeSession);
   updateSessionEntryState(activeSession);
@@ -496,9 +501,9 @@ function buildDemoScenarioData(scenario) {
 
   const scheduledNudge = {
     user_id: "demo-user",
-    nudge_type: "momentum",
-    title: "Keep your rhythm going",
-    message: "You already have momentum. A short session tomorrow morning will keep the pattern alive.",
+    nudge_type: "theme",
+    title: "Build on what already landed",
+    message: "You already followed through on 'Write one sentence of gratitude before bed.' Build on the completed step 'Write one sentence of gratitude before bed' and ask what fresh obedience Christ is inviting next.",
     recommended_entry_point: "continue where I left off",
     recommended_minutes: 15,
     recommended_guide_mode: "coach",
@@ -515,8 +520,8 @@ function buildDemoScenarioData(scenario) {
     delivery_channel: "push",
     deliver_at: "2026-04-06T07:30:00-04:00",
     fallback_at: "2026-04-06T07:30:00-04:00",
-    idempotency_key: "demo-user:momentum:continue where I left off:2026-04-06T07:30:00-04:00",
-    reason: "This push can be queued for the user's next preferred study window.",
+    idempotency_key: "demo-user:theme:continue where I left off:2026-04-06T07:30:00-04:00",
+    reason: "This push can be queued for the user's next preferred study window so the user can build on a completed step.",
     nudge: scheduledNudge,
   };
 
@@ -1268,6 +1273,59 @@ function renderTodayPlan(recommendation, activeSession, actionItems, memorySumma
   `;
 }
 
+function renderCompletionSummary(memorySummary, actionItems) {
+  const anchorAction = state.lastFollowThroughUpdate?.actionItem
+    || state.lastCompletion?.actionItem
+    || actionItems.find((item) => item.action_item_id === state.selectedActionItemId)
+    || actionItems[0]
+    || null;
+
+  if (!anchorAction && !memorySummary?.memory_count) {
+    elements.completionSummaryPill.textContent = "Waiting";
+    elements.completionSummaryCard.innerHTML = '<p class="empty-state">Complete a session and Emmaus will summarize what it noticed, what it is carrying forward, and your next step.</p>';
+    return;
+  }
+
+  const followThroughUpdate = state.lastFollowThroughUpdate;
+  const completionTag = followThroughUpdate ? "Updated" : state.lastCompletion ? "New" : "Ready";
+  elements.completionSummaryPill.textContent = completionTag;
+  const latestSummary = memorySummary?.latest_summary || "Emmaus is carrying a recent session forward.";
+  const carryForwardPrompt = memorySummary?.carry_forward_prompt || null;
+  const growthArea = safeArray(memorySummary?.growth_areas)[0] || null;
+  const actionTitle = anchorAction?.title || "Your next action step";
+  const actionDetail = anchorAction?.detail || "Emmaus will place your next step here after a session completes.";
+  const actionCreatedAt = anchorAction?.created_at ? formatDateTime(anchorAction.created_at) : null;
+  const beforeSummary = followThroughUpdate?.beforeMemorySummary?.latest_summary || null;
+  const beforePrompt = followThroughUpdate?.beforeMemorySummary?.carry_forward_prompt || null;
+  const changeSummary = beforeSummary && beforeSummary !== latestSummary
+    ? `<p class="session-context-copy"><strong>Updated thread:</strong> ${escapeHtml(beforeSummary)} -> ${escapeHtml(latestSummary)}</p>`
+    : "";
+  const changePrompt = beforePrompt && beforePrompt !== carryForwardPrompt
+    ? `<p class="session-context-copy"><strong>New carry-forward:</strong> ${escapeHtml(carryForwardPrompt || "")}</p>`
+    : "";
+  const followThroughNote = followThroughUpdate?.actionItem?.follow_up_note
+    ? `<p class="session-context-copy"><strong>What landed:</strong> ${escapeHtml(followThroughUpdate.actionItem.follow_up_note)}</p>`
+    : "";
+
+  elements.completionSummaryCard.innerHTML = `
+    <div class="completion-card">
+      <p><strong>${followThroughUpdate ? "Emmaus updated this thread" : "What Emmaus noticed"}</strong></p>
+      <p class="today-plan-copy">${escapeHtml(latestSummary)}</p>
+      ${changeSummary}
+      ${growthArea ? `<p><strong>Growth edge:</strong> ${escapeHtml(growthArea)}</p>` : ""}
+      ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Emmaus will carry forward:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
+      ${changePrompt}
+      ${followThroughNote}
+      <div class="inline-card">
+        <p><strong>${escapeHtml(actionTitle)}</strong></p>
+        <p>${escapeHtml(actionDetail)}</p>
+        ${actionCreatedAt ? `<span class="meta-pill">Created ${escapeHtml(actionCreatedAt)}</span>` : ""}
+        ${followThroughUpdate?.actionItem?.follow_up_outcome ? `<span class="meta-pill">${escapeHtml(sentenceCase(followThroughUpdate.actionItem.follow_up_outcome.replaceAll("_", " ")))}</span>` : ""}
+      </div>
+    </div>
+  `;
+}
+
 function renderActionItems(actionItems) {
   const openItems = actionItems.filter((item) => item.status === "open");
   elements.openActionCount.textContent = String(openItems.length);
@@ -1326,6 +1384,29 @@ function syncSelectedActionItem(actionItems) {
   elements.followUpNoteInput.value = selected.follow_up_note || "";
 }
 
+function buildSessionContextCard(payload) {
+  const recommendation = payload.recommendation || state.recommendation;
+  const memorySummary = state.memorySummary;
+  const reason = recommendation?.reason || "Emmaus has shaped this session around what seems most helpful for your next step with Christ.";
+  const carryForwardPrompt = memorySummary?.carry_forward_prompt || null;
+  const leadingPattern = safeArray(recommendation?.gap_report?.observed_patterns)[0] || null;
+  const meta = [
+    recommendation?.focus_area ? `<span class="meta-pill">${escapeHtml(sentenceCase(recommendation.focus_area))}</span>` : "",
+    recommendation?.recommended_guide_mode ? `<span class="meta-pill">${escapeHtml(sentenceCase(recommendation.recommended_guide_mode))}</span>` : "",
+    recommendation?.recommended_minutes ? `<span class="meta-pill">${escapeHtml(String(recommendation.recommended_minutes))} min</span>` : "",
+  ].filter(Boolean).join("");
+
+  return `
+    <div class="session-context-card">
+      <p><strong>Why Emmaus brought you here today</strong></p>
+      <p class="session-context-copy">${escapeHtml(reason)}</p>
+      ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Continuing thread:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
+      ${leadingPattern ? `<p class="session-context-copy"><strong>Watching for:</strong> ${escapeHtml(leadingPattern)}</p>` : ""}
+      ${meta ? `<div class="session-meta">${meta}</div>` : ""}
+    </div>
+  `;
+}
+
 function renderSessionStart(payload, { navigate = true } = {}) {
   state.activeSessionPayload = payload;
   state.currentQuestion = payload.current_question || null;
@@ -1335,6 +1416,7 @@ function renderSessionStart(payload, { navigate = true } = {}) {
   elements.sessionReference.textContent = formatReference(session.reference);
   elements.questionProgressPill.textContent = buildQuestionProgress(session);
   elements.sessionHero.innerHTML = `
+    ${buildSessionContextCard(payload)}
     <div class="inline-card">
       <p><strong>${escapeHtml(sentenceCase(session.guide_mode))} mode</strong></p>
       <p>${escapeHtml(session.latest_message || "Emmaus is ready to guide this session.")}</p>
@@ -1460,10 +1542,12 @@ function renderNudge(nudge, nudgePlan) {
     return;
   }
 
+  const threadContext = buildNudgeThreadContext(nudge);
   elements.nudgeCard.innerHTML = `
     <div class="nudge-card">
       <p><strong>${escapeHtml(nudge.title)}</strong></p>
       <p>${escapeHtml(nudge.message)}</p>
+      ${threadContext}
       <div class="nudge-meta">
         <span class="meta-pill">${escapeHtml(sentenceCase(nudge.nudge_type.replaceAll("_", " ")) )}</span>
         <span class="meta-pill">${escapeHtml(String(nudge.recommended_minutes))} min</span>
@@ -1489,6 +1573,38 @@ function renderNudge(nudge, nudgePlan) {
       <p>${escapeHtml(nudgePlan.reason)}</p>
       ${nudgePlan.deliver_at ? `<p><strong>Deliver at:</strong> ${escapeHtml(formatDateTime(nudgePlan.deliver_at, nudge.local_timezone))}</p>` : ""}
       ${nudgePlan.fallback_at ? `<p><strong>Fallback:</strong> ${escapeHtml(formatDateTime(nudgePlan.fallback_at, nudge.local_timezone))}</p>` : ""}
+    </div>
+  `;
+}
+
+function buildNudgeThreadContext(nudge) {
+  const memorySummary = state.memorySummary;
+  const latestCompletedAction = Array.isArray(state.actionItems)
+    ? state.actionItems.find((item) => item.status === "completed" && (item.follow_up_outcome || item.completed_at))
+    : null;
+
+  if (!memorySummary?.carry_forward_prompt && !latestCompletedAction) {
+    return "";
+  }
+
+  const reasonLine = latestCompletedAction
+    ? `Because you already followed through on ${escapeHtml(latestCompletedAction.title)}, Emmaus is carrying that thread forward instead of starting over.`
+    : "Emmaus is carrying one recent thread forward so this nudge feels specific instead of generic.";
+
+  const followThroughLine = latestCompletedAction?.follow_up_note
+    ? `<p class="micro-copy">Last follow-through: ${escapeHtml(latestCompletedAction.follow_up_note)}</p>`
+    : "";
+
+  const promptLine = memorySummary?.carry_forward_prompt
+    ? `<p><strong>Carry forward:</strong> ${escapeHtml(memorySummary.carry_forward_prompt)}</p>`
+    : "";
+
+  return `
+    <div class="nudge-thread-card">
+      <p class="panel-label">Why this nudge</p>
+      <p>${reasonLine}</p>
+      ${followThroughLine}
+      ${promptLine}
     </div>
   `;
 }
@@ -1775,6 +1891,13 @@ async function onCompleteSession(event) {
     },
   });
 
+  state.lastFollowThroughUpdate = null;
+  state.lastCompletion = {
+    actionItem: payload.action_item,
+    engagement: payload.engagement,
+    session: payload.session,
+    completedAt: new Date().toISOString(),
+  };
   state.selectedActionItemId = payload.action_item.action_item_id;
   elements.summaryNotes.value = "";
   elements.actionItemTitle.value = "";
@@ -1794,7 +1917,8 @@ async function onSubmitActionFollowUp(event) {
     return;
   }
 
-  await fetchJson(`/v1/study/action-items/${encodeURIComponent(state.selectedActionItemId)}/complete`, {
+  const beforeMemorySummary = state.memorySummary ? JSON.parse(JSON.stringify(state.memorySummary)) : null;
+  const updatedActionItem = await fetchJson(`/v1/study/action-items/${encodeURIComponent(state.selectedActionItemId)}/complete`, {
     method: "POST",
     body: {
       user_id: getUserId(),
@@ -1805,8 +1929,14 @@ async function onSubmitActionFollowUp(event) {
 
   elements.followUpNoteInput.value = "";
   await refreshExperience({ restoreScreen: false });
+  state.lastFollowThroughUpdate = {
+    actionItem: updatedActionItem,
+    beforeMemorySummary,
+    afterMemorySummary: state.memorySummary ? JSON.parse(JSON.stringify(state.memorySummary)) : null,
+  };
+  renderCompletionSummary(state.memorySummary, state.actionItems);
   showScreen("actions");
-  showToast("Follow-through saved.");
+  showToast("Follow-through saved. Emmaus updated your thread.");
 }
 
 async function onPreviewNudgeAtTime(event) {
