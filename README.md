@@ -121,8 +121,18 @@ The current frontend emphasizes:
 - action-item follow-up that captures what happened when the user actually applied the session
 - a nudge preview plus delivery-plan surface that is ready to feed future mobile notifications
 
+## Demo mode
+
+Emmaus now includes a built-in demo mode for the mobile web client.
+
+- The home screen includes scene buttons for `Live`, `First visit`, `In progress`, `Overdue action`, and `Scheduled nudge`.
+- Demo scenes are read-only and never write to the live database.
+- You can also open a seeded state directly with `?demo=first_visit`, `?demo=in_progress`, `?demo=overdue_action`, or `?demo=scheduled_nudge`.
+- Switch back to `Live` anytime to use the real API-backed experience.
+
 ## Open-source licensing posture
 
 - The codebase is MIT licensed.
 - No proprietary Bible texts or commentary are bundled.
 - Users are expected to connect their own licensed or public-domain content through provider adapters.
+

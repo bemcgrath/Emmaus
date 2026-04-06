@@ -25,11 +25,15 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "Start Today's Plan" in response.text
+    assert "Demo Mode" in response.text
+    assert "data-demo-scenario=\"scheduled_nudge\"" in response.text
     assert "follow-up-target-copy" in response.text
     assert "nudge-plan-card" in response.text
 
     asset = client.get("/static/app.js")
     assert asset.status_code == 200
+    assert "demoScenario" in asset.text
+    assert "buildDemoScenarioData" in asset.text
     assert "followUpOutcomeSelect" in asset.text
     assert "delivery_status" in asset.text
 
@@ -277,3 +281,4 @@ def test_mood_shapes_recommendation_and_nudge_preview(tmp_path, monkeypatch):
     nudge_payload = nudge.json()
     assert nudge_payload["nudge_type"] == "encouragement"
     assert nudge_payload["recommended_minutes"] <= 10
+
