@@ -401,6 +401,33 @@ function buildDemoScenarioData(scenario) {
     current_question: { question: "What does this passage reveal about God's character or intentions?", type: "interpretation", difficulty: "balanced" },
   };
 
+  const completedActionHistory = [
+    {
+      action_item_id: "demo-action-archived-01",
+      user_id: "demo-user",
+      session_id: "demo-session-archived-01",
+      title: "Pray with Sarah after group",
+      detail: "Ask Sarah how she is really doing and pray with her before heading home.",
+      status: "completed",
+      created_at: "2026-04-01T19:10:00-04:00",
+      completed_at: "2026-04-01T21:05:00-04:00",
+      follow_up_note: "I almost left without doing it, but the conversation opened naturally and we prayed together in the parking lot.",
+      follow_up_outcome: "prayed_through",
+    },
+    {
+      action_item_id: "demo-action-archived-02",
+      user_id: "demo-user",
+      session_id: "demo-session-archived-02",
+      title: "Share Psalm 23 with Dad",
+      detail: "Call Dad on the drive home and tell him why Psalm 23 steadied you this week.",
+      status: "completed",
+      created_at: "2026-04-02T07:15:00-04:00",
+      completed_at: "2026-04-02T18:42:00-04:00",
+      follow_up_note: "The call was shorter than I hoped, but I still shared the verse and asked how I could keep praying for him.",
+      follow_up_outcome: "discussed_with_someone",
+    },
+  ];
+
   const overdueActionItems = [
     {
       action_item_id: "demo-action-01",
@@ -413,6 +440,23 @@ function buildDemoScenarioData(scenario) {
       completed_at: null,
       follow_up_note: null,
       follow_up_outcome: null,
+    },
+    ...completedActionHistory,
+  ];
+
+  const scheduledActionHistory = [
+    ...completedActionHistory,
+    {
+      action_item_id: "demo-action-archived-03",
+      user_id: "demo-user",
+      session_id: "demo-session-archived-03",
+      title: "Write one sentence of gratitude before bed",
+      detail: "End the day by writing one line about where you saw Christ's faithfulness.",
+      status: "completed",
+      created_at: "2026-04-04T20:55:00-04:00",
+      completed_at: "2026-04-04T22:08:00-04:00",
+      follow_up_note: "It was brief, but it helped me end the day with more clarity and less hurry.",
+      follow_up_outcome: "completed",
     },
   ];
 
@@ -451,8 +495,8 @@ function buildDemoScenarioData(scenario) {
         recommended_guide_mode: "guide",
         recommended_minutes: 10,
         recommended_entry_point: "I want to begin gently",
-        reason: "Emmaus is starting with a short, welcoming session so the user can establish a first rhythm.",
-        suggested_action: "Finish one short session and carry one simple prayer into the rest of the day.",
+        reason: "Emmaus is starting with a short, welcoming session that feels safe on mobile and easy to finish in one sitting.",
+        suggested_action: "Finish one short session, then carry one sentence of prayer with you into the next part of the day.",
       },
       streaks: { user_id: "demo-user", completed_sessions: 0, current_streak: 0, longest_streak: 0, last_completed_on: null },
       actionItems: [],
@@ -462,7 +506,7 @@ function buildDemoScenarioData(scenario) {
         ...scheduledNudge,
         nudge_type: "encouragement",
         title: "A gentle first step",
-        message: "Start with one short session and let Emmaus begin learning how you study.",
+        message: "Start with one short session, answer honestly, and let Emmaus begin learning where you need clarity and follow-through.",
         timing_decision: "now",
         timing_reason: "No preferred study window is configured yet, so Emmaus can prompt gently right away.",
         scheduled_for: null,
@@ -483,8 +527,8 @@ function buildDemoScenarioData(scenario) {
       profile: baseProfile,
       recommendation: baseRecommendation,
       streaks: { user_id: "demo-user", completed_sessions: 6, current_streak: 3, longest_streak: 6, last_completed_on: "2026-04-04" },
-      actionItems: [],
-      latestMood: { user_id: "demo-user", mood: "peaceful", energy: "medium", notes: "Ready for a focused morning session.", created_at: "2026-04-05T07:25:00-04:00" },
+      actionItems: completedActionHistory,
+      latestMood: { user_id: "demo-user", mood: "peaceful", energy: "medium", notes: "Ready for a focused morning session, but I want the application to land somewhere concrete.", created_at: "2026-04-05T07:25:00-04:00" },
       activeSession,
       nudge: scheduledNudge,
       nudgePlan: scheduledPlan,
@@ -524,8 +568,8 @@ function buildDemoScenarioData(scenario) {
       profile: { ...baseProfile, current_streak: 4, longest_streak: 8 },
       recommendation: { ...baseRecommendation, focus_area: "growth", recommended_guide_mode: "challenger", reason: "The user has momentum, so Emmaus can stretch the next session a bit more." },
       streaks: { user_id: "demo-user", completed_sessions: 9, current_streak: 4, longest_streak: 8, last_completed_on: "2026-04-05" },
-      actionItems: [],
-      latestMood: { user_id: "demo-user", mood: "encouraged", energy: "high", notes: "Open to a deeper challenge tomorrow morning.", created_at: "2026-04-05T20:45:00-04:00" },
+      actionItems: scheduledActionHistory,
+      latestMood: { user_id: "demo-user", mood: "encouraged", energy: "high", notes: "Open to a deeper challenge tomorrow morning and grateful for the last few concrete wins.", created_at: "2026-04-05T20:45:00-04:00" },
       activeSession: null,
       nudge: scheduledNudge,
       nudgePlan: scheduledPlan,
@@ -536,8 +580,8 @@ function buildDemoScenarioData(scenario) {
     profile: baseProfile,
     recommendation: baseRecommendation,
     streaks: { user_id: "demo-user", completed_sessions: 6, current_streak: 3, longest_streak: 6, last_completed_on: "2026-04-04" },
-    actionItems: [],
-    latestMood: { user_id: "demo-user", mood: "peaceful", energy: "medium", notes: "Ready for today's plan.", created_at: "2026-04-05T07:25:00-04:00" },
+    actionItems: [completedActionHistory[0]],
+    latestMood: { user_id: "demo-user", mood: "peaceful", energy: "medium", notes: "Ready for today's plan and encouraged by one recent follow-through win.", created_at: "2026-04-05T07:25:00-04:00" },
     activeSession: null,
     nudge: {
       ...scheduledNudge,
@@ -1583,3 +1627,6 @@ async function loadTextSources() {
   }
   renderTextSourceOptions();
 }
+
+
+
