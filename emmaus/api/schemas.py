@@ -20,6 +20,14 @@ class RegisterApiTextSourceRequest(BaseModel):
     license_name: str = "User Supplied"
 
 
+class RegisterUploadedTextSourceRequest(BaseModel):
+    source_id: str = Field(pattern=r"^[a-z0-9_\-]+$")
+    name: str
+    filename: str
+    file_content: str = Field(min_length=1)
+    license_name: str = "User Supplied"
+
+
 class PassageQuery(BaseModel):
     source_id: str | None = None
     book: str

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from pathlib import Path
 
 from emmaus.domain.models import PassageReference, PassageText, TextSourceDescriptor
@@ -42,6 +44,30 @@ class TextSourceService:
         )
         self.registry.register(provider)
         return provider.descriptor
+
+    def register_uploaded_source(
+        self,
+        source_id: str,
+        name: str,
+        filename: str,
+        file_content: str,
+        license_name: str,
+    ) -> TextSourceDescriptor:
+        payload = json.loads(file_content)
+        if not isinstance(payload, dict) or "books" not in payload:
+            raise ValueError("Uploaded Bible JSON must contain a top-level 'books' object.")
+
+        uploads_dir = self.data_dir / "user_sources"
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        suffix = Path(filename).suffix or ".json"
+        target_path = uploads_dir / f"{source_id}{suffix}"
+        target_path.write_text(file_content, encoding="utf-8")
+        return self.register_local_source(
+            source_id=source_id,
+            name=name,
+            file_path=str(target_path),
+            license_name=license_name,
+        )
 
     def get_passage(self, reference: PassageReference, source_id: str | None = None) -> PassageText:
         resolved_source = source_id or self.default_source

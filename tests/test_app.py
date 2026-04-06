@@ -1,4 +1,5 @@
 import importlib
+import json
 
 from fastapi.testclient import TestClient
 
@@ -26,7 +27,10 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "text/html" in response.headers["content-type"]
     assert "Start Today's Plan" in response.text
     assert "Demo Mode" in response.text
+    assert "data-demo-scenario=\"comprehension_gap\"" in response.text
     assert "data-demo-scenario=\"scheduled_nudge\"" in response.text
+    assert "source-library" in response.text
+    assert "source-upload-form" in response.text
     assert "follow-up-target-copy" in response.text
     assert "nudge-plan-card" in response.text
 
@@ -34,8 +38,59 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert asset.status_code == 200
     assert "demoScenario" in asset.text
     assert "buildDemoScenarioData" in asset.text
+    assert "comprehension_gap" in asset.text
+    assert "setPreferredBibleSource" in asset.text
+    assert "source-upload-file" in asset.text
     assert "followUpOutcomeSelect" in asset.text
     assert "delivery_status" in asset.text
+
+
+def test_uploaded_text_source_can_be_registered_and_used(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    uploaded_source = client.post(
+        "/v1/sources/text/upload",
+        json={
+            "source_id": "uploaded_demo",
+            "name": "Uploaded Demo Bible",
+            "filename": "uploaded_demo.json",
+            "file_content": json.dumps(
+                {
+                    "name": "Uploaded Demo Bible",
+                    "copyright": "Public Domain",
+                    "books": {
+                        "John": {
+                            "1": {
+                                "1": "In the beginning was the Word.",
+                                "2": "The same was in the beginning with God.",
+                            }
+                        }
+                    },
+                }
+            ),
+            "license_name": "Public Domain",
+        },
+    )
+    assert uploaded_source.status_code == 201
+    descriptor = uploaded_source.json()
+    assert descriptor["source_id"] == "uploaded_demo"
+    assert descriptor["provider_type"] == "local_file"
+
+    passage = client.post(
+        "/v1/texts/passage",
+        json={
+            "source_id": "uploaded_demo",
+            "book": "John",
+            "chapter": 1,
+            "start_verse": 1,
+            "end_verse": 2,
+        },
+    )
+    assert passage.status_code == 200
+    payload = passage.json()
+    assert payload["source_id"] == "uploaded_demo"
+    assert "In the beginning was the Word." in payload["text"]
+
 
 
 def test_update_preferences_and_profile(tmp_path, monkeypatch):

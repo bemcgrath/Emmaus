@@ -44,6 +44,7 @@
             <div class="chip-row demo-chip-row" id="demo-scene-row">
               <button type="button" class="choice-chip" data-demo-scenario="live">Live</button>
               <button type="button" class="choice-chip" data-demo-scenario="first_visit">First visit</button>
+              <button type="button" class="choice-chip" data-demo-scenario="comprehension_gap">Comprehension gap</button>
               <button type="button" class="choice-chip" data-demo-scenario="in_progress">In progress</button>
               <button type="button" class="choice-chip" data-demo-scenario="overdue_action">Overdue action</button>
               <button type="button" class="choice-chip" data-demo-scenario="scheduled_nudge">Scheduled nudge</button>
@@ -70,11 +71,66 @@
             <div class="panel-heading">
               <div>
                 <p class="panel-label">Today</p>
-                <h2>Return to today’s plan</h2>
+                <h2>Return to todayï¿½s plan</h2>
               </div>
               <span class="status-pill" id="today-plan-pill">Loading</span>
             </div>
             <div id="today-plan-card" class="content-stack"></div>
+          </section>
+
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Bible</p>
+                <h2>Choose your source</h2>
+              </div>
+            </div>
+            <p class="micro-copy" id="source-manager-copy">Choose a connected Bible or add one from your phone or browser without leaving Emmaus.</p>
+            <div id="source-library" class="list-stack"></div>
+            <form id="source-upload-form" class="stack-form compact-form">
+              <p class="panel-label">Add local JSON</p>
+              <label>
+                <span>Source name</span>
+                <input id="source-upload-name" type="text" placeholder="My Public Domain Bible" />
+              </label>
+              <label>
+                <span>Source ID</span>
+                <input id="source-upload-id" type="text" placeholder="my_public_domain_bible" />
+              </label>
+              <label>
+                <span>License</span>
+                <input id="source-upload-license" type="text" value="User Supplied" />
+              </label>
+              <label>
+                <span>Bible JSON file</span>
+                <input id="source-upload-file" type="file" accept=".json,application/json" />
+              </label>
+              <button class="secondary-button full-width" type="submit">Add local Bible</button>
+            </form>
+            <form id="source-api-form" class="stack-form compact-form">
+              <p class="panel-label">Connect API source</p>
+              <label>
+                <span>Source name</span>
+                <input id="source-api-name" type="text" placeholder="Licensed Bible API" />
+              </label>
+              <label>
+                <span>Source ID</span>
+                <input id="source-api-id" type="text" placeholder="licensed_bible_api" />
+              </label>
+              <label>
+                <span>Base URL</span>
+                <input id="source-api-url" type="url" placeholder="https://example.com/bible" />
+              </label>
+              <label>
+                <span>API key</span>
+                <input id="source-api-key" type="password" placeholder="Optional" />
+              </label>
+              <label>
+                <span>License</span>
+                <input id="source-api-license" type="text" value="User Supplied" />
+              </label>
+              <button class="secondary-button full-width" type="submit">Connect API Bible</button>
+            </form>
           </section>
 
           <section class="dual-grid">

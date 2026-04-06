@@ -9,6 +9,7 @@ The app is designed around a personalized guide that helps users read, understan
 - [Objective](docs/OBJECTIVE.md)
 - [Product Blueprint](docs/PRODUCT_BLUEPRINT.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Bible Source Connection](docs/BIBLE_SOURCE_CONNECTION.md)
 
 ## Core Product Direction
 
@@ -62,6 +63,7 @@ tests/            API and frontend smoke tests
 
 - `GET /v1/sources/text`
 - `POST /v1/sources/text/local`
+- `POST /v1/sources/text/upload`
 - `POST /v1/sources/text/api`
 
 ### Text lookup
@@ -116,18 +118,40 @@ Emmaus now includes a lightweight mobile web client served directly from the Fas
 The current frontend emphasizes:
 
 - onboarding that captures guide mode, study rhythm, preferred days, timing windows, and nudge tone
-- a return-to-today’s-plan home screen that highlights the next best step
+- a return-to-todayï¿½s-plan home screen that highlights the next best step
 - session persistence that restores an in-progress study flow after refresh or return
 - action-item follow-up that captures what happened when the user actually applied the session
 - a nudge preview plus delivery-plan surface that is ready to feed future mobile notifications
+
+## How Bible connection works
+
+Emmaus does not ship with proprietary Bible text. Instead, a user connects a Bible source once, and the app reads passages from that source through the text-provider layer.
+
+The current connection flow is:
+
+1. Register a source.
+2. Save that source on the user profile or pass it when a session starts.
+3. Emmaus resolves passages through the provider registry and keeps the rest of the app logic source-agnostic.
+
+Current supported source types:
+
+- Local file path: register a local JSON Bible file with POST /v1/sources/text/local.
+- Uploaded local JSON: upload a Bible JSON file directly from the app with POST /v1/sources/text/upload.
+- API-backed source: register a remote Bible API adapter with POST /v1/sources/text/api and an optional API key.
+
+Once registered, the source appears in `GET /v1/sources/text`, and the user can reference it by `source_id` either as `preferred_translation_source_id` on the profile or `text_source_id` when starting a session.
+
+The current web client now includes a mobile-friendly Bible source manager. Users can choose an existing source with one tap, upload a local JSON Bible file, or connect an API-backed source directly from the app.
+
+See [docs/BIBLE_SOURCE_CONNECTION.md](docs/BIBLE_SOURCE_CONNECTION.md) for the exact request flow and examples.
 
 ## Demo mode
 
 Emmaus now includes a built-in demo mode for the mobile web client.
 
-- The home screen includes scene buttons for `Live`, `First visit`, `In progress`, `Overdue action`, and `Scheduled nudge`.
+- The home screen includes scene buttons for `Live`, `First visit`, `Comprehension gap`, `In progress`, `Overdue action`, and `Scheduled nudge`.
 - Demo scenes are read-only and never write to the live database.
-- You can also open a seeded state directly with `?demo=first_visit`, `?demo=in_progress`, `?demo=overdue_action`, or `?demo=scheduled_nudge`.
+- You can also open a seeded state directly with `?demo=first_visit`, `?demo=comprehension_gap`, `?demo=in_progress`, `?demo=overdue_action`, or `?demo=scheduled_nudge`.
 - Switch back to `Live` anytime to use the real API-backed experience.
 
 ## Open-source licensing posture

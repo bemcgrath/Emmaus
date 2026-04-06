@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from emmaus.api.deps import get_container
-from emmaus.api.schemas import RegisterApiTextSourceRequest, RegisterLocalTextSourceRequest
+from emmaus.api.schemas import RegisterApiTextSourceRequest, RegisterLocalTextSourceRequest, RegisterUploadedTextSourceRequest
 from emmaus.core.bootstrap import Container
 
 
@@ -39,4 +39,22 @@ def register_api_text_source(
         api_key=payload.api_key,
         license_name=payload.license_name,
     )
+    return descriptor
+
+
+@router.post("/upload", status_code=201)
+def register_uploaded_text_source(
+    payload: RegisterUploadedTextSourceRequest,
+    container: Container = Depends(get_container),
+):
+    try:
+        descriptor = container.text_service.register_uploaded_source(
+            source_id=payload.source_id,
+            name=payload.name,
+            filename=payload.filename,
+            file_content=payload.file_content,
+            license_name=payload.license_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return descriptor

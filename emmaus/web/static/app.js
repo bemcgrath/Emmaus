@@ -522,6 +522,114 @@ function buildDemoScenarioData(scenario) {
     };
   }
 
+  if (scenario === "comprehension_gap") {
+    return {
+      profile: { ...baseProfile, current_streak: 1, longest_streak: 6, last_completed_on: "2026-04-03" },
+      recommendation: {
+        user_id: "demo-user",
+        focus_area: "comprehension",
+        recommended_reference: { book: "Mark", chapter: 4, start_verse: 35, end_verse: 41 },
+        recommended_guide_mode: "guide",
+        recommended_minutes: 12,
+        recommended_entry_point: "I need clarity before application",
+        reason: "Recent responses moved quickly to personal reaction, so Emmaus is slowing this session down and revisiting what the passage actually says.",
+        suggested_action: "Write one sentence about what this passage reveals about Christ before deciding what to do next.",
+        gap_report: {
+          user_id: "demo-user",
+          comprehension_gap: 0.82,
+          application_gap: 0.34,
+          consistency_gap: 0.29,
+          focus_area: "comprehension",
+          observed_patterns: [
+            "Recent answers jumped to feelings before identifying what the text says.",
+            "Interpretation questions have needed more second-pass clarity than application questions.",
+          ],
+        },
+      },
+      streaks: { user_id: "demo-user", completed_sessions: 4, current_streak: 1, longest_streak: 6, last_completed_on: "2026-04-03" },
+      actionItems: [completedActionHistory[1]],
+      latestMood: { user_id: "demo-user", mood: "neutral", energy: "medium", notes: "I feel willing to study, but I keep realizing I move too fast through the meaning.", created_at: "2026-04-05T06:50:00-04:00" },
+      activeSession: null,
+      nudge: {
+        user_id: "demo-user",
+        nudge_type: "encouragement",
+        title: "Slow down and read for clarity",
+        message: "Emmaus is recommending a shorter session that stays close to the text before moving into application.",
+        recommended_entry_point: "I need clarity before application",
+        recommended_minutes: 12,
+        recommended_guide_mode: "guide",
+        recommendation: {
+          user_id: "demo-user",
+          focus_area: "comprehension",
+          recommended_reference: { book: "Mark", chapter: 4, start_verse: 35, end_verse: 41 },
+          recommended_guide_mode: "guide",
+          recommended_minutes: 12,
+          recommended_entry_point: "I need clarity before application",
+          reason: "Recent responses moved quickly to personal reaction, so Emmaus is slowing this session down and revisiting what the passage actually says.",
+          suggested_action: "Write one sentence about what this passage reveals about Christ before deciding what to do next.",
+          gap_report: {
+            user_id: "demo-user",
+            comprehension_gap: 0.82,
+            application_gap: 0.34,
+            consistency_gap: 0.29,
+            focus_area: "comprehension",
+            observed_patterns: [
+              "Recent answers jumped to feelings before identifying what the text says.",
+              "Interpretation questions have needed more second-pass clarity than application questions.",
+            ],
+          },
+        },
+        timing_decision: "now",
+        timing_reason: "The user is inside the preferred study window and this is a good moment for a short reset session.",
+        scheduled_for: null,
+        local_timezone: "America/New_York",
+      },
+      nudgePlan: {
+        user_id: "demo-user",
+        delivery_status: "send_now",
+        delivery_channel: "push",
+        deliver_at: "2026-04-05T07:05:00-04:00",
+        fallback_at: "2026-04-05T07:05:00-04:00",
+        idempotency_key: "demo-user:encouragement:I need clarity before application:2026-04-05T07:05:00-04:00",
+        reason: "Emmaus can send this reset-style nudge now because the user is available and the recommended session is short.",
+        nudge: {
+          user_id: "demo-user",
+          nudge_type: "encouragement",
+          title: "Slow down and read for clarity",
+          message: "Emmaus is recommending a shorter session that stays close to the text before moving into application.",
+          recommended_entry_point: "I need clarity before application",
+          recommended_minutes: 12,
+          recommended_guide_mode: "guide",
+          recommendation: {
+            user_id: "demo-user",
+            focus_area: "comprehension",
+            recommended_reference: { book: "Mark", chapter: 4, start_verse: 35, end_verse: 41 },
+            recommended_guide_mode: "guide",
+            recommended_minutes: 12,
+            recommended_entry_point: "I need clarity before application",
+            reason: "Recent responses moved quickly to personal reaction, so Emmaus is slowing this session down and revisiting what the passage actually says.",
+            suggested_action: "Write one sentence about what this passage reveals about Christ before deciding what to do next.",
+            gap_report: {
+              user_id: "demo-user",
+              comprehension_gap: 0.82,
+              application_gap: 0.34,
+              consistency_gap: 0.29,
+              focus_area: "comprehension",
+              observed_patterns: [
+                "Recent answers jumped to feelings before identifying what the text says.",
+                "Interpretation questions have needed more second-pass clarity than application questions.",
+              ],
+            },
+          },
+          timing_decision: "now",
+          timing_reason: "The user is inside the preferred study window and this is a good moment for a short reset session.",
+          scheduled_for: null,
+          local_timezone: "America/New_York",
+        },
+      },
+    };
+  }
+
   if (scenario === "in_progress") {
     return {
       profile: baseProfile,
@@ -951,7 +1059,7 @@ function renderActionItems(actionItems) {
       const isSelected = item.action_item_id === state.selectedActionItemId;
       const completed = item.status === "completed";
       const footer = completed
-        ? `<p class="micro-copy">Completed ${escapeHtml(formatDateTime(item.completed_at))}${item.follow_up_outcome ? ` • ${escapeHtml(sentenceCase(item.follow_up_outcome.replaceAll("_", " ")) )}` : ""}</p>${item.follow_up_note ? `<p>${escapeHtml(item.follow_up_note)}</p>` : ""}`
+        ? `<p class="micro-copy">Completed ${escapeHtml(formatDateTime(item.completed_at))}${item.follow_up_outcome ? ` ï¿½ ${escapeHtml(sentenceCase(item.follow_up_outcome.replaceAll("_", " ")) )}` : ""}</p>${item.follow_up_note ? `<p>${escapeHtml(item.follow_up_note)}</p>` : ""}`
         : `<button class="action-button" type="button" data-action-item-select="${escapeHtml(item.action_item_id)}">${isSelected ? "Selected for follow-up" : "Complete follow-through"}</button>`;
       return `
         <article class="action-card ${completed ? "completed" : ""} ${isSelected ? "selected" : ""}">
@@ -1630,3 +1738,223 @@ async function loadTextSources() {
 
 
 
+function bibleSourceElements() {
+  return {
+    library: document.getElementById("source-library"),
+    copy: document.getElementById("source-manager-copy"),
+    uploadForm: document.getElementById("source-upload-form"),
+    uploadName: document.getElementById("source-upload-name"),
+    uploadId: document.getElementById("source-upload-id"),
+    uploadLicense: document.getElementById("source-upload-license"),
+    uploadFile: document.getElementById("source-upload-file"),
+    apiForm: document.getElementById("source-api-form"),
+    apiName: document.getElementById("source-api-name"),
+    apiId: document.getElementById("source-api-id"),
+    apiUrl: document.getElementById("source-api-url"),
+    apiKey: document.getElementById("source-api-key"),
+    apiLicense: document.getElementById("source-api-license"),
+  };
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const sourceUi = bibleSourceElements();
+  sourceUi.library?.addEventListener("click", onSourceLibraryClick);
+  sourceUi.uploadForm?.addEventListener("submit", onUploadBibleSource);
+  sourceUi.apiForm?.addEventListener("submit", onConnectBibleApiSource);
+});
+
+async function loadTextSources() {
+  if (isDemoMode()) {
+    state.textSources = DEFAULT_TEXT_SOURCES;
+    renderTextSourceOptions();
+    return;
+  }
+  try {
+    const response = await fetchJson("/v1/sources/text");
+    state.textSources = response.items || response.sources || response || [];
+  } catch {
+    state.textSources = DEFAULT_TEXT_SOURCES;
+  }
+  renderTextSourceOptions();
+}
+
+function renderTextSourceOptions() {
+  const sources = state.textSources.length ? state.textSources : DEFAULT_TEXT_SOURCES;
+  const options = sources
+    .map((source) => `<option value="${escapeHtml(source.source_id)}">${escapeHtml(source.name)}</option>`)
+    .join("");
+  elements.textSourceSelect.innerHTML = options;
+  elements.preferredSourceSelect.innerHTML = options;
+
+  const preferredSourceId = state.profile?.preferences?.preferred_translation_source_id || sources[0]?.source_id || "";
+  const sessionSourceId = state.activeSessionPayload?.session?.text_source_id || preferredSourceId;
+
+  if (preferredSourceId) {
+    elements.preferredSourceSelect.value = preferredSourceId;
+  }
+  if (sessionSourceId) {
+    elements.textSourceSelect.value = sessionSourceId;
+  }
+
+  renderBibleSourceManager();
+}
+
+function renderProfile(profile) {
+  const preferences = profile?.preferences || {};
+  elements.userIdInput.value = profile?.user_id || state.userId;
+  elements.displayNameInput.value = profile?.display_name || "";
+  elements.preferredMinutesInput.value = preferences.preferred_session_minutes || "";
+  elements.guideModeSelect.value = preferences.preferred_guide_mode || "guide";
+  elements.nudgeIntensitySelect.value = preferences.nudge_intensity || "balanced";
+  elements.timezoneInput.value = preferences.timezone || "";
+  elements.studyWindowStartInput.value = preferences.preferred_study_window_start || "";
+  elements.studyWindowEndInput.value = preferences.preferred_study_window_end || "";
+  elements.quietHoursStartInput.value = preferences.quiet_hours_start || "";
+  elements.quietHoursEndInput.value = preferences.quiet_hours_end || "";
+  state.selectedStudyDays = Array.isArray(preferences.preferred_study_days) ? [...preferences.preferred_study_days] : [];
+  updateStudyDayChips();
+  renderTextSourceOptions();
+}
+
+function renderBibleSourceManager() {
+  const sourceUi = bibleSourceElements();
+  if (!sourceUi.library || !sourceUi.copy) {
+    return;
+  }
+
+  const sources = (state.textSources.length ? state.textSources : DEFAULT_TEXT_SOURCES).filter(
+    (source) => source.source_id !== "user_api_placeholder",
+  );
+  const preferredSourceId = state.profile?.preferences?.preferred_translation_source_id || elements.preferredSourceSelect?.value || "";
+  const preferredSource = sources.find((source) => source.source_id === preferredSourceId) || null;
+
+  sourceUi.copy.textContent = preferredSource
+    ? `Current Bible: ${preferredSource.name}. Tap any source below to make it your default study text.`
+    : "Choose a connected Bible or add one from your phone or browser without leaving Emmaus.";
+
+  if (!sources.length) {
+    sourceUi.library.innerHTML = '<p class="empty-state">No Bible sources are connected yet. Add one below to get started.</p>';
+    return;
+  }
+
+  sourceUi.library.innerHTML = sources
+    .map((source) => {
+      const isPreferred = source.source_id === preferredSourceId;
+      const providerLabel = source.provider_type === "remote_api" ? "API source" : "Local file";
+      return `
+        <article class="action-card ${isPreferred ? "selected" : ""}">
+          <div class="action-card-header">
+            <div>
+              <p><strong>${escapeHtml(source.name)}</strong></p>
+              <p>${escapeHtml(providerLabel)}${source.license_name ? ` • ${escapeHtml(source.license_name)}` : ""}</p>
+            </div>
+            <span class="status-pill">${isPreferred ? "Current" : "Available"}</span>
+          </div>
+          <div class="source-card-actions">
+            <button class="action-button" type="button" data-source-prefer="${escapeHtml(source.source_id)}" ${isPreferred ? "disabled" : ""}>${isPreferred ? "Using this Bible" : "Use this Bible"}</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+async function onSourceLibraryClick(event) {
+  const button = event.target.closest("[data-source-prefer]");
+  if (!button) {
+    return;
+  }
+  await setPreferredBibleSource(button.dataset.sourcePrefer);
+}
+
+async function onUploadBibleSource(event) {
+  event.preventDefault();
+  if (!ensureLiveMode("Switch to Live to connect a real Bible source.")) {
+    return;
+  }
+
+  const sourceUi = bibleSourceElements();
+  const file = sourceUi.uploadFile?.files?.[0];
+  if (!file) {
+    showToast("Choose a Bible JSON file first.");
+    return;
+  }
+
+  const sourceName = optionalText(sourceUi.uploadName.value) || file.name.replace(/\.json$/i, "");
+  const sourceId = optionalText(sourceUi.uploadId.value) || buildSourceIdCandidate(sourceName);
+  const licenseName = optionalText(sourceUi.uploadLicense.value) || "User Supplied";
+  const fileContent = await file.text();
+
+  const descriptor = await fetchJson("/v1/sources/text/upload", {
+    method: "POST",
+    body: {
+      source_id: sourceId,
+      name: sourceName,
+      filename: file.name,
+      file_content: fileContent,
+      license_name: licenseName,
+    },
+  });
+
+  await setPreferredBibleSource(descriptor.source_id, { successMessage: `${descriptor.name} is now your default Bible.` });
+  sourceUi.uploadForm.reset();
+  sourceUi.uploadLicense.value = "User Supplied";
+}
+
+async function onConnectBibleApiSource(event) {
+  event.preventDefault();
+  if (!ensureLiveMode("Switch to Live to connect a real Bible source.")) {
+    return;
+  }
+
+  const sourceUi = bibleSourceElements();
+  const sourceName = optionalText(sourceUi.apiName.value);
+  const baseUrl = optionalText(sourceUi.apiUrl.value);
+  if (!sourceName || !baseUrl) {
+    showToast("Add a source name and base URL first.");
+    return;
+  }
+
+  const sourceId = optionalText(sourceUi.apiId.value) || buildSourceIdCandidate(sourceName);
+  const licenseName = optionalText(sourceUi.apiLicense.value) || "User Supplied";
+  const descriptor = await fetchJson("/v1/sources/text/api", {
+    method: "POST",
+    body: {
+      source_id: sourceId,
+      name: sourceName,
+      base_url: baseUrl,
+      api_key: optionalText(sourceUi.apiKey.value),
+      license_name: licenseName,
+    },
+  });
+
+  await setPreferredBibleSource(descriptor.source_id, { successMessage: `${descriptor.name} is now your default Bible.` });
+  sourceUi.apiForm.reset();
+  sourceUi.apiLicense.value = "User Supplied";
+}
+
+async function setPreferredBibleSource(sourceId, { successMessage = "Bible source updated." } = {}) {
+  if (!sourceId) {
+    return;
+  }
+  if (!ensureLiveMode("Switch to Live to update your default Bible source.")) {
+    return;
+  }
+
+  await fetchJson(`/v1/users/${encodeURIComponent(getUserId())}/preferences`, {
+    method: "PATCH",
+    body: { preferred_translation_source_id: sourceId },
+  });
+  await loadTextSources();
+  await refreshExperience({ restoreScreen: false });
+  showToast(successMessage);
+}
+
+function buildSourceIdCandidate(value) {
+  return String(value || "source")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    || "source";
+}
