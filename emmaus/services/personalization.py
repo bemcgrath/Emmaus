@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -8,80 +9,121 @@ from emmaus.domain.models import (
     NudgeDeliveryPlan,
     NudgePreview,
     PassageReference,
+    SessionResponse,
     StudyGapReport,
     StudyRecommendation,
+    StudyResponseEvaluation,
+    StudySession,
     UserProfile,
 )
+from emmaus.providers.llm import LLMProviderRegistry
 from emmaus.services.study import StudyService
+from emmaus.services.text import TextSourceService
 
 
 class PersonalizationService:
-    def __init__(self, study_service: StudyService) -> None:
+    def __init__(
+        self,
+        study_service: StudyService,
+        text_service: TextSourceService,
+        llm_registry: LLMProviderRegistry,
+    ) -> None:
         self.study_service = study_service
+        self.text_service = text_service
+        self.llm_registry = llm_registry
 
     def build_gap_report(self, user_id: str) -> StudyGapReport:
         profile = self.study_service.get_profile(user_id)
         pattern_summary = self.study_service.summarize_patterns(user_id)
-        recent_responses = self.study_service.list_recent_responses(user_id)
+        recent_evaluations = self._evaluate_recent_responses(user_id)
         open_action_items = self.study_service.list_action_items(user_id, status="open")
         events = self.study_service.list_events(user_id)
         latest_mood = self.study_service.get_latest_mood_checkin(user_id)
 
         observed_patterns: list[str] = []
+        focus_votes: Counter[str] = Counter()
 
-        comprehension_gap = 0.15
-        comprehension_responses = [
-            response for response in recent_responses if response.question_type in {"observation", "interpretation"}
+        comprehension_gap = 0.2
+        comprehension_evaluations = [
+            evaluation
+            for _, _, evaluation in recent_evaluations
+            if evaluation.question_type in {"observation", "interpretation", "reflection"}
         ]
-        if comprehension_responses:
-            short_count = sum(1 for response in comprehension_responses if len(response.response_text.strip()) < 80)
-            comprehension_gap += min(0.55, short_count / max(1, len(comprehension_responses)) * 0.6)
-            if short_count:
-                observed_patterns.append("Recent observation or interpretation answers have been brief.")
+        if comprehension_evaluations:
+            average_comprehension = self._average_score(comprehension_evaluations, "comprehension_score")
+            average_clarity = self._average_score(comprehension_evaluations, "clarity_score")
+            comprehension_gap = max(0.05, 1 - ((average_comprehension * 0.75) + (average_clarity * 0.25)))
+            if average_comprehension < 0.55:
+                self._append_pattern(
+                    observed_patterns,
+                    "Recent answers suggest the user needs to slow down and understand the passage more clearly before moving on.",
+                )
+            elif average_comprehension < 0.72:
+                self._append_pattern(
+                    observed_patterns,
+                    "Recent answers show partial understanding that could grow with stronger observation and interpretation.",
+                )
+            self._merge_patterns(observed_patterns, comprehension_evaluations)
+            focus_votes.update(evaluation.recommended_focus for evaluation in comprehension_evaluations)
         elif profile.completed_sessions > 0:
-            comprehension_gap += 0.25
-            observed_patterns.append("Recent sessions do not show enough interpretive depth yet.")
+            comprehension_gap = 0.45
+            self._append_pattern(observed_patterns, "Recent sessions do not yet show enough evidence of understanding to guide the next step confidently.")
 
-        application_gap = 0.2
-        application_responses = [response for response in recent_responses if response.question_type == "application"]
-        if application_responses:
-            short_application = sum(1 for response in application_responses if len(response.response_text.strip()) < 90)
-            application_gap += min(0.5, short_application / max(1, len(application_responses)) * 0.6)
-            if short_application:
-                observed_patterns.append("Application responses have often lacked concrete follow-through.")
+        application_gap = 0.22
+        application_evaluations = [
+            evaluation
+            for _, _, evaluation in recent_evaluations
+            if evaluation.question_type in {"application", "reflection"}
+        ]
+        if application_evaluations:
+            average_application = self._average_score(application_evaluations, "application_score")
+            average_clarity = self._average_score(application_evaluations, "clarity_score")
+            application_gap = max(0.08, 1 - ((average_application * 0.8) + (average_clarity * 0.2)))
+            if average_application < 0.58:
+                self._append_pattern(
+                    observed_patterns,
+                    "Recent responses point in a meaningful direction, but they still need clearer real-world follow-through.",
+                )
+            self._merge_patterns(observed_patterns, application_evaluations)
+            focus_votes.update(evaluation.recommended_focus for evaluation in application_evaluations)
+
         if open_action_items:
-            application_gap += min(0.45, 0.18 * len(open_action_items))
-            application_gap = max(application_gap, 0.8)
-            observed_patterns.append("There are unfinished action items from prior sessions.")
+            application_gap = min(1.0, max(application_gap + min(0.4, 0.15 * len(open_action_items)), 0.72))
+            self._append_pattern(observed_patterns, "There are unfinished action items from prior sessions.")
 
         consistency_gap = 0.1
         if profile.completed_sessions == 0:
             consistency_gap = 0.45
-            observed_patterns.append("The user is still building an initial study rhythm.")
+            self._append_pattern(observed_patterns, "The user is still building an initial study rhythm.")
         elif profile.current_streak == 0:
             consistency_gap += 0.45
-            observed_patterns.append("The current study rhythm has broken and needs a gentle restart.")
+            self._append_pattern(observed_patterns, "The current study rhythm has broken and needs a gentle restart.")
         elif profile.current_streak == 1:
             consistency_gap += 0.2
         if profile.last_completed_on is not None:
             days_since_last = (datetime.now(UTC).date() - profile.last_completed_on).days
             if days_since_last >= 3:
                 consistency_gap = min(1.0, consistency_gap + 0.25)
-                observed_patterns.append("Several days have passed since the last completed session.")
+                self._append_pattern(observed_patterns, "Several days have passed since the last completed session.")
 
         low_engagement_events = [event for event in events if event.engagement_score <= 2 and event.event_type != "mood_logged"]
         if low_engagement_events:
-            comprehension_gap = min(1.0, comprehension_gap + 0.1)
-            consistency_gap = min(1.0, consistency_gap + 0.1)
-            observed_patterns.append("Low-engagement sessions suggest the plan should be simpler or more focused.")
+            comprehension_gap = min(1.0, comprehension_gap + 0.08)
+            consistency_gap = min(1.0, consistency_gap + 0.12)
+            self._append_pattern(observed_patterns, "Low-engagement sessions suggest the next plan should be simpler or more focused.")
 
         if latest_mood is not None:
             if latest_mood.mood in {"anxious", "stressed", "discouraged"}:
                 consistency_gap = min(1.0, consistency_gap + 0.15)
-                application_gap = min(1.0, application_gap + 0.1)
-                observed_patterns.append(f"Recent mood check-in shows the user feels {latest_mood.mood}.")
+                application_gap = min(1.0, application_gap + 0.08)
+                self._append_pattern(observed_patterns, f"Recent mood check-in shows the user feels {latest_mood.mood}.")
             elif latest_mood.mood in {"encouraged", "peaceful"} and pattern_summary.average_engagement >= 4:
-                observed_patterns.append("Recent mood check-in suggests the user may be ready for a deeper challenge.")
+                self._append_pattern(observed_patterns, "Recent mood check-in suggests the user may be ready for a deeper challenge.")
+
+        if focus_votes["comprehension"] > focus_votes["application"]:
+            comprehension_gap = min(1.0, comprehension_gap + 0.05)
+        elif focus_votes["application"] > focus_votes["comprehension"]:
+            application_gap = min(1.0, application_gap + 0.05)
 
         comprehension_gap = round(min(1.0, comprehension_gap), 2)
         application_gap = round(min(1.0, application_gap), 2)
@@ -93,9 +135,13 @@ class PersonalizationService:
             ("consistency", consistency_gap),
             key=lambda item: item[1],
         )[0]
-        if max(comprehension_gap, application_gap, consistency_gap) < 0.35 and pattern_summary.average_engagement >= 4:
+        if (
+            max(comprehension_gap, application_gap, consistency_gap) < 0.35
+            and pattern_summary.average_engagement >= 4
+            and focus_votes["growth"] >= max(1, focus_votes["comprehension"], focus_votes["application"])
+        ):
             focus_area = "growth"
-            observed_patterns.append("Recent engagement is healthy enough to support a deeper challenge.")
+            self._append_pattern(observed_patterns, "Recent engagement and response quality are healthy enough to support a deeper challenge.")
 
         return StudyGapReport(
             user_id=user_id,
@@ -113,6 +159,7 @@ class PersonalizationService:
         latest_mood = self.study_service.get_latest_mood_checkin(user_id)
 
         focus = gap_report.focus_area
+        lead_pattern = gap_report.observed_patterns[0] if gap_report.observed_patterns else None
         if focus == "consistency":
             reference = PassageReference(book="Psalm", chapter=23, start_verse=1, end_verse=3)
             guide_mode = "coach"
@@ -121,26 +168,29 @@ class PersonalizationService:
             reason = "A gentle restart will help rebuild rhythm without overwhelming the user."
             suggested_action = "Finish one short session and keep one practical encouragement in view today."
         elif focus == "application":
-            reference = PassageReference(book="John", chapter=3, start_verse=16, end_verse=17)
+            reference = PassageReference(book="James", chapter=1, start_verse=22, end_verse=25)
             guide_mode = "coach"
             entry_point = "continue where I left off"
             minutes = max(10, min(20, pattern_summary.recommended_session_minutes))
             reason = "Recent study shows the user needs stronger follow-through and clearer next steps."
             suggested_action = "Focus the next session on one concrete act of obedience, encouragement, or prayer."
         elif focus == "comprehension":
-            reference = PassageReference(book="John", chapter=3, start_verse=16, end_verse=17)
+            reference = PassageReference(book="Luke", chapter=24, start_verse=13, end_verse=17)
             guide_mode = "guide"
-            entry_point = "I want to study a topic"
+            entry_point = "I want to understand this passage better"
             minutes = max(15, pattern_summary.recommended_session_minutes)
             reason = "Recent answers suggest the user needs more interpretive depth and clearer understanding."
             suggested_action = "Slow down the next session and strengthen observation and interpretation before moving on."
         else:
-            reference = PassageReference(book="John", chapter=3, start_verse=16, end_verse=17)
+            reference = PassageReference(book="Luke", chapter=24, start_verse=25, end_verse=27)
             guide_mode = "challenger"
             entry_point = "I want a deeper challenge"
             minutes = max(20, pattern_summary.recommended_session_minutes)
             reason = "Current patterns are healthy enough to push into deeper reflection and challenge."
             suggested_action = "Use the next session to confront assumptions and pursue a more demanding application."
+
+        if lead_pattern is not None:
+            reason = f"{reason} {lead_pattern}"
 
         if profile.preferences.preferred_guide_mode == "peer" and focus in {"consistency", "application"}:
             guide_mode = "peer"
@@ -251,6 +301,40 @@ class PersonalizationService:
             reason="A push notification should be held because today is outside the user's allowed study window or day.",
             nudge=preview,
         )
+
+    def _evaluate_recent_responses(self, user_id: str, limit_sessions: int = 5) -> list[tuple[StudySession, SessionResponse, StudyResponseEvaluation]]:
+        evaluated_responses: list[tuple[StudySession, SessionResponse, StudyResponseEvaluation]] = []
+        sessions = self.study_service.list_sessions(user_id, status="completed")[:limit_sessions]
+        for session in sessions:
+            passage = self.text_service.get_passage(session.reference, session.text_source_id)
+            provider = self.llm_registry.get(session.llm_source_id)
+            passage_reference = self._format_reference(session.reference)
+            for response in self.study_service.list_session_responses(session.session_id):
+                evaluation = provider.evaluate_response(
+                    passage_reference=passage_reference,
+                    passage_text=passage.text,
+                    question=response.question,
+                    question_type=response.question_type,
+                    response_text=response.response_text,
+                )
+                evaluated_responses.append((session, response, evaluation))
+        return evaluated_responses
+
+    def _average_score(self, evaluations: list[StudyResponseEvaluation], attribute: str) -> float:
+        return round(sum(getattr(evaluation, attribute) for evaluation in evaluations) / len(evaluations), 2)
+
+    def _append_pattern(self, observed_patterns: list[str], pattern: str) -> None:
+        if pattern and pattern not in observed_patterns:
+            observed_patterns.append(pattern)
+
+    def _merge_patterns(self, observed_patterns: list[str], evaluations: list[StudyResponseEvaluation]) -> None:
+        for evaluation in evaluations:
+            for pattern in evaluation.observed_patterns:
+                self._append_pattern(observed_patterns, pattern)
+
+    def _format_reference(self, reference: PassageReference) -> str:
+        ending = f"-{reference.end_verse}" if reference.end_verse else ""
+        return f"{reference.book} {reference.chapter}:{reference.start_verse}{ending}"
 
     def _decide_nudge_timing(
         self,

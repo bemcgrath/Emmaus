@@ -25,7 +25,11 @@ class Container:
             repository=self.study_repository,
             history_limit=self.settings.study_history_limit,
         )
-        self.personalization_service = PersonalizationService(self.study_service)
+        self.personalization_service = PersonalizationService(
+            self.study_service,
+            self.text_service,
+            self.llm_registry,
+        )
         self.agent_service = AdaptiveStudyAgent(
             study_service=self.study_service,
             personalization_service=self.personalization_service,

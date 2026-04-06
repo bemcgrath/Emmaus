@@ -16,6 +16,7 @@ from emmaus.domain.models import (
     StudyPlanStep,
     StudyQuestion,
     StudyRecommendation,
+    StudyResponseEvaluation,
     StudySession,
 )
 from emmaus.providers.commentary import CommentaryProviderRegistry
@@ -184,6 +185,15 @@ class AdaptiveStudyAgent:
             response_text=response_text,
         )
         self.study_service.add_session_response(response)
+
+        passage = self.text_service.get_passage(session.reference, session.text_source_id)
+        evaluation = self.llm_registry.get(session.llm_source_id).evaluate_response(
+            passage_reference=self._format_reference(session.reference),
+            passage_text=passage.text,
+            question=current_question.question,
+            question_type=current_question.type,
+            response_text=response_text,
+        )
         self.study_service.record_event(
             StudyEvent(
                 user_id=user_id,
@@ -191,13 +201,13 @@ class AdaptiveStudyAgent:
                 reference=session.reference,
                 difficulty=current_question.difficulty,
                 engagement_score=engagement_score,
-                notes=response_text[:280],
+                notes=self._event_note(response_text, evaluation),
             )
         )
 
         next_index = session.current_question_index + 1
         next_question = session.questions[next_index] if next_index < len(session.questions) else None
-        reply_message = self._build_follow_up_message(session.guide_mode, current_question.question, response_text, next_question)
+        reply_message = self._build_follow_up_message(session.guide_mode, evaluation, next_question)
         updated_session = session.model_copy(
             update={
                 "current_question_index": next_index,
@@ -210,6 +220,7 @@ class AdaptiveStudyAgent:
             reply_message=reply_message,
             next_question=next_question,
             remaining_questions=max(0, len(updated_session.questions) - updated_session.current_question_index),
+            evaluation=evaluation,
         )
 
     def complete_session(
@@ -419,20 +430,27 @@ class AdaptiveStudyAgent:
     def _build_follow_up_message(
         self,
         guide_mode: str,
-        question: str,
-        response_text: str,
+        evaluation: StudyResponseEvaluation,
         next_question: StudyQuestion | None,
     ) -> str:
-        depth_note = "Stay with that a little longer and keep it concrete." if len(response_text.strip()) < 80 else "That is a thoughtful response."
-        if guide_mode == "challenger":
-            depth_note = "Good. Do not settle for the easy answer here." if len(response_text.strip()) < 80 else "Good. Keep testing your assumptions against the text."
-        elif guide_mode == "peer":
-            depth_note = "Thanks for naming that honestly." if len(response_text.strip()) >= 40 else "That is a good start. Say a little more about what you mean."
-        elif guide_mode == "coach":
-            depth_note = "Strong. Let's make sure this turns into follow-through."
+        guide_prefix = {
+            "guide": "Stay close to the passage.",
+            "peer": "You're naming this honestly.",
+            "challenger": "Press a little deeper here.",
+            "coach": "Let's turn this into follow-through.",
+        }[guide_mode]
+        focus_hint = {
+            "comprehension": "Keep looking for what the text actually says before moving too quickly to application.",
+            "application": "Name the next step in a way you can actually do today.",
+            "consistency": "Keep the next step simple enough to finish.",
+            "growth": "You're ready to press a little deeper on the next question.",
+        }[evaluation.recommended_focus]
         if next_question is None:
-            return f"{depth_note} You've worked through the main questions for this session. Complete the session to receive your action step."
-        return f"{depth_note} Next question: {next_question.question}"
+            return (
+                f"{evaluation.encouragement} {guide_prefix} {focus_hint} "
+                "You've worked through the main questions for this session. Complete the session to receive your action step."
+            )
+        return f"{evaluation.encouragement} {guide_prefix} {focus_hint} Next question: {next_question.question}"
 
     def _create_action_item(
         self,
@@ -463,3 +481,14 @@ class AdaptiveStudyAgent:
             f"Before your next session, choose one concrete act of obedience, encouragement, or conversation that flows from "
             f"{reference.book} {reference.chapter}."
         )
+
+    def _event_note(self, response_text: str, evaluation: StudyResponseEvaluation) -> str:
+        snippet = response_text.strip().replace("\n", " ")[:140]
+        return (
+            f"{snippet} | focus={evaluation.recommended_focus} | "
+            f"comp={evaluation.comprehension_score:.2f} app={evaluation.application_score:.2f} clarity={evaluation.clarity_score:.2f}"
+        )
+
+    def _format_reference(self, reference: PassageReference) -> str:
+        ending = f"-{reference.end_verse}" if reference.end_verse else ""
+        return f"{reference.book} {reference.chapter}:{reference.start_verse}{ending}"

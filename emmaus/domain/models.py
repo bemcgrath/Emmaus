@@ -134,6 +134,16 @@ class SessionResponse(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class StudyResponseEvaluation(BaseModel):
+    question_type: Literal["observation", "interpretation", "application", "reflection"]
+    comprehension_score: float = Field(ge=0, le=1)
+    application_score: float = Field(ge=0, le=1)
+    clarity_score: float = Field(ge=0, le=1)
+    recommended_focus: Literal["comprehension", "application", "consistency", "growth"] = "growth"
+    encouragement: str
+    observed_patterns: list[str] = Field(default_factory=list)
+
+
 class StudySession(BaseModel):
     session_id: str
     user_id: str
@@ -230,6 +240,7 @@ class AgentSessionTurnResponse(BaseModel):
     reply_message: str
     next_question: StudyQuestion | None = None
     remaining_questions: int
+    evaluation: StudyResponseEvaluation
 
 
 class AgentSessionCompleteResponse(BaseModel):
