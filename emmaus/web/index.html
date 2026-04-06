@@ -98,10 +98,8 @@
               <div class="content-stack compact-gap">
                 <p><strong id="source-current-name">Current Bible</strong></p>
                 <p class="micro-copy" id="source-current-detail">Choose the Bible Emmaus should use for new sessions.</p>
-                <div id="source-current-meta" class="source-current-meta"></div>
               </div>
               <div class="source-card-actions current-bible-actions">
-                <button id="source-preview-current" class="action-button" type="button">Preview sample</button>
                 <button id="source-manage-toggle" class="secondary-button" type="button" aria-expanded="false">Manage Bible</button>
               </div>
             </div>
@@ -342,9 +340,31 @@
               <button class="primary-button full-width" id="follow-up-submit-button" type="submit" disabled>Save follow-through</button>
             </form>
           </section>
-        </section>
-
-        <section class="screen" data-screen="profile">
+            <section class="panel stack-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="panel-label">Prayer</p>
+                  <h2>Keep praying with intention</h2>
+                </div>
+                <span class="status-pill" id="prayer-summary-pill">0 active</span>
+              </div>
+              <p class="micro-copy">Keep the people, needs, and hopes you want to carry before Christ in one simple list.</p>
+              <div id="prayer-item-list" class="list-stack"></div>
+              <form id="prayer-form" class="stack-form compact-form">
+                <label>
+                  <span>Prayer title</span>
+                  <input id="prayer-title-input" name="prayerTitle" type="text" placeholder="Pray for Madison" />
+                </label>
+                <label>
+                  <span>What are you praying for?</span>
+                  <textarea id="prayer-detail-input" name="prayerDetail" rows="3" placeholder="Ask Christ for wisdom, peace, healing, provision, or whatever is needed."></textarea>
+                </label>
+                <button class="secondary-button full-width" id="prayer-submit-button" type="submit">Add prayer</button>
+              </form>
+            </section>
+          </section>
+  
+          <section class="screen" data-screen="profile">
           <section class="panel stack-panel">
             <div class="panel-heading">
               <div>
@@ -373,6 +393,23 @@
                   <option value="peer">Peer</option>
                   <option value="challenger">Challenger</option>
                   <option value="coach">Coach</option>
+                </select>
+              </label>
+              <label>
+                <span>Question feel</span>
+                <select id="question-style-select" name="questionStyle">
+                  <option value="concise">Concise</option>
+                  <option value="reflective">Reflective</option>
+                  <option value="probing">Probing</option>
+                  <option value="practical">Practical</option>
+                </select>
+              </label>
+              <label>
+                <span>Guide tone</span>
+                <select id="guidance-tone-select" name="guidanceTone">
+                  <option value="warm">Warm</option>
+                  <option value="steady">Steady</option>
+                  <option value="direct">Direct</option>
                 </select>
               </label>
               <label>

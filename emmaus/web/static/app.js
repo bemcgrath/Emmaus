@@ -39,6 +39,7 @@ const state = {
   lastCompletion: null,
   lastFollowThroughUpdate: null,
   actionItems: [],
+  prayerItems: [],
   onboardingStep: 1,
   textSources: [],
   translationTemplates: [],
@@ -76,8 +77,6 @@ function cacheElements() {
     memoryThreadCard: document.getElementById("memory-thread-card"),
     sourceCurrentName: document.getElementById("source-current-name"),
     sourceCurrentDetail: document.getElementById("source-current-detail"),
-    sourceCurrentMeta: document.getElementById("source-current-meta"),
-    sourcePreviewCurrent: document.getElementById("source-preview-current"),
     sourceManageToggle: document.getElementById("source-manage-toggle"),
     sourceManagerDetails: document.getElementById("source-manager-details"),
     sourcePreviewCard: document.getElementById("source-preview-card"),
@@ -86,6 +85,8 @@ function cacheElements() {
     displayNameInput: document.getElementById("display-name-input"),
     preferredMinutesInput: document.getElementById("preferred-minutes-input"),
     guideModeSelect: document.getElementById("guide-mode-select"),
+    questionStyleSelect: document.getElementById("question-style-select"),
+    guidanceToneSelect: document.getElementById("guidance-tone-select"),
     preferredSourceSelect: document.getElementById("preferred-source-select"),
     nudgeIntensitySelect: document.getElementById("nudge-intensity-select"),
     timezoneInput: document.getElementById("timezone-input"),
@@ -133,6 +134,11 @@ function cacheElements() {
     completionSummaryCard: document.getElementById("completion-summary-card"),
     actionSummaryPill: document.getElementById("action-summary-pill"),
     actionItemList: document.getElementById("action-item-list"),
+    prayerSummaryPill: document.getElementById("prayer-summary-pill"),
+    prayerItemList: document.getElementById("prayer-item-list"),
+    prayerForm: document.getElementById("prayer-form"),
+    prayerTitleInput: document.getElementById("prayer-title-input"),
+    prayerDetailInput: document.getElementById("prayer-detail-input"),
     actionFollowUpForm: document.getElementById("action-follow-up-form"),
     followUpTargetCopy: document.getElementById("follow-up-target-copy"),
     followUpOutcomeSelect: document.getElementById("follow-up-outcome-select"),
@@ -149,7 +155,6 @@ function cacheElements() {
 }
 
 function bindEvents() {
-  elements.sourcePreviewCurrent?.addEventListener("click", onPreviewCurrentBible);
   elements.sourceManageToggle?.addEventListener("click", onToggleBibleManager);
   elements.navButtons.forEach((button) => {
     button.addEventListener("click", () => showScreen(button.dataset.navTarget));
@@ -171,6 +176,8 @@ function bindEvents() {
   elements.todayPlanCard.addEventListener("click", onTodayPlanAction);
   elements.onboardingPanel.addEventListener("click", onOnboardingAction);
   elements.actionItemList.addEventListener("click", onActionListClick);
+  elements.prayerItemList?.addEventListener("click", onPrayerListClick);
+  elements.prayerForm?.addEventListener("submit", onSubmitPrayerItem);
   elements.moodChipRow.querySelectorAll(".choice-chip").forEach((chip) => chip.addEventListener("click", () => selectMood(chip.dataset.value)));
   elements.studyDaysRow.querySelectorAll(".choice-chip").forEach((chip) => chip.addEventListener("click", () => toggleStudyDay(chip.dataset.day)));
 }
@@ -346,6 +353,7 @@ function renderDemoDashboard({ restoreScreen = false } = {}) {
     recommendation: demo.recommendation,
     streaks: demo.streaks,
     actionItems: demo.actionItems,
+      prayerItems: demo.prayerItems || [],
     latestMood: demo.latestMood,
     activeSession: demo.activeSession,
     memorySummary: demo.memorySummary,
@@ -357,12 +365,13 @@ function renderDemoDashboard({ restoreScreen = false } = {}) {
   }
 }
 
-function renderDashboardShell({ profile, recommendation, streaks, actionItems, latestMood, activeSession, memorySummary }) {
+function renderDashboardShell({ profile, recommendation, streaks, actionItems, prayerItems, latestMood, activeSession, memorySummary }) {
   renderProfile(profile);
-  renderRecommendation(recommendation);
+  renderRecommendation(recommendation, memorySummary);
   renderMemorySummary(memorySummary);
   renderStreaks(streaks);
   renderActionItems(actionItems);
+  renderPrayerItems(prayerItems || []);
   renderCompletionSummary(memorySummary, actionItems);
   renderLatestMood(latestMood);
   renderOnboarding(profile, streaks, activeSession);
@@ -901,19 +910,22 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
   state.userId = userId;
   localStorage.setItem("emmaus.userId", userId);
 
-  const [profile, recommendation, streaks, actionItemsResponse, latestMood, activeSession, memorySummary] = await Promise.all([
+  const [profile, recommendation, streaks, actionItemsResponse, prayerItemsResponse, latestMood, activeSession, memorySummary] = await Promise.all([
     fetchJson(`/v1/users/${encodeURIComponent(userId)}/profile`),
     fetchJson(`/v1/agent/recommendations/${encodeURIComponent(userId)}`),
     fetchJson(`/v1/engagement/streaks/${encodeURIComponent(userId)}`),
     fetchJson(`/v1/study/action-items/${encodeURIComponent(userId)}`),
+    fetchJson(`/v1/study/prayer-items/${encodeURIComponent(userId)}`),
     fetchJson(`/v1/study/mood/${encodeURIComponent(userId)}`, { allowNull: true }),
     fetchJson(`/v1/agent/session/active/${encodeURIComponent(userId)}`, { allowNull: true }),
+    fetchJson(`/v1/users/${encodeURIComponent(userId)}/memory`, { allowNull: true }),
   ]);
 
   state.profile = profile;
   state.recommendation = recommendation;
   state.streaks = streaks;
   state.actionItems = actionItemsResponse.items || [];
+  state.prayerItems = prayerItemsResponse.items || [];
   state.latestMood = latestMood;
   state.activeSessionPayload = activeSession;
   state.currentQuestion = activeSession?.current_question || null;
@@ -926,6 +938,7 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
     recommendation,
     streaks,
     actionItems: state.actionItems,
+    prayerItems: state.prayerItems,
     latestMood,
     activeSession,
   });
@@ -944,6 +957,7 @@ function renderDemoDashboard({ restoreScreen = false } = {}) {
   state.recommendation = demo.recommendation;
   state.streaks = demo.streaks;
   state.actionItems = demo.actionItems;
+  state.prayerItems = demo.prayerItems || [];
   state.latestMood = demo.latestMood;
   state.activeSessionPayload = demo.activeSession;
   state.currentQuestion = demo.activeSession?.current_question || null;
@@ -955,6 +969,7 @@ function renderDemoDashboard({ restoreScreen = false } = {}) {
     recommendation: demo.recommendation,
     streaks: demo.streaks,
     actionItems: demo.actionItems,
+      prayerItems: demo.prayerItems || [],
     latestMood: demo.latestMood,
     activeSession: demo.activeSession,
   });
@@ -965,12 +980,13 @@ function renderDemoDashboard({ restoreScreen = false } = {}) {
   }
 }
 
-function renderDashboardShell({ profile, recommendation, streaks, actionItems, latestMood, activeSession }) {
+function renderDashboardShell({ profile, recommendation, streaks, actionItems, prayerItems, latestMood, activeSession }) {
   renderHero(profile, recommendation, activeSession, actionItems);
   renderProfile(profile);
-  renderRecommendation(recommendation);
+  renderRecommendation(recommendation, state.memorySummary);
   renderStreaks(streaks);
   renderActionItems(actionItems);
+  renderPrayerItems(prayerItems || []);
   renderLatestMood(latestMood);
   renderOnboarding(profile, streaks, activeSession, actionItems);
   updateSessionEntryState(activeSession);
@@ -1105,18 +1121,6 @@ function onToggleBibleManager() {
   setBibleManagerExpanded(!state.bibleManagerExpanded);
 }
 
-async function onPreviewCurrentBible() {
-  const preferredSourceId = getEffectivePreferredSourceId(state.textSources.length ? state.textSources : DEFAULT_TEXT_SOURCES);
-  if (!preferredSourceId) {
-    showToast("Choose a Bible first.");
-    return;
-  }
-  if (!state.bibleManagerExpanded) {
-    setBibleManagerExpanded(true);
-  }
-  await previewBibleSource(preferredSourceId);
-}
-
 function renderSourcePreview(preview) {
   if (!elements.sourcePreviewCard) {
     return;
@@ -1190,6 +1194,8 @@ function renderProfile(profile) {
   elements.displayNameInput.value = profile?.display_name || "";
   elements.preferredMinutesInput.value = preferences.preferred_session_minutes || "";
   elements.guideModeSelect.value = preferences.preferred_guide_mode || "guide";
+  elements.questionStyleSelect.value = preferences.preferred_question_style || "reflective";
+  elements.guidanceToneSelect.value = preferences.preferred_guidance_tone || "steady";
   elements.nudgeIntensitySelect.value = preferences.nudge_intensity || "balanced";
   elements.timezoneInput.value = preferences.timezone || "";
   elements.studyWindowStartInput.value = preferences.preferred_study_window_start || "";
@@ -1208,32 +1214,34 @@ function renderProfile(profile) {
   }
 }
 
-function renderRecommendation(recommendation) {
-  if (!recommendation) {
-    elements.focusPill.textContent = "Waiting";
-    elements.recommendationCard.innerHTML = '<p class="empty-state">No recommendation is available yet.</p>';
-    return;
-  }
+function renderRecommendation(recommendation, memorySummary) {
+    if (!recommendation) {
+      elements.focusPill.textContent = "Waiting";
+      elements.recommendationCard.innerHTML = '<p class="empty-state">No recommendation is available yet.</p>';
+      return;
+    }
 
-  elements.focusPill.textContent = humanizeFocusArea(recommendation.focus_area);
-  const patterns = safeArray(recommendation.gap_report?.observed_patterns)
-    .map((pattern) => `<span class="meta-pill">${escapeHtml(pattern)}</span>`)
-    .join("");
+    const reasonSummary = buildTodayReasonSummary(recommendation);
+    const carryForwardCopy = buildTodayCarryForwardCopy(memorySummary);
+    const emphasisPattern = truncateGuideCopy(polishGuideCopy(safeArray(recommendation.gap_report?.observed_patterns)[0] || ""), 110);
+    const supportCopy = carryForwardCopy || emphasisPattern;
+    const supportLabel = carryForwardCopy ? "Building on:" : "Pay attention to:";
+    const suggestedAction = truncateGuideCopy(polishGuideCopy(recommendation.suggested_action), 115);
 
-  elements.recommendationCard.innerHTML = `
-    <div class="recommendation-card">
-      <p><strong>${escapeHtml(formatReference(recommendation.recommended_reference))}</strong></p>
-      <p>${escapeHtml(recommendation.reason)}</p>
-      <div class="recommendation-meta">
-        <span class="meta-pill">${escapeHtml(humanizeGuideMode(recommendation.recommended_guide_mode))}</span>
-        <span class="meta-pill">${escapeHtml(String(recommendation.recommended_minutes))} min</span>
-        <span class="meta-pill">${escapeHtml(humanizeEntryPoint(recommendation.recommended_entry_point))}</span>
+    elements.focusPill.textContent = humanizeFocusArea(recommendation.focus_area);
+    elements.recommendationCard.innerHTML = `
+      <div class="recommendation-card compact-recommendation-card">
+        <p><strong>${escapeHtml(formatReference(recommendation.recommended_reference))}</strong></p>
+        <p class="today-plan-copy">${escapeHtml(reasonSummary)}</p>
+        <div class="recommendation-meta">
+          <span class="meta-pill">${escapeHtml(humanizeGuideMode(recommendation.recommended_guide_mode))}</span>
+          <span class="meta-pill">${escapeHtml(String(recommendation.recommended_minutes))} min</span>
+        </div>
+        ${supportCopy ? `<p class="recommendation-support"><strong>${escapeHtml(supportLabel)}</strong> ${escapeHtml(supportCopy)}</p>` : ""}
+        <p class="memory-prompt"><strong>Next step:</strong> ${escapeHtml(suggestedAction)}</p>
       </div>
-      <p><strong>A simple next step:</strong> ${escapeHtml(recommendation.suggested_action)}</p>
-      ${patterns ? `<div class="content-stack">${patterns}</div>` : ""}
-    </div>
-  `;
-}
+    `;
+  }
 
 function renderMemorySummary(memorySummary) {
   if (!memorySummary || !memorySummary.memory_count) {
@@ -1691,6 +1699,42 @@ function renderActionItems(actionItems) {
     .join("");
 }
 
+function renderPrayerItems(prayerItems) {
+  const activeItems = prayerItems.filter((item) => item.status === "active");
+  elements.prayerSummaryPill.textContent = `${activeItems.length} active`;
+
+  if (!prayerItems.length) {
+    elements.prayerItemList.innerHTML = '<p class="empty-state">No prayer items yet. Add one here so Emmaus can keep it in view with your next steps.</p>';
+    return;
+  }
+
+  elements.prayerItemList.innerHTML = prayerItems
+    .map((item) => {
+      const active = item.status === "active";
+      const prayedCopy = item.last_prayed_at ? `Last prayed ${escapeHtml(formatDateTime(item.last_prayed_at))}` : "Not marked prayed yet";
+      const answeredCopy = item.answered_at ? `<p class="micro-copy">Answered ${escapeHtml(formatDateTime(item.answered_at))}</p>` : "";
+      const actions = active
+        ? `<div class="button-row"><button class="action-button" type="button" data-prayer-pray="${escapeHtml(item.prayer_item_id)}">Prayed today</button><button class="action-button" type="button" data-prayer-answer="${escapeHtml(item.prayer_item_id)}">Mark answered</button></div>`
+        : "";
+      return `
+        <article class="action-card ${active ? "" : "completed"}">
+          <div class="action-card-header">
+            <div>
+              <p><strong>${escapeHtml(item.title)}</strong></p>
+              <p>${escapeHtml(item.detail)}</p>
+            </div>
+            <span class="status-pill">${escapeHtml(item.status === "answered" ? "Answered" : "Active")}</span>
+          </div>
+          <p class="micro-copy">Created ${escapeHtml(formatDateTime(item.created_at))}</p>
+          <p class="micro-copy">${prayedCopy}</p>
+          ${answeredCopy}
+          ${actions}
+        </article>
+      `;
+    })
+    .join("");
+}
+
 function syncSelectedActionItem(actionItems) {
   const openItems = actionItems.filter((item) => item.status === "open");
   const selected = openItems.find((item) => item.action_item_id === state.selectedActionItemId) || openItems[0] || null;
@@ -2106,6 +2150,56 @@ function onActionListClick(event) {
   renderActionItems(state.actionItems);
 }
 
+async function onPrayerListClick(event) {
+  const prayButton = event.target.closest("[data-prayer-pray]");
+  const answerButton = event.target.closest("[data-prayer-answer]");
+  if (!prayButton && !answerButton) {
+    return;
+  }
+  if (!ensureLiveMode("Switch to Live to update a real prayer item.")) {
+    return;
+  }
+
+  const prayerItemId = prayButton?.dataset.prayerPray || answerButton?.dataset.prayerAnswer;
+  const endpoint = prayButton ? "pray" : "answer";
+  await fetchJson(`/v1/study/prayer-items/${encodeURIComponent(prayerItemId)}/${endpoint}`, {
+    method: "POST",
+    body: { user_id: getUserId() },
+  });
+  await refreshExperience({ restoreScreen: false });
+  showScreen("actions");
+  showToast(prayButton ? "Prayer updated." : "Prayer marked answered.");
+}
+
+async function onSubmitPrayerItem(event) {
+  event.preventDefault();
+  if (!ensureLiveMode("Switch to Live to save a real prayer item.")) {
+    return;
+  }
+
+  const title = optionalText(elements.prayerTitleInput.value);
+  const detail = optionalText(elements.prayerDetailInput.value);
+  if (!title || !detail) {
+    showToast("Add both a prayer title and what you want to pray for.");
+    return;
+  }
+
+  await fetchJson("/v1/study/prayer-items", {
+    method: "POST",
+    body: {
+      user_id: getUserId(),
+      title,
+      detail,
+      related_session_id: state.activeSessionPayload?.session?.session_id || null,
+    },
+  });
+  elements.prayerTitleInput.value = "";
+  elements.prayerDetailInput.value = "";
+  await refreshExperience({ restoreScreen: false });
+  showScreen("actions");
+  showToast("Prayer item saved.");
+}
+
 async function onSaveIdentity(event) {
   event.preventDefault();
   if (!ensureLiveMode("Switch to Live to save real preferences.")) {
@@ -2119,6 +2213,8 @@ async function onSaveIdentity(event) {
     display_name: optionalText(elements.displayNameInput.value),
     preferred_session_minutes: optionalNumber(elements.preferredMinutesInput.value),
     preferred_guide_mode: optionalText(elements.guideModeSelect.value),
+    preferred_question_style: optionalText(elements.questionStyleSelect.value),
+    preferred_guidance_tone: optionalText(elements.guidanceToneSelect.value),
     preferred_translation_source_id: optionalText(elements.preferredSourceSelect.value),
     nudge_intensity: optionalText(elements.nudgeIntensitySelect.value),
     timezone: optionalText(elements.timezoneInput.value) || Intl.DateTimeFormat().resolvedOptions().timeZone || null,
@@ -2643,8 +2739,6 @@ function bibleSourceElements() {
     apiKey: document.getElementById("source-api-key"),
     currentName: document.getElementById("source-current-name"),
     currentDetail: document.getElementById("source-current-detail"),
-    currentMeta: document.getElementById("source-current-meta"),
-    previewCurrent: document.getElementById("source-preview-current"),
     manageToggle: document.getElementById("source-manage-toggle"),
     details: document.getElementById("source-manager-details"),
   };
@@ -2696,14 +2790,6 @@ function renderBibleSourceManager() {
     sourceUi.currentDetail.textContent = preferredSource
       ? `${preferredSource.name} is your current Bible for new sessions. Active sessions keep the Bible they started with.`
       : currentProviderLabel;
-  }
-  if (sourceUi.currentMeta) {
-    sourceUi.currentMeta.innerHTML = preferredSource
-      ? `<span class="meta-pill">Current</span><span class="meta-pill">${escapeHtml(currentProviderLabel)}</span>`
-      : "";
-  }
-  if (sourceUi.previewCurrent) {
-    sourceUi.previewCurrent.disabled = !preferredSource;
   }
 
   const shouldExpand = state.bibleManagerExpanded || !preferredSourceId;

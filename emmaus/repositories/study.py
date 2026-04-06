@@ -9,6 +9,7 @@ from pathlib import Path
 from emmaus.domain.models import (
     ActionItem,
     MoodCheckIn,
+    PrayerItem,
     SessionResponse,
     SpiritualMemoryEntry,
     StudyEvent,
@@ -103,6 +104,18 @@ class SQLiteStudyRepository:
                     energy TEXT NOT NULL,
                     notes TEXT,
                     created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS prayer_items (
+                    prayer_item_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    detail TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    last_prayed_at TEXT,
+                    answered_at TEXT,
+                    related_session_id TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS spiritual_memories (
@@ -425,6 +438,73 @@ class SQLiteStudyRepository:
             )
         return self.get_action_item(action_item_id)
 
+    def create_prayer_item(self, prayer_item: PrayerItem) -> PrayerItem:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO prayer_items (
+                    prayer_item_id, user_id, title, detail, status, created_at, last_prayed_at, answered_at, related_session_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    prayer_item.prayer_item_id,
+                    prayer_item.user_id,
+                    prayer_item.title,
+                    prayer_item.detail,
+                    prayer_item.status,
+                    prayer_item.created_at.isoformat(),
+                    self._dt_or_none(prayer_item.last_prayed_at),
+                    self._dt_or_none(prayer_item.answered_at),
+                    prayer_item.related_session_id,
+                ),
+            )
+        return prayer_item
+
+    def get_prayer_item(self, prayer_item_id: str) -> PrayerItem | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM prayer_items WHERE prayer_item_id = ?",
+                (prayer_item_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_prayer_item(row)
+
+    def list_prayer_items(self, user_id: str, status: str | None = None) -> list[PrayerItem]:
+        query = "SELECT * FROM prayer_items WHERE user_id = ?"
+        params: list[str] = [user_id]
+        if status is not None:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY created_at DESC"
+        with self._connect() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [self._row_to_prayer_item(row) for row in rows]
+
+    def mark_prayer_item_prayed(self, prayer_item_id: str, prayed_at: datetime) -> PrayerItem | None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE prayer_items
+                SET last_prayed_at = ?
+                WHERE prayer_item_id = ?
+                """,
+                (prayed_at.isoformat(), prayer_item_id),
+            )
+        return self.get_prayer_item(prayer_item_id)
+
+    def mark_prayer_item_answered(self, prayer_item_id: str, answered_at: datetime) -> PrayerItem | None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE prayer_items
+                SET status = 'answered', answered_at = ?
+                WHERE prayer_item_id = ?
+                """,
+                (answered_at.isoformat(), prayer_item_id),
+            )
+        return self.get_prayer_item(prayer_item_id)
+
     def add_spiritual_memory(self, memory: SpiritualMemoryEntry) -> SpiritualMemoryEntry:
         with self._connect() as connection:
             connection.execute(
@@ -503,6 +583,19 @@ class SQLiteStudyRepository:
                 "longest_streak": longest_streak,
                 "last_completed_on": completed_dates[0] if completed_dates else None,
             }
+        )
+
+    def _row_to_prayer_item(self, row: sqlite3.Row) -> PrayerItem:
+        return PrayerItem(
+            prayer_item_id=row["prayer_item_id"],
+            user_id=row["user_id"],
+            title=row["title"],
+            detail=row["detail"],
+            status=row["status"],
+            created_at=self._parse_datetime(row["created_at"]),
+            last_prayed_at=self._parse_datetime(row["last_prayed_at"]),
+            answered_at=self._parse_datetime(row["answered_at"]),
+            related_session_id=row["related_session_id"],
         )
 
     def _row_to_session(self, row: sqlite3.Row) -> StudySession:

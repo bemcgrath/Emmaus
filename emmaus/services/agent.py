@@ -22,6 +22,7 @@ from emmaus.domain.models import (
     StudyRecommendation,
     StudyResponseEvaluation,
     StudySession,
+    StudyStyleProfile,
 )
 from emmaus.providers.commentary import CommentaryProviderRegistry
 from emmaus.providers.llm import LLMProviderRegistry
@@ -97,6 +98,7 @@ class AdaptiveStudyAgent:
         profile = self.study_service.get_or_create_profile(user_id, display_name)
         pattern_summary = self.study_service.summarize_patterns(user_id)
         recommendation = self.personalization_service.build_recommendation(user_id)
+        style_profile = self.personalization_service.build_style_profile(user_id, recommendation=recommendation)
         reference = reference or recommendation.recommended_reference
         resolved_text_source = (
             text_source_id or profile.preferences.preferred_translation_source_id or self.text_service.default_source
@@ -114,6 +116,8 @@ class AdaptiveStudyAgent:
             recommendation=recommendation,
             passage=passage,
             llm_source_id=llm_source_id,
+            requested_minutes=resolved_minutes,
+            style_profile=style_profile,
         )
         plan = self._generate_plan(resolved_minutes, passage.text, resolved_mode, recommendation)
 
@@ -132,6 +136,7 @@ class AdaptiveStudyAgent:
             entry_point=resolved_entry_point,
             guidance=guidance,
             recommendation=recommendation,
+            style_profile=style_profile,
         )
 
         session = StudySession(
@@ -218,7 +223,9 @@ class AdaptiveStudyAgent:
 
         next_index = session.current_question_index + 1
         next_question = session.questions[next_index] if next_index < len(session.questions) else None
-        reply_message = self._build_follow_up_message(session.guide_mode, evaluation, next_question)
+        recommendation = self.personalization_service.build_recommendation(user_id)
+        style_profile = self.personalization_service.build_style_profile(user_id, recommendation=recommendation)
+        reply_message = self._build_follow_up_message(session.guide_mode, evaluation, next_question, style_profile)
         updated_session = session.model_copy(
             update={
                 "current_question_index": next_index,
@@ -345,8 +352,11 @@ class AdaptiveStudyAgent:
         recommendation: StudyRecommendation,
         passage: PassageText,
         llm_source_id: str,
+        requested_minutes: int,
+        style_profile: StudyStyleProfile,
     ) -> list[StudyQuestion]:
         difficulty = pattern_summary.preferred_difficulty
+        question_count = self._question_count_for_minutes(requested_minutes)
         llm_questions = self._generate_llm_questions(
             passage=passage,
             guide_mode=guide_mode,
@@ -354,16 +364,52 @@ class AdaptiveStudyAgent:
             recommendation=recommendation,
             difficulty=difficulty,
             llm_source_id=llm_source_id,
+            question_count=question_count,
+            style_profile=style_profile,
         )
         if llm_questions is not None:
-            return llm_questions
+            return self._apply_style_to_questions(llm_questions, style_profile)
 
         anchor_phrase = self._extract_anchor_phrase(passage.text)
         contrast_phrase = self._extract_contrast_phrase(passage.text)
         primary_theme = self._primary_theme_label(passage.text)
+        reflection_question = self._reflection_question(anchor_phrase, recommendation.focus_area, primary_theme)
 
         if recommendation.focus_area == "comprehension":
-            return [
+            if question_count <= 2:
+                questions = [
+                    StudyQuestion(
+                        question=f"Which phrase should you slow down and notice first in this passage? Start with '{anchor_phrase}'.",
+                        type="observation",
+                        difficulty=difficulty,
+                    ),
+                    StudyQuestion(
+                        question=self._interpretation_question(contrast_phrase, primary_theme),
+                        type="interpretation",
+                        difficulty=difficulty,
+                    ),
+                ]
+                return self._apply_style_to_questions(questions, style_profile)
+            if question_count == 3:
+                questions = [
+                    StudyQuestion(
+                        question=f"Which phrase should you slow down and notice first in this passage? Start with '{anchor_phrase}'.",
+                        type="observation",
+                        difficulty=difficulty,
+                    ),
+                    StudyQuestion(
+                        question=self._interpretation_question(contrast_phrase, primary_theme),
+                        type="interpretation",
+                        difficulty=difficulty,
+                    ),
+                    StudyQuestion(
+                        question=f"What part of '{anchor_phrase}' still feels unclear or worth a second look before you move on?",
+                        type="reflection",
+                        difficulty=difficulty,
+                    ),
+                ]
+                return self._apply_style_to_questions(questions, style_profile)
+            questions = [
                 StudyQuestion(
                     question=f"Which phrase should you slow down and notice first in this passage? Start with '{anchor_phrase}'.",
                     type="observation",
@@ -375,24 +421,50 @@ class AdaptiveStudyAgent:
                     difficulty=difficulty,
                 ),
                 StudyQuestion(
-                    question=f"What part of '{anchor_phrase}' still feels unclear or worth a second look before you move on?",
+                    question=reflection_question,
                     type="reflection",
                     difficulty=difficulty,
                 ),
+                StudyQuestion(
+                    question=self._application_question(guide_mode, recommendation.focus_area, primary_theme),
+                    type="application",
+                    difficulty=difficulty,
+                ),
             ]
+            return self._apply_style_to_questions(questions, style_profile)
 
         opener = self._observation_question(entry_point, recommendation.focus_area, anchor_phrase, primary_theme)
+        interpretation_question = self._interpretation_question(contrast_phrase, primary_theme)
         closing_question = self._application_question(guide_mode, recommendation.focus_area, primary_theme)
 
-        return [
+        if question_count <= 2:
+            questions = [
+                StudyQuestion(question=opener, type="observation", difficulty=difficulty),
+                StudyQuestion(question=closing_question, type="application", difficulty=difficulty),
+            ]
+            return self._apply_style_to_questions(questions, style_profile)
+        if question_count == 3:
+            questions = [
+                StudyQuestion(question=opener, type="observation", difficulty=difficulty),
+                StudyQuestion(
+                    question=interpretation_question,
+                    type="interpretation",
+                    difficulty=difficulty,
+                ),
+                StudyQuestion(question=closing_question, type="application", difficulty=difficulty),
+            ]
+            return self._apply_style_to_questions(questions, style_profile)
+        questions = [
             StudyQuestion(question=opener, type="observation", difficulty=difficulty),
             StudyQuestion(
-                question=self._interpretation_question(contrast_phrase, primary_theme),
+                question=interpretation_question,
                 type="interpretation",
                 difficulty=difficulty,
             ),
+            StudyQuestion(question=reflection_question, type="reflection", difficulty=difficulty),
             StudyQuestion(question=closing_question, type="application", difficulty=difficulty),
         ]
+        return self._apply_style_to_questions(questions, style_profile)
 
     def _generate_llm_questions(
         self,
@@ -402,30 +474,37 @@ class AdaptiveStudyAgent:
         recommendation: StudyRecommendation,
         difficulty: str,
         llm_source_id: str,
+        question_count: int,
+        style_profile: StudyStyleProfile,
     ) -> list[StudyQuestion] | None:
         prompt = (
             "You are Emmaus, creating Bible study questions for a mobile-first session. "
-            "Return JSON only as an array of exactly 3 objects with keys: question, type, difficulty. "
-            "Types must be observation, interpretation, or application. "
+            f"Return JSON only as an array of exactly {question_count} objects with keys: question, type, difficulty. "
+            "Types must come from observation, interpretation, application, or reflection. "
             "Each question should be concise, passage-aware, and easy to answer on a phone. "
-            "At least one question must quote or clearly echo a phrase from the passage.\n\n"
+            "At least one question must quote or clearly echo a phrase from the passage. "
+            "Shorter sessions should stay focused and lighter, while longer sessions may include a reflection question for added depth.\n\n"
             f"Passage reference: {self._format_reference(passage.reference)}\n"
             f"Passage text: {passage.text}\n"
             f"Guide mode: {guide_mode}\n"
             f"Entry point: {entry_point}\n"
             f"Focus area: {recommendation.focus_area}\n"
             f"Difficulty: {difficulty}\n"
+            f"Question style: {style_profile.question_style}\n"
+            f"Guidance tone: {style_profile.guidance_tone}\n"
+            f"Style reason: {style_profile.reason}\n"
+            f"Session length: {question_count} question(s)\n"
         )
         raw = self.llm_registry.get(llm_source_id).generate_guidance(prompt)
         try:
             payload = json.loads(self._extract_json_payload(raw))
         except (json.JSONDecodeError, ValueError, TypeError):
             return None
-        if not isinstance(payload, list) or len(payload) != 3:
+        if not isinstance(payload, list) or len(payload) != question_count:
             return None
 
         questions: list[StudyQuestion] = []
-        valid_types = {"observation", "interpretation", "application"}
+        valid_types = {"observation", "interpretation", "application", "reflection"}
         for item in payload:
             if not isinstance(item, dict):
                 return None
@@ -442,6 +521,13 @@ class AdaptiveStudyAgent:
                 )
             )
         return questions
+
+    def _question_count_for_minutes(self, requested_minutes: int) -> int:
+        if requested_minutes <= 12:
+            return 2
+        if requested_minutes >= 23:
+            return 4
+        return 3
 
     def _observation_question(self, entry_point: str, focus_area: str, anchor_phrase: str, primary_theme: str) -> str:
         if entry_point in {"encouragement", "I need encouragement"}:
@@ -469,6 +555,61 @@ class AdaptiveStudyAgent:
         if focus_area == "application":
             return f"Because this passage emphasizes {primary_theme}, what is one concrete response you can make in the next 24 hours?"
         return f"How should the truth about {primary_theme} change one real choice you make today?"
+
+    def _reflection_question(self, anchor_phrase: str, focus_area: str, primary_theme: str) -> str:
+        if focus_area == "comprehension":
+            return f"What part of '{anchor_phrase}' still feels unclear or worth sitting with a little longer?"
+        if focus_area == "application":
+            return f"Where do you feel resistance to living out what this passage says about {primary_theme}?"
+        if focus_area == "consistency":
+            return f"What would make it easy to forget '{anchor_phrase}' by tonight, and how can you return to it?"
+        if focus_area == "growth":
+            return f"What desire, fear, or assumption does this passage expose as you sit with {primary_theme}?"
+        return f"What part of '{anchor_phrase}' lingers with you most, and why?"
+
+    def _apply_style_to_questions(
+        self,
+        questions: list[StudyQuestion],
+        style_profile: StudyStyleProfile,
+    ) -> list[StudyQuestion]:
+        return [
+            question.model_copy(
+                update={
+                    "question": self._style_question_text(question.question, question.type, style_profile),
+                }
+            )
+            for question in questions
+        ]
+
+    def _style_question_text(
+        self,
+        question: str,
+        question_type: str,
+        style_profile: StudyStyleProfile,
+    ) -> str:
+        styled = question.strip()
+
+        if style_profile.question_style == "concise":
+            replacements = {
+                "Which phrase should you slow down and notice first in this passage?": "What should you notice first?",
+                "Which words or repeated idea stand out first in this passage?": "What stands out first?",
+                "Because this passage": "What will you do because of this passage",
+            }
+            for old, new in replacements.items():
+                styled = styled.replace(old, new)
+        elif style_profile.question_style == "reflective" and question_type in {"observation", "reflection"}:
+            styled = f"Take a moment with this: {styled}"
+        elif style_profile.question_style == "probing" and question_type in {"interpretation", "reflection"}:
+            styled = f"Go a little deeper: {styled}"
+        elif style_profile.question_style == "practical" and question_type in {"application", "reflection"}:
+            styled = f"Make this concrete: {styled}"
+
+        if style_profile.guidance_tone == "warm" and not styled.startswith("Take a moment"):
+            styled = f"Gently consider this: {styled}"
+        elif style_profile.guidance_tone == "direct" and not styled.startswith("Go a little deeper"):
+            styled = f"Answer plainly: {styled}"
+
+        return styled
 
     def _extract_anchor_phrase(self, passage_text: str) -> str:
         cleaned = re.sub(r"\s+", " ", passage_text).strip()
@@ -526,8 +667,6 @@ class AdaptiveStudyAgent:
         guide_mode: str,
         recommendation: StudyRecommendation,
     ) -> list[StudyPlanStep]:
-        read_minutes = 5 if requested_minutes >= 15 else 3
-        response_minutes = max(5, requested_minutes - (read_minutes + 5))
         focus_instruction = "Let the guide help you slow down and respond honestly."
         if recommendation.focus_area == "comprehension":
             focus_instruction = "Move slowly and focus on understanding what the passage is actually saying before jumping ahead."
@@ -541,26 +680,85 @@ class AdaptiveStudyAgent:
         closing_instruction = "Close by naming one concrete response for the next 24 hours."
         if guide_mode == "challenger":
             closing_instruction = "Close by naming one belief or habit this passage is pressing you to revisit."
+        elif guide_mode == "coach":
+            closing_instruction = "Close by naming one concrete next step you can actually follow through on before your next session."
+
+        if requested_minutes <= 12:
+            reflect_minutes = max(2, requested_minutes - 7)
+            return [
+                StudyPlanStep(
+                    title="Read Slowly",
+                    instruction=f"Read the passage once or twice. Start with this excerpt: {passage_text[:160]}",
+                    estimated_minutes=3,
+                ),
+                StudyPlanStep(
+                    title="Notice One Thing",
+                    instruction="Stay with one phrase or repeated idea before moving on.",
+                    estimated_minutes=2,
+                ),
+                StudyPlanStep(
+                    title="Answer Two Focused Questions",
+                    instruction="Keep your answers short, honest, and anchored in the text.",
+                    estimated_minutes=reflect_minutes,
+                ),
+                StudyPlanStep(
+                    title="Take One Next Step",
+                    instruction=closing_instruction,
+                    estimated_minutes=2,
+                ),
+            ]
+
+        if requested_minutes >= 23:
+            reflect_minutes = max(6, requested_minutes - 17)
+            return [
+                StudyPlanStep(
+                    title="Read and Pray",
+                    instruction=f"Read the passage twice and ask Christ to help you notice what matters most. Start here: {passage_text[:180]}",
+                    estimated_minutes=5,
+                ),
+                StudyPlanStep(
+                    title="Trace the Passage",
+                    instruction=focus_instruction,
+                    estimated_minutes=4,
+                ),
+                StudyPlanStep(
+                    title="Work Through Four Questions",
+                    instruction="Move slowly enough to answer with honesty, clarity, and depth.",
+                    estimated_minutes=reflect_minutes,
+                ),
+                StudyPlanStep(
+                    title="Revisit with Passage Helps",
+                    instruction="Use headings, footnotes, or cross-reference cues if they help you see the passage more clearly.",
+                    estimated_minutes=4,
+                ),
+                StudyPlanStep(
+                    title="Respond and Pray",
+                    instruction=closing_instruction,
+                    estimated_minutes=4,
+                ),
+            ]
+
+        reflect_minutes = max(4, requested_minutes - 11)
         return [
             StudyPlanStep(
                 title="Read Slowly",
                 instruction=f"Read the selected text twice. Start with this excerpt: {passage_text[:180]}",
-                estimated_minutes=read_minutes,
+                estimated_minutes=4,
             ),
             StudyPlanStep(
-                title="Focus",
-                instruction=focus_instruction,
-                estimated_minutes=2,
+                title="Use Passage Helps",
+                instruction="If you need it, use the guide or passage helps to slow down and see the structure more clearly.",
+                estimated_minutes=3,
             ),
             StudyPlanStep(
-                title="Reflect",
+                title="Work Through Three Questions",
                 instruction="Answer the guide's questions with honest, specific responses.",
-                estimated_minutes=response_minutes,
+                estimated_minutes=reflect_minutes,
             ),
             StudyPlanStep(
                 title="Respond",
                 instruction=closing_instruction,
-                estimated_minutes=5,
+                estimated_minutes=4,
             ),
         ]
 
@@ -572,13 +770,20 @@ class AdaptiveStudyAgent:
         entry_point: str,
         guidance: str,
         recommendation: StudyRecommendation,
+        style_profile: StudyStyleProfile,
     ) -> str:
         greeting = f"Welcome back, {display_name}." if display_name else "Welcome back."
+        tone_line = {
+            "warm": "We'll take this gently and stay close to the passage.",
+            "steady": "We'll move steadily enough to understand and respond.",
+            "direct": "We'll get quickly to the heart of the passage and one clear response.",
+        }[style_profile.guidance_tone]
         return (
             f"{greeting} We'll spend about {requested_minutes} minutes in {reference.book} "
             f"{reference.chapter}:{reference.start_verse}"
             f"{'-' + str(reference.end_verse) if reference.end_verse else ''}. "
-            f"This session starts from '{entry_point}' and focuses on {recommendation.focus_area}. {guidance}"
+            f"This session starts from '{entry_point}' and focuses on {recommendation.focus_area}. "
+            f"{tone_line} {guidance}"
         )
 
     def _build_follow_up_message(
@@ -586,6 +791,7 @@ class AdaptiveStudyAgent:
         guide_mode: str,
         evaluation: StudyResponseEvaluation,
         next_question: StudyQuestion | None,
+        style_profile: StudyStyleProfile,
     ) -> str:
         guide_prefix = {
             "guide": "Stay close to the passage.",
@@ -593,6 +799,11 @@ class AdaptiveStudyAgent:
             "challenger": "Press a little deeper here.",
             "coach": "Let's turn this into follow-through.",
         }[guide_mode]
+        tone_prefix = {
+            "warm": "Take your time here.",
+            "steady": "Keep going one clear step at a time.",
+            "direct": "Be plain and specific here.",
+        }[style_profile.guidance_tone]
         focus_hint = {
             "comprehension": "Keep looking for what the text actually says before moving too quickly to application.",
             "application": "Name the next step in a way you can actually do today.",
@@ -601,10 +812,10 @@ class AdaptiveStudyAgent:
         }[evaluation.recommended_focus]
         if next_question is None:
             return (
-                f"{evaluation.encouragement} {guide_prefix} {focus_hint} "
+                f"{evaluation.encouragement} {tone_prefix} {guide_prefix} {focus_hint} "
                 "You've worked through the main questions for this session. Complete the session to receive your action step."
             )
-        return f"{evaluation.encouragement} {guide_prefix} {focus_hint} Next question: {next_question.question}"
+        return f"{evaluation.encouragement} {tone_prefix} {guide_prefix} {focus_hint} Next question: {next_question.question}"
 
     def _create_action_item(
         self,
@@ -615,10 +826,12 @@ class AdaptiveStudyAgent:
     ) -> ActionItem:
         passage = self.text_service.get_passage(session.reference, session.text_source_id)
         last_response = responses[-1].response_text if responses else None
+        style_profile = self.personalization_service.build_style_profile(session.user_id)
         generated_title, generated_detail = self._generate_action_item_content(
             session=session,
             passage=passage,
             last_response=last_response,
+            style_profile=style_profile,
         )
         return ActionItem(
             action_item_id=str(uuid4()),
@@ -633,6 +846,7 @@ class AdaptiveStudyAgent:
         session: StudySession,
         passage: PassageText,
         last_response: str | None,
+        style_profile: StudyStyleProfile,
     ) -> tuple[str, str]:
         prompt = (
             "You are Emmaus, creating a single practical Bible study action item for a mobile user. "
@@ -642,6 +856,8 @@ class AdaptiveStudyAgent:
             f"Passage reference: {self._format_reference(session.reference)}\n"
             f"Passage text: {passage.text}\n"
             f"Guide mode: {session.guide_mode}\n"
+            f"Question style: {style_profile.question_style}\n"
+            f"Guidance tone: {style_profile.guidance_tone}\n"
             f"Last user response: {last_response or 'None'}\n"
         )
         raw = self.llm_registry.get(session.llm_source_id).generate_guidance(prompt)
@@ -793,6 +1009,51 @@ class AdaptiveStudyAgent:
             f"Return to {primary_theme} and follow through on '{action_item.title}' before moving on to something new."
         )[:180]
         return summary, recurring_themes[:3], growth_areas[:3], carry_forward_prompt
+
+    def _apply_style_to_questions(
+        self,
+        questions: list[StudyQuestion],
+        style_profile: StudyStyleProfile,
+    ) -> list[StudyQuestion]:
+        return [
+            question.model_copy(
+                update={
+                    "question": self._style_question_text(question.question, question.type, style_profile),
+                }
+            )
+            for question in questions
+        ]
+
+    def _style_question_text(
+        self,
+        question: str,
+        question_type: str,
+        style_profile: StudyStyleProfile,
+    ) -> str:
+        styled = question.strip()
+
+        if style_profile.question_style == "concise":
+            replacements = {
+                "Which phrase should you slow down and notice first in this passage?": "What should you notice first?",
+                "Which words or repeated idea stand out first in this passage?": "What stands out first?",
+                "How does": "How does",
+                "Because this passage": "What will you do because of this passage",
+            }
+            for old, new in replacements.items():
+                styled = styled.replace(old, new)
+        elif style_profile.question_style == "reflective" and question_type in {"observation", "reflection"}:
+            styled = f"Take a moment with this: {styled}"
+        elif style_profile.question_style == "probing" and question_type in {"interpretation", "reflection"}:
+            styled = f"Go a little deeper: {styled}"
+        elif style_profile.question_style == "practical" and question_type in {"application", "reflection"}:
+            styled = f"Make this concrete: {styled}"
+
+        if style_profile.guidance_tone == "warm" and not styled.startswith("Take a moment"):
+            styled = f"Gently consider this: {styled}"
+        elif style_profile.guidance_tone == "direct" and not styled.startswith("Go a little deeper"):
+            styled = f"Answer plainly: {styled}"
+
+        return styled
 
     def _normalize_short_list(self, value: object) -> list[str]:
         if not isinstance(value, list):

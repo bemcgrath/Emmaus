@@ -109,6 +109,10 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "completion-summary-card" in response.text
     assert "completion-summary-pill" in response.text
     assert "follow-up-target-copy" in response.text
+    assert "question-style-select" in response.text
+    assert "guidance-tone-select" in response.text
+    assert "prayer-item-list" in response.text
+    assert "prayer-form" in response.text
     assert "nudge-plan-card" in response.text
     assert response.text.count('id="identity-form"') == 1
     assert response.text.count('id="mood-form"') == 1
@@ -337,7 +341,7 @@ def test_configured_esv_becomes_effective_default_source(tmp_path, monkeypatch):
         "/v1/agent/session/start",
         json={
             "user_id": "demo-user",
-            "requested_minutes": 10,
+            "requested_minutes": 15,
         },
     )
     assert start.status_code == 200
@@ -416,7 +420,7 @@ def test_active_session_can_be_resumed(tmp_path, monkeypatch):
         json={
             "user_id": "demo-user",
             "text_source_id": "sample_local",
-            "requested_minutes": 10,
+            "requested_minutes": 15,
         },
     )
     assert start.status_code == 200
@@ -458,7 +462,7 @@ def test_action_item_is_passage_aware(tmp_path, monkeypatch):
                 "start_verse": 16,
                 "end_verse": 17,
             },
-            "requested_minutes": 10,
+            "requested_minutes": 15,
         },
     )
     session_id = start.json()["session"]["session_id"]
@@ -501,7 +505,7 @@ def test_action_item_follow_up_is_saved(tmp_path, monkeypatch):
         json={
             "user_id": "demo-user",
             "text_source_id": "sample_local",
-            "requested_minutes": 10,
+            "requested_minutes": 15,
         },
     )
     session_id = start.json()["session"]["session_id"]
@@ -554,7 +558,7 @@ def test_action_item_follow_up_refreshes_spiritual_memory(tmp_path, monkeypatch)
         json={
             "user_id": "demo-user",
             "text_source_id": "sample_local",
-            "requested_minutes": 10,
+            "requested_minutes": 15,
         },
     )
     session_id = start.json()["session"]["session_id"]
@@ -605,6 +609,85 @@ def test_action_item_follow_up_refreshes_spiritual_memory(tmp_path, monkeypatch)
 
 
 
+def test_style_preferences_shape_profile_and_session_language(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    updated = client.patch(
+        "/v1/users/demo-user/preferences",
+        json={
+            "display_name": "Brian",
+            "preferred_guide_mode": "coach",
+            "preferred_question_style": "practical",
+            "preferred_guidance_tone": "direct",
+            "preferred_translation_source_id": "sample_local",
+        },
+    )
+    assert updated.status_code == 200
+    updated_profile = updated.json()
+    assert updated_profile["preferences"]["preferred_question_style"] == "practical"
+    assert updated_profile["preferences"]["preferred_guidance_tone"] == "direct"
+
+    started = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "requested_minutes": 15,
+        },
+    )
+    assert started.status_code == 200
+    payload = started.json()
+    assert "We'll get quickly to the heart of the passage" in payload["session"]["latest_message"]
+    assert any(
+        question["question"].startswith("Answer plainly:") or question["question"].startswith("Make this concrete:")
+        for question in payload["session"]["questions"]
+    )
+
+
+def test_prayer_items_can_be_created_prayed_and_answered(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    create = client.post(
+        "/v1/study/prayer-items",
+        json={
+            "user_id": "demo-user",
+            "title": "Pray for Madison",
+            "detail": "Ask Christ to give Madison peace and clear wisdom this week.",
+        },
+    )
+    assert create.status_code == 201
+    prayer_item = create.json()
+    prayer_item_id = prayer_item["prayer_item_id"]
+    assert prayer_item["status"] == "active"
+
+    listed = client.get("/v1/study/prayer-items/demo-user")
+    assert listed.status_code == 200
+    listed_items = listed.json()["items"]
+    assert len(listed_items) == 1
+    assert listed_items[0]["title"] == "Pray for Madison"
+
+    prayed = client.post(
+        f"/v1/study/prayer-items/{prayer_item_id}/pray",
+        json={"user_id": "demo-user"},
+    )
+    assert prayed.status_code == 200
+    assert prayed.json()["last_prayed_at"] is not None
+    assert prayed.json()["status"] == "active"
+
+    answered = client.post(
+        f"/v1/study/prayer-items/{prayer_item_id}/answer",
+        json={"user_id": "demo-user"},
+    )
+    assert answered.status_code == 200
+    answered_payload = answered.json()
+    assert answered_payload["status"] == "answered"
+    assert answered_payload["answered_at"] is not None
+
+    active_items = client.get("/v1/study/prayer-items/demo-user", params={"status": "active"})
+    assert active_items.status_code == 200
+    assert active_items.json()["items"] == []
+
+
 def test_phase_one_guided_session_flow(tmp_path, monkeypatch):
     client = build_client(tmp_path, monkeypatch)
 
@@ -613,7 +696,7 @@ def test_phase_one_guided_session_flow(tmp_path, monkeypatch):
         json={
             "user_id": "demo-user",
             "display_name": "Brian",
-            "requested_minutes": 10,
+            "requested_minutes": 15,
             "entry_point": "I have 10 minutes",
             "text_source_id": "sample_local",
         },
@@ -673,7 +756,7 @@ def test_llm_evaluation_drives_recommendation_focus(tmp_path, monkeypatch):
         json={
             "user_id": "demo-user",
             "text_source_id": "sample_local",
-            "requested_minutes": 10,
+            "requested_minutes": 15,
         },
     )
     session_id = start.json()["session"]["session_id"]
@@ -963,3 +1046,56 @@ def test_nudge_preview_builds_on_completed_follow_through(tmp_path, monkeypatch)
 
 
 
+
+
+def test_requested_minutes_changes_question_count_and_plan(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    brief = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "brief-user",
+            "text_source_id": "sample_local",
+            "reference": {
+                "book": "John",
+                "chapter": 3,
+                "start_verse": 16,
+                "end_verse": 17,
+            },
+            "requested_minutes": 10,
+        },
+    )
+    assert brief.status_code == 200
+    brief_payload = brief.json()
+    assert len(brief_payload["session"]["questions"]) == 2
+    assert [step["title"] for step in brief_payload["session"]["plan"]] == [
+        "Read Slowly",
+        "Notice One Thing",
+        "Answer Two Focused Questions",
+        "Take One Next Step",
+    ]
+
+    deep = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "deep-user",
+            "text_source_id": "sample_local",
+            "reference": {
+                "book": "John",
+                "chapter": 3,
+                "start_verse": 16,
+                "end_verse": 17,
+            },
+            "requested_minutes": 30,
+        },
+    )
+    assert deep.status_code == 200
+    deep_payload = deep.json()
+    assert len(deep_payload["session"]["questions"]) == 4
+    assert [step["title"] for step in deep_payload["session"]["plan"]] == [
+        "Read and Pray",
+        "Trace the Passage",
+        "Work Through Four Questions",
+        "Revisit with Passage Helps",
+        "Respond and Pray",
+    ]

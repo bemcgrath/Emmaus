@@ -8,6 +8,7 @@ from emmaus.domain.models import (
     ActionItem,
     EngagementSummary,
     MoodCheckIn,
+    PrayerItem,
     SessionResponse,
     SpiritualMemoryEntry,
     SpiritualMemorySummary,
@@ -224,6 +225,47 @@ class StudyService:
         )
         self._refresh_spiritual_memory_from_action_follow_up(action_item)
         return action_item
+
+    def create_prayer_item(self, prayer_item: PrayerItem) -> PrayerItem:
+        self.get_or_create_profile(prayer_item.user_id)
+        saved = self.repository.create_prayer_item(prayer_item)
+        self.record_event(
+            StudyEvent(
+                user_id=prayer_item.user_id,
+                event_type="prayer_item_created",
+                notes=prayer_item.title,
+            )
+        )
+        return saved
+
+    def list_prayer_items(self, user_id: str, status: str | None = None) -> list[PrayerItem]:
+        return self.repository.list_prayer_items(user_id, status)
+
+    def mark_prayer_item_prayed(self, prayer_item_id: str, user_id: str) -> PrayerItem:
+        prayer_item = self.repository.mark_prayer_item_prayed(prayer_item_id, datetime.now(UTC))
+        if prayer_item is None or prayer_item.user_id != user_id:
+            raise KeyError(f"Unknown prayer item '{prayer_item_id}'.")
+        self.record_event(
+            StudyEvent(
+                user_id=user_id,
+                event_type="prayer_item_prayed",
+                notes=prayer_item.title,
+            )
+        )
+        return prayer_item
+
+    def mark_prayer_item_answered(self, prayer_item_id: str, user_id: str) -> PrayerItem:
+        prayer_item = self.repository.mark_prayer_item_answered(prayer_item_id, datetime.now(UTC))
+        if prayer_item is None or prayer_item.user_id != user_id:
+            raise KeyError(f"Unknown prayer item '{prayer_item_id}'.")
+        self.record_event(
+            StudyEvent(
+                user_id=user_id,
+                event_type="prayer_item_answered",
+                notes=prayer_item.title,
+            )
+        )
+        return prayer_item
 
     def _refresh_spiritual_memory_from_action_follow_up(self, action_item: ActionItem) -> None:
         memory = self.get_latest_spiritual_memory_for_session(action_item.session_id)

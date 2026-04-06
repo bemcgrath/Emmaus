@@ -44,6 +44,8 @@ class UserPreferences(BaseModel):
     preferred_difficulty: Literal["gentle", "balanced", "challenging"] = "balanced"
     preferred_session_minutes: int = 20
     preferred_guide_mode: Literal["guide", "peer", "challenger", "coach"] = "guide"
+    preferred_question_style: Literal["concise", "reflective", "probing", "practical"] = "reflective"
+    preferred_guidance_tone: Literal["warm", "steady", "direct"] = "steady"
     nudge_intensity: Literal["gentle", "balanced", "direct"] = "balanced"
     preferred_study_days: list[str] = Field(default_factory=list)
     timezone: str = "UTC"
@@ -76,6 +78,9 @@ class StudyEvent(BaseModel):
         "session_completed",
         "action_item_completed",
         "mood_logged",
+        "prayer_item_created",
+        "prayer_item_prayed",
+        "prayer_item_answered",
     ]
     reference: PassageReference | None = None
     difficulty: Literal["gentle", "balanced", "challenging"] = "balanced"
@@ -97,6 +102,13 @@ class StudyPatternSummary(BaseModel):
     preferred_difficulty: Literal["gentle", "balanced", "challenging"]
     recent_topics: list[str] = Field(default_factory=list)
     recommended_session_minutes: int
+
+
+class StudyStyleProfile(BaseModel):
+    user_id: str
+    question_style: Literal["concise", "reflective", "probing", "practical"]
+    guidance_tone: Literal["warm", "steady", "direct"]
+    reason: str
 
 
 class StudyQuestion(BaseModel):
@@ -122,6 +134,18 @@ class ActionItem(BaseModel):
     completed_at: datetime | None = None
     follow_up_note: str | None = None
     follow_up_outcome: Literal["completed", "partially_completed", "prayed_through", "discussed_with_someone"] | None = None
+
+
+class PrayerItem(BaseModel):
+    prayer_item_id: str
+    user_id: str
+    title: str
+    detail: str
+    status: Literal["active", "answered"] = "active"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_prayed_at: datetime | None = None
+    answered_at: datetime | None = None
+    related_session_id: str | None = None
 
 
 class SessionResponse(BaseModel):

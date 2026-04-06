@@ -42,7 +42,7 @@ label { display: grid; gap: 0.45rem; }
 label span { color: var(--text-muted); font-size: 0.92rem; }
 h1, h2, h3, p { margin: 0; }
 h1, h2 { font-family: var(--font-display); line-height: 1.1; }
-h1 { font-size: clamp(1.55rem, 6.6vw, 2.2rem); max-width: 14ch; }
+h1 { font-size: clamp(1.45rem, 5.8vw, 2.05rem); max-width: 18ch; line-height: 1.04; letter-spacing: -0.02em; text-wrap: balance; }
 h2 { font-size: 1.35rem; }
 .eyebrow, .panel-label, .hero-kicker, .micro-copy { margin: 0; letter-spacing: 0.02em; }
 .eyebrow, .panel-label, .hero-kicker { text-transform: uppercase; font-size: 0.76rem; color: var(--text-muted); }
@@ -52,8 +52,8 @@ h2 { font-size: 1.35rem; }
   min-height: 100vh;
   padding: max(0.9rem, env(safe-area-inset-top)) 1rem calc(6rem + env(safe-area-inset-bottom));
 }
-.topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.85rem; margin-bottom: 0.7rem; }
-.topbar > div { display: grid; gap: 0.18rem; flex: 1 1 auto; min-width: 0; }
+.topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.45rem; }
+.topbar > div { display: grid; gap: 0.08rem; flex: 1 1 auto; min-width: 0; }
 .topbar .eyebrow { font-size: 0.72rem; }
 .screens, .screen, .hero-card, .stack-panel, .stack-form, .content-stack, .list-stack, .commentary-block { display: grid; gap: 0.85rem; }
 .screen { display: none; }
@@ -163,7 +163,7 @@ button:hover, button:focus-visible { transform: translateY(-1px); }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid rgba(159, 94, 45, 0.28); outline-offset: 2px; }
 @media (max-width: 420px) {
   .app-shell { padding-top: max(0.7rem, env(safe-area-inset-top)); padding-left: 0.85rem; padding-right: 0.85rem; }
-  h1 { font-size: clamp(1.45rem, 8vw, 1.9rem); max-width: 12ch; }
+  h1 { font-size: clamp(1.35rem, 7.2vw, 1.8rem); max-width: 16ch; }
   .topbar { margin-bottom: 0.55rem; }
   .dual-grid { grid-template-columns: 1fr; }
   .hero-actions, .panel-heading, .button-row, .today-plan-actions, .inline-inputs { flex-direction: column; align-items: stretch; }
@@ -223,4 +223,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .compact-gap {
   gap: 0.4rem;
+}
+.compact-recommendation-card {
+  gap: 0.7rem;
+}
+.recommendation-support {
+  color: var(--text-muted);
+  line-height: 1.45;
+  padding: 0.75rem 0.9rem;
+  border-radius: 16px;
+  background: rgba(240, 212, 170, 0.2);
 }

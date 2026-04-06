@@ -13,6 +13,7 @@ from emmaus.domain.models import (
     StudyRecommendation,
     StudyResponseEvaluation,
     StudySession,
+    StudyStyleProfile,
     UserProfile,
 )
 from emmaus.providers.llm import LLMProviderRegistry
@@ -234,6 +235,55 @@ class PersonalizationService:
             reason=reason,
             suggested_action=suggested_action,
             gap_report=gap_report,
+        )
+
+    def build_style_profile(
+        self,
+        user_id: str,
+        recommendation: StudyRecommendation | None = None,
+    ) -> StudyStyleProfile:
+        profile = self.study_service.get_profile(user_id)
+        pattern_summary = self.study_service.summarize_patterns(user_id)
+        latest_mood = self.study_service.get_latest_mood_checkin(user_id)
+        open_action_items = self.study_service.list_action_items(user_id, status="open")
+        recommendation = recommendation or self.build_recommendation(user_id)
+
+        question_style = profile.preferences.preferred_question_style
+        guidance_tone = profile.preferences.preferred_guidance_tone
+        reasons: list[str] = []
+
+        if latest_mood is not None and latest_mood.mood in {"anxious", "stressed", "discouraged"}:
+            guidance_tone = "warm"
+            if recommendation.focus_area != "application":
+                question_style = "reflective"
+            reasons.append("Recent mood signals call for gentler language and a calmer pace.")
+        elif recommendation.focus_area == "application" or open_action_items:
+            question_style = "practical"
+            reasons.append("Recent follow-through patterns call for clearer next-step language.")
+        elif recommendation.focus_area == "growth" and pattern_summary.average_engagement >= 4:
+            question_style = "probing"
+            if guidance_tone == "steady":
+                guidance_tone = "direct"
+            reasons.append("Recent engagement suggests the user can handle deeper and more direct questions.")
+        elif recommendation.focus_area == "comprehension":
+            question_style = "reflective"
+            reasons.append("Current study needs slower observation and clearer understanding.")
+        elif recommendation.focus_area == "consistency" and pattern_summary.average_engagement <= 3:
+            question_style = "concise"
+            reasons.append("The next session should feel simple enough to finish without friction.")
+
+        if pattern_summary.average_engagement <= 2.5 and question_style == "probing":
+            question_style = "concise"
+            reasons.append("Lower recent engagement means shorter prompts will likely land better.")
+
+        if not reasons:
+            reasons.append("Emmaus is using the saved guide preferences as the baseline voice for this session.")
+
+        return StudyStyleProfile(
+            user_id=user_id,
+            question_style=question_style,
+            guidance_tone=guidance_tone,
+            reason=" ".join(reasons[:2]),
         )
 
     def preview_nudge(self, user_id: str, preview_at: datetime | None = None) -> NudgePreview:

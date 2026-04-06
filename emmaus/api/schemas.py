@@ -146,6 +146,8 @@ class UpdateUserPreferencesRequest(BaseModel):
     preferred_difficulty: Literal["gentle", "balanced", "challenging"] | None = None
     preferred_session_minutes: int | None = Field(default=None, ge=5, le=60)
     preferred_guide_mode: Literal["guide", "peer", "challenger", "coach"] | None = None
+    preferred_question_style: Literal["concise", "reflective", "probing", "practical"] | None = None
+    preferred_guidance_tone: Literal["warm", "steady", "direct"] | None = None
     nudge_intensity: Literal["gentle", "balanced", "direct"] | None = None
     preferred_study_days: list[str] | None = None
     timezone: str | None = None
@@ -160,6 +162,8 @@ class UpdateUserPreferencesRequest(BaseModel):
             "preferred_difficulty": self.preferred_difficulty,
             "preferred_session_minutes": self.preferred_session_minutes,
             "preferred_guide_mode": self.preferred_guide_mode,
+            "preferred_question_style": self.preferred_question_style,
+            "preferred_guidance_tone": self.preferred_guidance_tone,
             "nudge_intensity": self.nudge_intensity,
             "preferred_study_days": self.preferred_study_days,
             "timezone": self.timezone,
@@ -181,6 +185,17 @@ class CompleteActionItemRequest(BaseModel):
     user_id: str
     follow_up_note: str | None = None
     follow_up_outcome: Literal["completed", "partially_completed", "prayed_through", "discussed_with_someone"] | None = None
+
+
+class CreatePrayerItemRequest(BaseModel):
+    user_id: str
+    title: str
+    detail: str
+    related_session_id: str | None = None
+
+
+class UpdatePrayerItemRequest(BaseModel):
+    user_id: str
 
 
 class NudgePreviewRequest(BaseModel):
