@@ -153,15 +153,31 @@ class StudyService:
     def list_action_items(self, user_id: str, status: str | None = None) -> list[ActionItem]:
         return self.repository.list_action_items(user_id, status)
 
-    def complete_action_item(self, action_item_id: str, user_id: str) -> ActionItem:
-        action_item = self.repository.complete_action_item(action_item_id, datetime.now(UTC))
+    def complete_action_item(
+        self,
+        action_item_id: str,
+        user_id: str,
+        follow_up_note: str | None = None,
+        follow_up_outcome: str | None = None,
+    ) -> ActionItem:
+        action_item = self.repository.complete_action_item(
+            action_item_id,
+            datetime.now(UTC),
+            follow_up_note=follow_up_note,
+            follow_up_outcome=follow_up_outcome,
+        )
         if action_item is None or action_item.user_id != user_id:
             raise KeyError(f"Unknown action item '{action_item_id}'.")
+        summary_bits = [action_item.title]
+        if follow_up_outcome:
+            summary_bits.append(f"outcome={follow_up_outcome}")
+        if follow_up_note:
+            summary_bits.append(follow_up_note[:180])
         self.record_event(
             StudyEvent(
                 user_id=user_id,
                 event_type="action_item_completed",
-                notes=action_item.title,
+                notes=" | ".join(summary_bits),
             )
         )
         return action_item

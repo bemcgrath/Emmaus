@@ -31,18 +31,6 @@ This adaptive cycle of testing, tailoring, and applying is the center of the pro
 - Modular: Bible text sources, commentary sources, and AI providers remain decoupled.
 - Open-source friendly: the architecture should remain compatible with permissive licensing like MIT.
 
-## Mobile-First Product Expectations
-
-Emmaus should be designed first for phones, then expanded outward.
-
-That means:
-
-- concise prompts and readable passage chunks
-- simple navigation with minimal taps between reading and response
-- agent messages that fit naturally in a mobile conversation flow
-- session entry points built around short available time windows
-- action items, streaks, and follow-up cues that are easy to review on a small screen
-
 ## Architecture
 
 ```text
@@ -58,21 +46,6 @@ data/             User-supplied or sample local text data
 docs/             Product and objective references
 tests/            API and frontend smoke tests
 ```
-
-### Separation of concerns
-
-- `BibleTextProvider` isolates passage retrieval from application logic.
-- `CommentaryProvider` isolates commentary lookup from study orchestration.
-- `LLMProvider` isolates AI vendor integrations from the adaptive study agent.
-- `StudyService` records user activity, profiles, sessions, and action items.
-- `AdaptiveStudyAgent` runs the adaptive cycle of session planning, questioning, and application.
-
-## Included providers
-
-- `LocalJsonBibleTextProvider`: reads from a user-supplied JSON file.
-- `RemoteApiBibleTextProvider`: placeholder adapter for API-key-backed sources.
-- `NotesPlaceholderCommentaryProvider`: placeholder for commentary plugins.
-- `NullLLMProvider`: rule-based fallback until a real AI adapter is connected.
 
 ## Current API Surface
 
@@ -110,11 +83,12 @@ tests/            API and frontend smoke tests
 - `POST /v1/study/action-items`
 - `POST /v1/study/action-items/{action_item_id}/complete`
 
-### Agentic session lifecycle
+### Agentic session lifecycle and nudges
 
 - `GET /v1/agent/recommendations/{user_id}`
 - `GET /v1/agent/session/active/{user_id}`
 - `POST /v1/agent/nudges/preview`
+- `POST /v1/agent/nudges/plan`
 - `POST /v1/agent/session`
 - `POST /v1/agent/session/start`
 - `POST /v1/agent/session/respond`
@@ -141,14 +115,11 @@ Emmaus now includes a lightweight mobile web client served directly from the Fas
 
 The current frontend emphasizes:
 
-- onboarding for first-time users so the guide starts with basic context
+- onboarding that captures guide mode, study rhythm, preferred days, timing windows, and nudge tone
 - a return-to-today’s-plan home screen that highlights the next best step
 - session persistence that restores an in-progress study flow after refresh or return
-- a guided session screen for passage reading, question response, and completion
-- an action-item view for follow-through after study
-- a nudge preview screen that shows timing-aware re-engagement guidance
-
-This keeps the interaction model close to the backend while the product surface is still taking shape.
+- action-item follow-up that captures what happened when the user actually applied the session
+- a nudge preview plus delivery-plan surface that is ready to feed future mobile notifications
 
 ## Open-source licensing posture
 

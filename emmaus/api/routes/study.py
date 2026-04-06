@@ -1,4 +1,4 @@
-﻿from uuid import uuid4
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -55,6 +55,11 @@ def complete_action_item(
     container: Container = Depends(get_container),
 ):
     try:
-        return container.study_service.complete_action_item(action_item_id, payload.user_id)
+        return container.study_service.complete_action_item(
+            action_item_id,
+            payload.user_id,
+            follow_up_note=payload.follow_up_note,
+            follow_up_outcome=payload.follow_up_outcome,
+        )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

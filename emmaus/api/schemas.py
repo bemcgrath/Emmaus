@@ -1,4 +1,4 @@
-﻿from typing import Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -164,6 +164,8 @@ class CreateActionItemRequest(BaseModel):
 
 class CompleteActionItemRequest(BaseModel):
     user_id: str
+    follow_up_note: str | None = None
+    follow_up_outcome: Literal["completed", "partially_completed", "prayed_through", "discussed_with_someone"] | None = None
 
 
 class NudgePreviewRequest(BaseModel):

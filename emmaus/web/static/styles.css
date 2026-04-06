@@ -1,6 +1,5 @@
 :root {
   color-scheme: light;
-  --bg: #f6f0e5;
   --surface: rgba(255, 252, 245, 0.86);
   --surface-strong: #fffaf0;
   --surface-muted: #f2e7d2;
@@ -12,7 +11,6 @@
   --accent-soft: #f0d4aa;
   --olive: #5a6f52;
   --olive-deep: #3e5340;
-  --rose: #914a4d;
   --shadow: 0 22px 50px rgba(69, 45, 20, 0.12);
   --radius-xl: 28px;
   --radius-lg: 20px;
@@ -128,14 +126,21 @@ h2 {
   margin-bottom: 1.1rem;
 }
 
-.screens {
+.screens,
+.screen,
+.hero-card,
+.stack-panel,
+.stack-form,
+.content-stack,
+.list-stack,
+.commentary-block,
+.inline-inputs {
   display: grid;
-  gap: 1rem;
+  gap: 0.85rem;
 }
 
 .screen {
   display: none;
-  gap: 1rem;
 }
 
 .screen-active {
@@ -160,17 +165,8 @@ h2 {
   background: linear-gradient(145deg, rgba(242, 231, 205, 0.98), rgba(255, 244, 220, 0.95));
 }
 
-.hero-card,
-.stack-panel,
-.stack-form,
-.content-stack,
-.list-stack,
-.commentary-block {
-  display: grid;
-  gap: 0.85rem;
-}
-
-.hero-copy {
+.hero-copy,
+.today-plan-copy {
   font-size: 1rem;
   line-height: 1.5;
   color: var(--text-muted);
@@ -185,7 +181,8 @@ h2 {
 .nudge-meta,
 .session-meta,
 .today-plan-actions,
-.dual-grid {
+.dual-grid,
+.inline-inputs {
   display: flex;
   gap: 0.75rem;
 }
@@ -262,7 +259,7 @@ button:disabled {
 }
 
 .choice-chip {
-  flex: 1 1 42%;
+  flex: 1 1 24%;
 }
 
 .choice-chip-active,
@@ -277,26 +274,18 @@ button:disabled {
 .action-card,
 .nudge-card,
 .recommendation-card,
-.today-plan-card {
+.today-plan-card,
+.nudge-plan-card {
   border-radius: var(--radius-lg);
   padding: 1rem;
   background: var(--surface-strong);
   border: 1px solid rgba(101, 78, 46, 0.08);
 }
 
-.today-plan-card {
+.today-plan-card,
+.nudge-plan-card {
   display: grid;
   gap: 0.85rem;
-}
-
-.today-plan-copy {
-  color: var(--text-muted);
-  line-height: 1.55;
-}
-
-.today-plan-actions,
-.button-row {
-  flex-wrap: wrap;
 }
 
 .session-passage {
@@ -420,7 +409,8 @@ textarea:focus-visible {
   .hero-actions,
   .panel-heading,
   .button-row,
-  .today-plan-actions {
+  .today-plan-actions,
+  .inline-inputs {
     flex-direction: column;
     align-items: stretch;
   }

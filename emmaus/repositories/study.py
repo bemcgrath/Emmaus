@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import sqlite3
@@ -82,7 +82,9 @@ class SQLiteStudyRepository:
                     detail TEXT NOT NULL,
                     status TEXT NOT NULL,
                     created_at TEXT NOT NULL,
-                    completed_at TEXT
+                    completed_at TEXT,
+                    follow_up_note TEXT,
+                    follow_up_outcome TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS mood_checkins (
@@ -95,6 +97,8 @@ class SQLiteStudyRepository:
                 );
                 """
             )
+            self._ensure_column(connection, "action_items", "follow_up_note", "TEXT")
+            self._ensure_column(connection, "action_items", "follow_up_outcome", "TEXT")
 
     def get_or_create_user(self, user_id: str, display_name: str | None = None) -> UserProfile:
         existing = self.get_user_profile(user_id)
@@ -343,8 +347,8 @@ class SQLiteStudyRepository:
             connection.execute(
                 """
                 INSERT INTO action_items (
-                    action_item_id, user_id, session_id, title, detail, status, created_at, completed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    action_item_id, user_id, session_id, title, detail, status, created_at, completed_at, follow_up_note, follow_up_outcome
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     action_item.action_item_id,
@@ -355,6 +359,8 @@ class SQLiteStudyRepository:
                     action_item.status,
                     action_item.created_at.isoformat(),
                     self._dt_or_none(action_item.completed_at),
+                    action_item.follow_up_note,
+                    action_item.follow_up_outcome,
                 ),
             )
         return action_item
@@ -380,11 +386,21 @@ class SQLiteStudyRepository:
             rows = connection.execute(query, tuple(params)).fetchall()
         return [self._row_to_action_item(row) for row in rows]
 
-    def complete_action_item(self, action_item_id: str, completed_at: datetime) -> ActionItem | None:
+    def complete_action_item(
+        self,
+        action_item_id: str,
+        completed_at: datetime,
+        follow_up_note: str | None = None,
+        follow_up_outcome: str | None = None,
+    ) -> ActionItem | None:
         with self._connect() as connection:
             connection.execute(
-                "UPDATE action_items SET status = 'completed', completed_at = ? WHERE action_item_id = ?",
-                (completed_at.isoformat(), action_item_id),
+                """
+                UPDATE action_items
+                SET status = 'completed', completed_at = ?, follow_up_note = ?, follow_up_outcome = ?
+                WHERE action_item_id = ?
+                """,
+                (completed_at.isoformat(), follow_up_note, follow_up_outcome, action_item_id),
             )
         return self.get_action_item(action_item_id)
 
@@ -447,6 +463,8 @@ class SQLiteStudyRepository:
             status=row["status"],
             created_at=self._parse_datetime(row["created_at"]),
             completed_at=self._parse_datetime(row["completed_at"]),
+            follow_up_note=row["follow_up_note"] if "follow_up_note" in row.keys() else None,
+            follow_up_outcome=row["follow_up_outcome"] if "follow_up_outcome" in row.keys() else None,
         )
 
     def _compute_streaks(self, completed_dates: Sequence[date]) -> tuple[int, int]:
@@ -473,6 +491,12 @@ class SQLiteStudyRepository:
                 else:
                     break
         return current_streak, longest
+
+    def _ensure_column(self, connection: sqlite3.Connection, table_name: str, column_name: str, definition: str) -> None:
+        rows = connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+        existing_columns = {row[1] for row in rows}
+        if column_name not in existing_columns:
+            connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
 
     def _parse_datetime(self, value: str | None) -> datetime | None:
         if value is None:

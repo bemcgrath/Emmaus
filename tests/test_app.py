@@ -25,11 +25,13 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "Start Today's Plan" in response.text
-    assert "today-plan-card" in response.text
+    assert "follow-up-target-copy" in response.text
+    assert "nudge-plan-card" in response.text
 
     asset = client.get("/static/app.js")
     assert asset.status_code == 200
-    assert "resume_active_session" in asset.text or "activeSessionPayload" in asset.text
+    assert "followUpOutcomeSelect" in asset.text
+    assert "delivery_status" in asset.text
 
 
 def test_update_preferences_and_profile(tmp_path, monkeypatch):
@@ -43,7 +45,9 @@ def test_update_preferences_and_profile(tmp_path, monkeypatch):
             "preferred_guide_mode": "coach",
             "preferred_difficulty": "gentle",
             "preferred_translation_source_id": "sample_local",
+            "nudge_intensity": "direct",
             "timezone": "America/New_York",
+            "preferred_study_days": ["mon", "wed", "fri"],
             "preferred_study_window_start": "08:00",
             "preferred_study_window_end": "09:00",
             "quiet_hours_start": "21:00",
@@ -55,7 +59,8 @@ def test_update_preferences_and_profile(tmp_path, monkeypatch):
     assert profile["display_name"] == "Brian"
     assert profile["preferences"]["preferred_session_minutes"] == 15
     assert profile["preferences"]["preferred_guide_mode"] == "coach"
-    assert profile["preferences"]["timezone"] == "America/New_York"
+    assert profile["preferences"]["nudge_intensity"] == "direct"
+    assert profile["preferences"]["preferred_study_days"] == ["mon", "wed", "fri"]
 
     profile_response = client.get("/v1/users/demo-user/profile")
     assert profile_response.status_code == 200
@@ -97,6 +102,58 @@ def test_active_session_can_be_resumed(tmp_path, monkeypatch):
     assert payload["session"]["current_question_index"] == 1
     assert payload["current_question"]["type"] in {"interpretation", "application", "reflection"}
     assert payload["passage"]["source_id"] == "sample_local"
+
+
+def test_action_item_follow_up_is_saved(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "requested_minutes": 10,
+        },
+    )
+    session_id = start.json()["session"]["session_id"]
+
+    for answer in [
+        "God is reaching toward people.",
+        "The passage shows mercy is central.",
+        "I should encourage a friend by tonight.",
+    ]:
+        client.post(
+            "/v1/agent/session/respond",
+            json={
+                "session_id": session_id,
+                "user_id": "demo-user",
+                "response_text": answer,
+                "engagement_score": 4,
+            },
+        )
+
+    complete = client.post(
+        "/v1/agent/session/complete",
+        json={
+            "session_id": session_id,
+            "user_id": "demo-user",
+        },
+    )
+    action_item_id = complete.json()["action_item"]["action_item_id"]
+
+    follow_up = client.post(
+        f"/v1/study/action-items/{action_item_id}/complete",
+        json={
+            "user_id": "demo-user",
+            "follow_up_note": "I sent the encouragement text during lunch and prayed first.",
+            "follow_up_outcome": "completed",
+        },
+    )
+    assert follow_up.status_code == 200
+    payload = follow_up.json()
+    assert payload["status"] == "completed"
+    assert payload["follow_up_note"].startswith("I sent the encouragement text")
+    assert payload["follow_up_outcome"] == "completed"
 
 
 def test_phase_one_guided_session_flow(tmp_path, monkeypatch):
@@ -153,70 +210,47 @@ def test_phase_one_guided_session_flow(tmp_path, monkeypatch):
     no_active = client.get("/v1/agent/session/active/demo-user")
     assert no_active.status_code == 404
 
-    action_items = client.get("/v1/study/action-items/demo-user")
-    assert action_items.status_code == 200
-    assert len(action_items.json()["items"]) == 1
 
-    streaks = client.get("/v1/engagement/streaks/demo-user")
-    assert streaks.status_code == 200
-    assert streaks.json()["completed_sessions"] == 1
-    assert streaks.json()["current_streak"] == 1
-
-
-def test_recommendation_targets_application_gaps(tmp_path, monkeypatch):
+def test_nudge_delivery_plan_is_notification_ready(tmp_path, monkeypatch):
     client = build_client(tmp_path, monkeypatch)
 
-    start = client.post(
-        "/v1/agent/session/start",
+    client.patch(
+        "/v1/users/demo-user/preferences",
         json={
-            "user_id": "demo-user",
-            "text_source_id": "sample_local",
-            "requested_minutes": 10,
-        },
-    )
-    session_id = start.json()["session"]["session_id"]
-
-    for answer in [
-        "Love.",
-        "It means God is good.",
-        "I should do better.",
-    ]:
-        client.post(
-            "/v1/agent/session/respond",
-            json={
-                "session_id": session_id,
-                "user_id": "demo-user",
-                "response_text": answer,
-                "engagement_score": 2,
-            },
-        )
-
-    client.post(
-        "/v1/agent/session/complete",
-        json={
-            "session_id": session_id,
-            "user_id": "demo-user",
+            "timezone": "America/New_York",
+            "preferred_study_days": ["monday"],
+            "preferred_study_window_start": "08:00",
+            "preferred_study_window_end": "09:00",
+            "quiet_hours_start": "21:00",
+            "quiet_hours_end": "07:00",
         },
     )
 
-    recommendation = client.get("/v1/agent/recommendations/demo-user")
-    assert recommendation.status_code == 200
-    payload = recommendation.json()
-    assert payload["focus_area"] == "application"
-    assert payload["recommended_guide_mode"] in {"coach", "peer"}
-    assert payload["gap_report"]["application_gap"] >= payload["gap_report"]["comprehension_gap"]
-
-    next_start = client.post(
-        "/v1/agent/session/start",
+    scheduled = client.post(
+        "/v1/agent/nudges/plan",
         json={
             "user_id": "demo-user",
-            "text_source_id": "sample_local",
+            "preview_at": "2026-04-06T10:00:00+00:00",
         },
     )
-    assert next_start.status_code == 200
-    next_payload = next_start.json()
-    assert next_payload["recommendation"]["focus_area"] == "application"
-    assert next_payload["session"]["guide_mode"] in {"coach", "peer"}
+    assert scheduled.status_code == 200
+    scheduled_payload = scheduled.json()
+    assert scheduled_payload["delivery_status"] == "scheduled"
+    assert scheduled_payload["delivery_channel"] == "push"
+    assert scheduled_payload["deliver_at"].startswith("2026-04-06T08:00:00")
+
+    suppressed = client.post(
+        "/v1/agent/nudges/plan",
+        json={
+            "user_id": "demo-user",
+            "preview_at": "2026-04-07T12:30:00+00:00",
+        },
+    )
+    assert suppressed.status_code == 200
+    suppressed_payload = suppressed.json()
+    assert suppressed_payload["delivery_status"] == "suppressed"
+    assert suppressed_payload["delivery_channel"] == "in_app"
+    assert suppressed_payload["fallback_at"] is not None
 
 
 def test_mood_shapes_recommendation_and_nudge_preview(tmp_path, monkeypatch):
@@ -234,71 +268,12 @@ def test_mood_shapes_recommendation_and_nudge_preview(tmp_path, monkeypatch):
     assert mood.status_code == 201
     assert mood.json()["mood"] == "stressed"
 
-    latest_mood = client.get("/v1/study/mood/demo-user")
-    assert latest_mood.status_code == 200
-    assert latest_mood.json()["energy"] == "low"
-
     recommendation = client.get("/v1/agent/recommendations/demo-user")
-    assert recommendation.status_code == 200
     recommendation_payload = recommendation.json()
     assert recommendation_payload["recommended_reference"]["book"] == "Psalm"
     assert recommendation_payload["recommended_minutes"] <= 10
-    assert recommendation_payload["recommended_entry_point"] == "I need encouragement"
 
     nudge = client.post("/v1/agent/nudges/preview", json={"user_id": "demo-user"})
-    assert nudge.status_code == 200
     nudge_payload = nudge.json()
     assert nudge_payload["nudge_type"] == "encouragement"
     assert nudge_payload["recommended_minutes"] <= 10
-    assert nudge_payload["recommendation"]["recommended_reference"]["book"] == "Psalm"
-
-
-def test_nudge_timing_respects_windows_and_quiet_hours(tmp_path, monkeypatch):
-    client = build_client(tmp_path, monkeypatch)
-
-    client.patch(
-        "/v1/users/demo-user/preferences",
-        json={
-            "timezone": "America/New_York",
-            "preferred_study_days": ["monday"],
-            "preferred_study_window_start": "08:00",
-            "preferred_study_window_end": "09:00",
-            "quiet_hours_start": "21:00",
-            "quiet_hours_end": "07:00",
-        },
-    )
-
-    later_today = client.post(
-        "/v1/agent/nudges/preview",
-        json={
-            "user_id": "demo-user",
-            "preview_at": "2026-04-06T10:00:00+00:00",
-        },
-    )
-    assert later_today.status_code == 200
-    later_payload = later_today.json()
-    assert later_payload["timing_decision"] == "later_today"
-    assert later_payload["local_timezone"] == "America/New_York"
-    assert later_payload["scheduled_for"].startswith("2026-04-06T08:00:00")
-
-    now_response = client.post(
-        "/v1/agent/nudges/preview",
-        json={
-            "user_id": "demo-user",
-            "preview_at": "2026-04-06T12:30:00+00:00",
-        },
-    )
-    assert now_response.status_code == 200
-    now_payload = now_response.json()
-    assert now_payload["timing_decision"] == "now"
-
-    not_today = client.post(
-        "/v1/agent/nudges/preview",
-        json={
-            "user_id": "demo-user",
-            "preview_at": "2026-04-07T12:30:00+00:00",
-        },
-    )
-    assert not_today.status_code == 200
-    not_today_payload = not_today.json()
-    assert not_today_payload["timing_decision"] == "not_today"

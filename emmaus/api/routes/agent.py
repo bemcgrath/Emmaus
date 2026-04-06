@@ -29,6 +29,12 @@ def preview_nudge(payload: NudgePreviewRequest, container: Container = Depends(g
     return container.personalization_service.preview_nudge(payload.user_id, preview_at=preview_at)
 
 
+@router.post("/nudges/plan")
+def plan_nudge_delivery(payload: NudgePreviewRequest, container: Container = Depends(get_container)):
+    preview_at = datetime.fromisoformat(payload.preview_at) if payload.preview_at else None
+    return container.personalization_service.build_nudge_delivery_plan(payload.user_id, preview_at=preview_at)
+
+
 @router.post("/session")
 def build_agent_session(payload: AgentSessionRequest, container: Container = Depends(get_container)):
     return container.agent_service.build_session(

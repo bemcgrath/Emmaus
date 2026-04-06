@@ -1,9 +1,17 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from emmaus.domain.models import MoodCheckIn, NudgePreview, PassageReference, StudyGapReport, StudyRecommendation, UserProfile
+from emmaus.domain.models import (
+    MoodCheckIn,
+    NudgeDeliveryPlan,
+    NudgePreview,
+    PassageReference,
+    StudyGapReport,
+    StudyRecommendation,
+    UserProfile,
+)
 from emmaus.services.study import StudyService
 
 
@@ -205,6 +213,45 @@ class PersonalizationService:
             local_timezone=local_timezone,
         )
 
+    def build_nudge_delivery_plan(self, user_id: str, preview_at: datetime | None = None) -> NudgeDeliveryPlan:
+        preview = self.preview_nudge(user_id, preview_at=preview_at)
+        if preview.timing_decision == "now":
+            deliver_at = preview_at or datetime.now(UTC)
+            return NudgeDeliveryPlan(
+                user_id=user_id,
+                delivery_status="send_now",
+                delivery_channel="push",
+                deliver_at=deliver_at,
+                fallback_at=deliver_at,
+                idempotency_key=self._idempotency_key(user_id, preview, deliver_at),
+                reason="The user is inside an allowed study window, so this notification can be sent immediately.",
+                nudge=preview,
+            )
+        if preview.timing_decision == "later_today":
+            deliver_at = preview.scheduled_for
+            return NudgeDeliveryPlan(
+                user_id=user_id,
+                delivery_status="scheduled",
+                delivery_channel="push",
+                deliver_at=deliver_at,
+                fallback_at=deliver_at,
+                idempotency_key=self._idempotency_key(user_id, preview, deliver_at),
+                reason="The nudge should wait until the user's preferred study window opens later today.",
+                nudge=preview,
+            )
+
+        fallback_at = self._next_delivery_candidate(self.study_service.get_profile(user_id), preview_at)
+        return NudgeDeliveryPlan(
+            user_id=user_id,
+            delivery_status="suppressed",
+            delivery_channel="in_app",
+            deliver_at=None,
+            fallback_at=fallback_at,
+            idempotency_key=self._idempotency_key(user_id, preview, fallback_at),
+            reason="A push notification should be held because today is outside the user's allowed study window or day.",
+            nudge=preview,
+        )
+
     def _decide_nudge_timing(
         self,
         profile: UserProfile,
@@ -261,6 +308,38 @@ class PersonalizationService:
             return "later_today", window_start_dt, "The preferred study window begins later today.", timezone_name
         return "not_today", None, "Today's preferred study window has already passed.", timezone_name
 
+    def _next_delivery_candidate(self, profile: UserProfile, preview_at: datetime | None) -> datetime | None:
+        timezone_name = profile.preferences.timezone or "UTC"
+        try:
+            zone = ZoneInfo(timezone_name)
+        except ZoneInfoNotFoundError:
+            zone = ZoneInfo("UTC")
+        base_time = preview_at or datetime.now(UTC)
+        if base_time.tzinfo is None:
+            base_time = base_time.replace(tzinfo=UTC)
+        local_now = base_time.astimezone(zone)
+        window_start = self._parse_time(profile.preferences.preferred_study_window_start) or time(hour=9, minute=0)
+        quiet_start = self._parse_time(profile.preferences.quiet_hours_start)
+        quiet_end = self._parse_time(profile.preferences.quiet_hours_end)
+        preferred_days = {day.strip().lower() for day in profile.preferences.preferred_study_days}
+
+        for day_offset in range(1, 8):
+            candidate = (local_now + timedelta(days=day_offset)).replace(
+                hour=window_start.hour,
+                minute=window_start.minute,
+                second=0,
+                microsecond=0,
+            )
+            if preferred_days:
+                names = {candidate.strftime("%A").lower(), candidate.strftime("%a").lower()}
+                if preferred_days.isdisjoint(names):
+                    continue
+            candidate_time = candidate.timetz().replace(tzinfo=None)
+            if self._in_window(candidate_time, quiet_start, quiet_end):
+                candidate = self._next_window_end(candidate, quiet_start, quiet_end)
+            return candidate.astimezone(UTC)
+        return None
+
     def _outside_preferred_days(self, profile: UserProfile, local_now: datetime) -> bool:
         preferred_days = profile.preferences.preferred_study_days
         if not preferred_days:
@@ -300,3 +379,7 @@ class PersonalizationService:
     def _can_fit_in_window(self, candidate: datetime, start: time, end: time) -> bool:
         candidate_time = candidate.timetz().replace(tzinfo=None)
         return self._in_window(candidate_time, start, end) or candidate_time == start
+
+    def _idempotency_key(self, user_id: str, preview: NudgePreview, deliver_at: datetime | None) -> str:
+        stamp = deliver_at.isoformat() if deliver_at is not None else "none"
+        return f"{user_id}:{preview.nudge_type}:{preview.recommended_entry_point}:{stamp}"

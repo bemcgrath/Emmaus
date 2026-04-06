@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from typing import Any, Literal
@@ -120,6 +120,8 @@ class ActionItem(BaseModel):
     status: Literal["open", "completed"] = "open"
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
+    follow_up_note: str | None = None
+    follow_up_outcome: Literal["completed", "partially_completed", "prayed_through", "discussed_with_someone"] | None = None
 
 
 class SessionResponse(BaseModel):
@@ -194,6 +196,17 @@ class NudgePreview(BaseModel):
     timing_reason: str
     scheduled_for: datetime | None = None
     local_timezone: str
+
+
+class NudgeDeliveryPlan(BaseModel):
+    user_id: str
+    delivery_status: Literal["send_now", "scheduled", "suppressed"]
+    delivery_channel: Literal["push", "in_app"] = "push"
+    deliver_at: datetime | None = None
+    fallback_at: datetime | None = None
+    idempotency_key: str
+    reason: str
+    nudge: NudgePreview
 
 
 class AgentStudyResponse(BaseModel):

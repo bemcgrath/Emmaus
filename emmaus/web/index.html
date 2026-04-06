@@ -41,10 +41,10 @@
               </div>
             </div>
             <p id="onboarding-copy" class="hero-copy">
-              Tell Emmaus a little about yourself, then begin with a short session that fits today.
+              Tell Emmaus when you prefer to study, how direct you want nudges to feel, and what kind of guide helps you most.
             </p>
             <div class="button-row">
-              <button class="primary-button" type="button" data-action="focus-identity">Complete profile</button>
+              <button class="primary-button" type="button" data-action="focus-identity">Complete onboarding</button>
               <button class="secondary-button" type="button" data-action="start-today-plan">Start first session</button>
             </div>
           </section>
@@ -88,7 +88,7 @@
             <div class="panel-heading">
               <div>
                 <p class="panel-label">Identity</p>
-                <h2>Guide profile</h2>
+                <h2>Guide profile and rhythm</h2>
               </div>
             </div>
             <form id="identity-form" class="stack-form">
@@ -113,6 +113,54 @@
                   <option value="coach">Coach</option>
                 </select>
               </label>
+              <label>
+                <span>Preferred text source</span>
+                <select id="preferred-source-select" name="preferredSource"></select>
+              </label>
+              <label>
+                <span>Nudge tone</span>
+                <select id="nudge-intensity-select" name="nudgeIntensity">
+                  <option value="gentle">Gentle</option>
+                  <option value="balanced">Balanced</option>
+                  <option value="direct">Direct</option>
+                </select>
+              </label>
+              <label>
+                <span>Timezone</span>
+                <input id="timezone-input" name="timezone" type="text" placeholder="America/New_York" />
+              </label>
+              <div class="stack-form compact-form">
+                <p class="panel-label">Preferred study days</p>
+                <div class="chip-row" id="study-days-row">
+                  <button type="button" class="choice-chip" data-day="mon">Mon</button>
+                  <button type="button" class="choice-chip" data-day="tue">Tue</button>
+                  <button type="button" class="choice-chip" data-day="wed">Wed</button>
+                  <button type="button" class="choice-chip" data-day="thu">Thu</button>
+                  <button type="button" class="choice-chip" data-day="fri">Fri</button>
+                  <button type="button" class="choice-chip" data-day="sat">Sat</button>
+                  <button type="button" class="choice-chip" data-day="sun">Sun</button>
+                </div>
+              </div>
+              <div class="inline-inputs">
+                <label>
+                  <span>Study window start</span>
+                  <input id="study-window-start-input" name="studyWindowStart" type="time" />
+                </label>
+                <label>
+                  <span>Study window end</span>
+                  <input id="study-window-end-input" name="studyWindowEnd" type="time" />
+                </label>
+              </div>
+              <div class="inline-inputs">
+                <label>
+                  <span>Quiet hours start</span>
+                  <input id="quiet-hours-start-input" name="quietHoursStart" type="time" />
+                </label>
+                <label>
+                  <span>Quiet hours end</span>
+                  <input id="quiet-hours-end-input" name="quietHoursEnd" type="time" />
+                </label>
+              </div>
               <button class="secondary-button full-width" type="submit">Save preferences</button>
             </form>
           </section>
@@ -259,8 +307,34 @@
               </div>
               <span class="status-pill" id="action-summary-pill">0 open</span>
             </div>
-            <p class="micro-copy">Every session should end with a real-world response. Use this space to keep your next step visible.</p>
+            <p class="micro-copy">Every session should end with a real-world response. Use this space to keep your next step visible and record what happened when you followed through.</p>
             <div id="action-item-list" class="list-stack"></div>
+          </section>
+
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Follow-up</p>
+                <h2>Reflect on what happened</h2>
+              </div>
+            </div>
+            <form id="action-follow-up-form" class="stack-form">
+              <p id="follow-up-target-copy" class="hero-copy">Select an open action item above to complete it with a short reflection.</p>
+              <label>
+                <span>Outcome</span>
+                <select id="follow-up-outcome-select" name="followUpOutcome">
+                  <option value="completed">Completed</option>
+                  <option value="partially_completed">Partially completed</option>
+                  <option value="prayed_through">Prayed through</option>
+                  <option value="discussed_with_someone">Discussed with someone</option>
+                </select>
+              </label>
+              <label>
+                <span>What happened?</span>
+                <textarea id="follow-up-note-input" name="followUpNote" rows="4" placeholder="What did you do, what was difficult, and what do you want to carry forward?"></textarea>
+              </label>
+              <button class="primary-button full-width" id="follow-up-submit-button" type="submit" disabled>Save follow-through</button>
+            </form>
           </section>
         </section>
 
@@ -274,6 +348,7 @@
               <span class="status-pill" id="nudge-timing-pill">Checking</span>
             </div>
             <div id="nudge-card" class="content-stack"></div>
+            <div id="nudge-plan-card" class="content-stack"></div>
             <form id="nudge-preview-form" class="stack-form compact-form">
               <label>
                 <span>Preview at</span>
