@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -10,6 +12,7 @@ from emmaus.domain.models import (
     AgentSessionTurnResponse,
     AgentStudyResponse,
     PassageReference,
+    PassageText,
     SessionResponse,
     StudyEvent,
     StudyPatternSummary,
@@ -103,7 +106,14 @@ class AdaptiveStudyAgent:
         resolved_entry_point = entry_point if entry_point != "continue" else recommendation.recommended_entry_point
 
         passage = self.text_service.get_passage(reference, resolved_text_source)
-        questions = self._generate_questions(pattern_summary, resolved_mode, resolved_entry_point, recommendation)
+        questions = self._generate_questions(
+            pattern_summary=pattern_summary,
+            guide_mode=resolved_mode,
+            entry_point=resolved_entry_point,
+            recommendation=recommendation,
+            passage=passage,
+            llm_source_id=llm_source_id,
+        )
         plan = self._generate_plan(resolved_minutes, passage.text, resolved_mode, recommendation)
 
         prompt = (
@@ -316,54 +326,181 @@ class AdaptiveStudyAgent:
         guide_mode: str,
         entry_point: str,
         recommendation: StudyRecommendation,
+        passage: PassageText,
+        llm_source_id: str,
     ) -> list[StudyQuestion]:
         difficulty = pattern_summary.preferred_difficulty
+        llm_questions = self._generate_llm_questions(
+            passage=passage,
+            guide_mode=guide_mode,
+            entry_point=entry_point,
+            recommendation=recommendation,
+            difficulty=difficulty,
+            llm_source_id=llm_source_id,
+        )
+        if llm_questions is not None:
+            return llm_questions
+
+        anchor_phrase = self._extract_anchor_phrase(passage.text)
+        contrast_phrase = self._extract_contrast_phrase(passage.text)
+        primary_theme = self._primary_theme_label(passage.text)
+
         if recommendation.focus_area == "comprehension":
             return [
                 StudyQuestion(
-                    question="What do you notice first in this passage before you interpret it?",
+                    question=f"Which phrase should you slow down and notice first in this passage? Start with '{anchor_phrase}'.",
                     type="observation",
                     difficulty=difficulty,
                 ),
                 StudyQuestion(
-                    question="What do you think this passage means in its immediate context?",
+                    question=self._interpretation_question(contrast_phrase, primary_theme),
                     type="interpretation",
                     difficulty=difficulty,
                 ),
                 StudyQuestion(
-                    question="What part still feels unclear or needs a slower second look?",
+                    question=f"What part of '{anchor_phrase}' still feels unclear or worth a second look before you move on?",
                     type="reflection",
                     difficulty=difficulty,
                 ),
             ]
 
-        closing_question = "What is one practical response you can make today based on this reading?"
-        if guide_mode == "challenger":
-            closing_question = "What comfortable assumption does this passage confront in your life right now?"
-        elif guide_mode == "peer":
-            closing_question = "What part of this passage feels most personal to you today?"
-        elif guide_mode == "coach":
-            closing_question = "What is one clear next step you will follow through on before your next session?"
-
-        opener = "What repeated words or themes stand out in this passage?"
-        if entry_point in {"encouragement", "I need encouragement"}:
-            opener = "What in this passage meets you where you are emotionally today?"
-        if recommendation.focus_area == "application":
-            opener = "What in this passage is easiest to admire but hardest to obey?"
-        elif recommendation.focus_area == "consistency":
-            opener = "What part of this passage gives you a simple, steady place to begin again today?"
-        elif recommendation.focus_area == "growth":
-            opener = "What deeper tension or challenge stands out in this passage?"
+        opener = self._observation_question(entry_point, recommendation.focus_area, anchor_phrase, primary_theme)
+        closing_question = self._application_question(guide_mode, recommendation.focus_area, primary_theme)
 
         return [
             StudyQuestion(question=opener, type="observation", difficulty=difficulty),
             StudyQuestion(
-                question="What does this passage reveal about God's character or intentions?",
+                question=self._interpretation_question(contrast_phrase, primary_theme),
                 type="interpretation",
                 difficulty=difficulty,
             ),
             StudyQuestion(question=closing_question, type="application", difficulty=difficulty),
         ]
+
+    def _generate_llm_questions(
+        self,
+        passage: PassageText,
+        guide_mode: str,
+        entry_point: str,
+        recommendation: StudyRecommendation,
+        difficulty: str,
+        llm_source_id: str,
+    ) -> list[StudyQuestion] | None:
+        prompt = (
+            "You are Emmaus, creating Bible study questions for a mobile-first session. "
+            "Return JSON only as an array of exactly 3 objects with keys: question, type, difficulty. "
+            "Types must be observation, interpretation, or application. "
+            "Each question should be concise, passage-aware, and easy to answer on a phone. "
+            "At least one question must quote or clearly echo a phrase from the passage.\n\n"
+            f"Passage reference: {self._format_reference(passage.reference)}\n"
+            f"Passage text: {passage.text}\n"
+            f"Guide mode: {guide_mode}\n"
+            f"Entry point: {entry_point}\n"
+            f"Focus area: {recommendation.focus_area}\n"
+            f"Difficulty: {difficulty}\n"
+        )
+        raw = self.llm_registry.get(llm_source_id).generate_guidance(prompt)
+        try:
+            payload = json.loads(self._extract_json_payload(raw))
+        except (json.JSONDecodeError, ValueError, TypeError):
+            return None
+        if not isinstance(payload, list) or len(payload) != 3:
+            return None
+
+        questions: list[StudyQuestion] = []
+        valid_types = {"observation", "interpretation", "application"}
+        for item in payload:
+            if not isinstance(item, dict):
+                return None
+            question = str(item.get("question", "")).strip()
+            question_type = str(item.get("type", "")).strip()
+            question_difficulty = str(item.get("difficulty") or difficulty).strip() or difficulty
+            if not question or question_type not in valid_types:
+                return None
+            questions.append(
+                StudyQuestion(
+                    question=question,
+                    type=question_type,
+                    difficulty=question_difficulty if question_difficulty in {"gentle", "balanced", "challenging"} else difficulty,
+                )
+            )
+        return questions
+
+    def _observation_question(self, entry_point: str, focus_area: str, anchor_phrase: str, primary_theme: str) -> str:
+        if entry_point in {"encouragement", "I need encouragement"}:
+            return f"Which words in '{anchor_phrase}' meet you where you are emotionally today?"
+        if focus_area == "application":
+            return f"Which line in this passage is easiest to admire but hardest to live out? Start with '{anchor_phrase}'."
+        if focus_area == "consistency":
+            return f"Which part of '{anchor_phrase}' gives you a simple place to begin again today?"
+        if focus_area == "growth":
+            return f"What deeper tension or challenge stands out when you sit with '{anchor_phrase}'?"
+        return f"Which words or repeated idea stand out first in this passage? Start with '{anchor_phrase}'."
+
+    def _interpretation_question(self, contrast_phrase: str | None, primary_theme: str) -> str:
+        if contrast_phrase:
+            return f"How does the contrast '{contrast_phrase}' shape what this passage reveals about God and his intentions?"
+        return f"What does this passage teach about {primary_theme}, and how do you see that in the text itself?"
+
+    def _application_question(self, guide_mode: str, focus_area: str, primary_theme: str) -> str:
+        if guide_mode == "challenger":
+            return f"If this passage is really about {primary_theme}, what comfortable assumption in your life does it confront right now?"
+        if guide_mode == "peer":
+            return f"Where does this passage about {primary_theme} feel most personal to you today?"
+        if guide_mode == "coach":
+            return f"Because this passage centers on {primary_theme}, what is one clear next step you will follow through on before your next session?"
+        if focus_area == "application":
+            return f"Because this passage emphasizes {primary_theme}, what is one concrete response you can make in the next 24 hours?"
+        return f"How should the truth about {primary_theme} change one real choice you make today?"
+
+    def _extract_anchor_phrase(self, passage_text: str) -> str:
+        cleaned = re.sub(r"\s+", " ", passage_text).strip()
+        segments = [segment.strip(" .;:") for segment in re.split(r"[.;]", cleaned) if segment.strip()]
+        if not segments:
+            return "this passage"
+        prioritized = sorted(segments, key=self._segment_priority, reverse=True)
+        anchor = prioritized[0]
+        return anchor[:90] + "..." if len(anchor) > 90 else anchor
+
+    def _extract_contrast_phrase(self, passage_text: str) -> str | None:
+        match = re.search(r"([^.;]*\bbut\b[^.;]*)", passage_text, flags=re.IGNORECASE)
+        if not match:
+            return None
+        contrast = match.group(1).strip(" .;")
+        return contrast[:110] + "..." if len(contrast) > 110 else contrast
+
+    def _segment_priority(self, segment: str) -> tuple[int, int]:
+        lower = segment.lower()
+        score = 0
+        for keyword in ["god", "jesus", "christ", "love", "saved", "condemn", "world", "shepherd", "restore", "righteousness", "grace", "mercy"]:
+            if keyword in lower:
+                score += 1
+        return score, len(segment)
+
+    def _primary_theme_label(self, passage_text: str) -> str:
+        lower = passage_text.lower()
+        if "love" in lower:
+            return "God's love"
+        if "saved" in lower or "salvation" in lower:
+            return "God's saving purpose"
+        if "condemn" in lower:
+            return "mercy instead of condemnation"
+        if "shepherd" in lower:
+            return "the Lord's shepherding care"
+        if "restore" in lower or "still waters" in lower:
+            return "rest and restoration"
+        return "God's character"
+
+    def _extract_json_payload(self, value: str) -> str:
+        text = value.strip()
+        if text.startswith("[") and text.endswith("]"):
+            return text
+        if text.startswith("{") and text.endswith("}"):
+            return text
+        match = re.search(r"(\[[\s\S]*\]|\{[\s\S]*\})", text)
+        if not match:
+            raise ValueError("No JSON payload found.")
+        return match.group(1)
 
     def _generate_plan(
         self,

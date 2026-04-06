@@ -205,6 +205,31 @@ def test_update_preferences_and_profile(tmp_path, monkeypatch):
 
 
 
+def test_passage_aware_questions_echo_passage_text(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "reference": {
+                "book": "John",
+                "chapter": 3,
+                "start_verse": 16,
+                "end_verse": 17,
+            },
+            "requested_minutes": 15,
+        },
+    )
+    assert start.status_code == 200
+    payload = start.json()
+    questions = [question["question"].lower() for question in payload["session"]["questions"]]
+    assert any(keyword in " ".join(questions) for keyword in ["love", "saved", "condemn", "world"])
+    assert "what repeated words or themes stand out in this passage?" not in questions
+
+
+
 def test_active_session_can_be_resumed(tmp_path, monkeypatch):
     client = build_client(tmp_path, monkeypatch)
 
