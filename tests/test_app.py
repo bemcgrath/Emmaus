@@ -96,6 +96,7 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "data-demo-scenario=\"comprehension_gap\"" in response.text
     assert "data-demo-scenario=\"scheduled_nudge\"" in response.text
     assert "translation-template-list" in response.text
+    assert "source-preview-card" in response.text
     assert "source-library" in response.text
     assert "source-use-starter" in response.text
     assert "source-esv-form" in response.text
@@ -119,6 +120,8 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "buildGeneratedSourceId" in asset.text
     assert "onConnectEsvSource" in asset.text
     assert "renderTranslationTemplates" in asset.text
+    assert "renderSourcePreview" in asset.text
+    assert "previewBibleSource" in asset.text
     assert "onTranslationTemplateClick" in asset.text
     assert "buildPassageMarkup" in asset.text
     assert "deriveOnboardingStep" in asset.text

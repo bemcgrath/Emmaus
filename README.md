@@ -11,6 +11,8 @@ The app is designed around a personalized guide that helps users read, understan
 - [Roadmap](docs/ROADMAP.md)
 - [Bible Source Connection](docs/BIBLE_SOURCE_CONNECTION.md)
 - [ESV Setup](docs/ESV_SETUP.md)
+- [Licensed Translation Guide](docs/LICENSED_TRANSLATIONS.md)
+- [Translation Provider Strategy](docs/TRANSLATION_PROVIDER_STRATEGY.md)
 
 ## Core Product Direction
 
@@ -31,6 +33,7 @@ This adaptive cycle of testing, tailoring, and applying is the center of the pro
 - Action-oriented: every session should move toward obedience, reflection, prayer, or discussion.
 - Mobile-first: the experience should feel natural, concise, and intuitive on a smartphone.
 - Modular: Bible text sources, commentary sources, and AI providers remain decoupled.
+- ESV-first MVP: the first polished licensed-translation experience should be ESV, with partner-platform support for other licensed translations coming later.
 - Open-source friendly: the architecture should remain compatible with permissive licensing like MIT.
 
 ## Architecture
@@ -48,6 +51,19 @@ data/             User-supplied or sample local text data
 docs/             Product and objective references
 tests/            API and frontend smoke tests
 ```
+
+## MVP Translation Focus
+
+Emmaus should be fully usable for `ESV` in the MVP.
+
+That means the MVP translation experience should prioritize:
+
+- a smooth `Connect ESV` flow
+- clear attribution and source visibility
+- strong mobile-first ESV setup and selection UX
+- the included starter Bible as the fallback when ESV is not connected
+
+For now, `NIV` and `NASB` should remain documented licensing targets rather than active MVP commitments.
 
 ## Current API Surface
 

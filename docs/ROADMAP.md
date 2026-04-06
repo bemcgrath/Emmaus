@@ -67,6 +67,7 @@ Scope:
 - streak tracking
 - restart nudges
 - mobile-first prompt and session design
+- ESV-first Bible-source experience for licensed translation support in MVP
 
 Core features:
 
@@ -171,6 +172,8 @@ Focus areas:
 Core features:
 
 - multi-translation support
+- direct-provider support where the official publisher path is strong
+- partner-provider support for broader licensed translation coverage after licensing review
 - side-by-side passage comparison
 - commentary provider selection
 - delayed commentary reveal after user reflection

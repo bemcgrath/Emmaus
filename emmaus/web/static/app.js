@@ -42,6 +42,7 @@ const state = {
   onboardingStep: 1,
   textSources: [],
   translationTemplates: [],
+  sourcePreview: null,
 };
 
 const elements = {};
@@ -71,6 +72,7 @@ function cacheElements() {
     todayPlanCard: document.getElementById("today-plan-card"),
     memoryThreadPill: document.getElementById("memory-thread-pill"),
     memoryThreadCard: document.getElementById("memory-thread-card"),
+    sourcePreviewCard: document.getElementById("source-preview-card"),
     identityForm: document.getElementById("identity-form"),
     userIdInput: document.getElementById("user-id-input"),
     displayNameInput: document.getElementById("display-name-input"),
@@ -1005,6 +1007,11 @@ function buildTranslationTemplateCard(template, sources, preferredSourceId) {
   }
   meta.push(`<span class="meta-pill">${escapeHtml(sentenceCase(template.setup_mode.replaceAll("_", " ")))}</span>`);
 
+  const previewButton = connectedSource || template.setup_mode === "starter"
+    ? `<button class="action-button" type="button" data-template-preview-source="${escapeHtml((connectedSource?.source_id || template.source_id || STARTER_SOURCE_ID))}">Preview sample</button>`
+    : "";
+  const actionClass = previewButton ? "source-card-actions dual-actions" : "source-card-actions";
+
   return `
     <article class="action-card translation-template-card ${isCurrent ? "selected" : ""}">
       <div>
@@ -1012,9 +1019,63 @@ function buildTranslationTemplateCard(template, sources, preferredSourceId) {
         <p>${escapeHtml(template.description)}</p>
       </div>
       <div class="template-meta">${meta.join("")}</div>
-      <button class="action-button" type="button" data-template-action="${escapeHtml(template.setup_mode)}" data-template-name="${escapeHtml(template.name)}" ${isCurrent ? "disabled" : ""}>${escapeHtml(actionLabel)}</button>
+      <div class="${actionClass}">
+        <button class="action-button" type="button" data-template-action="${escapeHtml(template.setup_mode)}" data-template-name="${escapeHtml(template.name)}" ${isCurrent ? "disabled" : ""}>${escapeHtml(actionLabel)}</button>
+        ${previewButton}
+      </div>
     </article>
   `;
+}
+
+function renderSourcePreview(preview) {
+  if (!elements.sourcePreviewCard) {
+    return;
+  }
+  if (!preview) {
+    elements.sourcePreviewCard.innerHTML = '<div class="action-card source-preview-card"><p><strong>Preview a sample passage</strong></p><p class="micro-copy">Tap Preview sample on a connected Bible to compare how it reads before choosing it.</p></div>';
+    return;
+  }
+
+  elements.sourcePreviewCard.innerHTML = `
+    <div class="action-card source-preview-card">
+      <p class="panel-label">Sample preview</p>
+      <p><strong>${escapeHtml(preview.translation_name)}</strong> ? ${escapeHtml(formatReference(preview.reference))}</p>
+      <p>${escapeHtml(preview.text)}</p>
+      ${preview.copyright_notice ? `<p class="micro-copy">${escapeHtml(preview.copyright_notice)}</p>` : ""}
+    </div>
+  `;
+}
+
+async function previewBibleSource(sourceId) {
+  if (!sourceId) {
+    return;
+  }
+
+  if (isDemoMode()) {
+    const demoPassage = state.activeSessionPayload?.passage || {
+      source_id: STARTER_SOURCE_ID,
+      translation_name: "Included Starter Bible",
+      reference: { book: "John", chapter: 3, start_verse: 16, end_verse: 17 },
+      text: "For God so loved the world, that he gave his only begotten Son, that whoever believes in him should not perish, but have everlasting life.",
+      copyright_notice: "Public Domain",
+    };
+    state.sourcePreview = { ...demoPassage, source_id: sourceId };
+    renderSourcePreview(state.sourcePreview);
+    return;
+  }
+
+  const preview = await fetchJson("/v1/texts/passage", {
+    method: "POST",
+    body: {
+      source_id: sourceId,
+      book: "John",
+      chapter: 3,
+      start_verse: 16,
+      end_verse: 17,
+    },
+  });
+  state.sourcePreview = preview;
+  renderSourcePreview(preview);
 }
 
 function renderProfile(profile) {
@@ -2402,6 +2463,7 @@ function renderBibleSourceManager() {
     : "Choose a translation first, then let Emmaus guide you through the easiest setup.";
 
   renderTranslationTemplates(sources, preferredSourceId);
+  renderSourcePreview(state.sourcePreview);
 
   if (sourceUi.useStarterButton) {
     const starterActive = preferredSourceId === STARTER_SOURCE_ID;
@@ -2440,8 +2502,9 @@ function renderBibleSourceManager() {
             </div>
             <span class="status-pill">${isPreferred ? "Current" : "Ready"}</span>
           </div>
-          <div class="source-card-actions">
+          <div class="source-card-actions dual-actions">
             <button class="action-button" type="button" data-source-prefer="${escapeHtml(source.source_id)}" ${isPreferred ? "disabled" : ""}>${isPreferred ? "Using this Bible" : "Use this Bible"}</button>
+            <button class="action-button" type="button" data-source-preview="${escapeHtml(source.source_id)}">Preview sample</button>
           </div>
         </article>
       `;
@@ -2450,6 +2513,12 @@ function renderBibleSourceManager() {
 }
 
 async function onTranslationTemplateClick(event) {
+  const previewButton = event.target.closest("[data-template-preview-source]");
+  if (previewButton) {
+    await previewBibleSource(previewButton.dataset.templatePreviewSource);
+    return;
+  }
+
   const button = event.target.closest("[data-template-action]");
   if (!button) {
     return;
@@ -2489,6 +2558,12 @@ async function onTranslationTemplateClick(event) {
 }
 
 async function onSourceLibraryClick(event) {
+  const previewButton = event.target.closest("[data-source-preview]");
+  if (previewButton) {
+    await previewBibleSource(previewButton.dataset.sourcePreview);
+    return;
+  }
+
   const button = event.target.closest("[data-source-prefer]");
   if (!button) {
     return;
