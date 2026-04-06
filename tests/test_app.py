@@ -101,6 +101,8 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "source-advanced-toggle" in response.text
     assert "onboarding-step-pill" in response.text
     assert "onboarding-flow" in response.text
+    assert "memory-thread-card" in response.text
+    assert "memory-thread-pill" in response.text
     assert "follow-up-target-copy" in response.text
     assert "nudge-plan-card" in response.text
 
@@ -112,6 +114,7 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "setPreferredBibleSource" in asset.text
     assert "buildGeneratedSourceId" in asset.text
     assert "deriveOnboardingStep" in asset.text
+    assert "renderMemorySummary" in asset.text
     assert "startGuidedSession" in asset.text
     assert "source-use-starter" in response.text
     assert "source-upload-file" in asset.text

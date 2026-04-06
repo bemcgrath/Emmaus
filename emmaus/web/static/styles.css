@@ -98,13 +98,15 @@ button:disabled { cursor: not-allowed; opacity: 0.6; transform: none; }
 .choice-chip { flex: 1 1 24%; }
 .choice-chip-active, .nav-pill-active { color: #fff7ef; background: linear-gradient(135deg, var(--olive) 0%, var(--olive-deep) 100%); }
 .demo-chip-row .choice-chip { flex-basis: 42%; }
-.prompt-card, .session-passage, .inline-card, .action-card, .nudge-card, .recommendation-card, .today-plan-card, .nudge-plan-card {
+.prompt-card, .session-passage, .inline-card, .action-card, .nudge-card, .recommendation-card, .today-plan-card, .nudge-plan-card, .memory-card {
   border-radius: var(--radius-lg);
   padding: 1rem;
   background: var(--surface-strong);
   border: 1px solid rgba(101, 78, 46, 0.08);
 }
-.today-plan-card, .nudge-plan-card { display: grid; gap: 0.85rem; }
+.today-plan-card, .nudge-plan-card, .memory-card { display: grid; gap: 0.85rem; }
+.memory-theme-list { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.memory-prompt { padding: 0.9rem 1rem; border-radius: 18px; background: rgba(240, 212, 170, 0.34); color: var(--accent-deep); }
 .session-passage { line-height: 1.7; white-space: pre-wrap; }
 .commentary-note { border-left: 4px solid var(--accent); padding-left: 0.9rem; }
 .meta-pill {

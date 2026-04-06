@@ -25,6 +25,7 @@ const state = {
   nudgePlan: null,
   profile: null,
   streaks: null,
+  memorySummary: null,
   actionItems: [],
   onboardingStep: 1,
   textSources: [],
@@ -55,6 +56,8 @@ function cacheElements() {
     onboardingFlow: document.getElementById("onboarding-flow"),
     todayPlanPill: document.getElementById("today-plan-pill"),
     todayPlanCard: document.getElementById("today-plan-card"),
+    memoryThreadPill: document.getElementById("memory-thread-pill"),
+    memoryThreadCard: document.getElementById("memory-thread-card"),
     identityForm: document.getElementById("identity-form"),
     userIdInput: document.getElementById("user-id-input"),
     displayNameInput: document.getElementById("display-name-input"),
@@ -202,6 +205,7 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
     fetchJson(`/v1/study/action-items/${encodeURIComponent(userId)}`),
     fetchJson(`/v1/study/mood/${encodeURIComponent(userId)}`, { allowNull: true }),
     fetchJson(`/v1/agent/session/active/${encodeURIComponent(userId)}`, { allowNull: true }),
+    fetchJson(`/v1/users/${encodeURIComponent(userId)}/memory`),
   ]);
 
   state.profile = profile;
@@ -216,6 +220,7 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
     actionItems: actionItems.items || [],
     latestMood,
     activeSession,
+    memorySummary,
   });
 
   await loadNudgeArtifacts();
@@ -232,6 +237,7 @@ function renderDemoDashboard({ restoreScreen = false } = {}) {
   state.activeSessionPayload = demo.activeSession;
   state.nudge = demo.nudge;
   state.nudgePlan = demo.nudgePlan;
+  state.memorySummary = demo.memorySummary;
   renderDashboardShell({
     profile: demo.profile,
     recommendation: demo.recommendation,
@@ -239,17 +245,19 @@ function renderDemoDashboard({ restoreScreen = false } = {}) {
     actionItems: demo.actionItems,
     latestMood: demo.latestMood,
     activeSession: demo.activeSession,
+    memorySummary: demo.memorySummary,
   });
   renderNudge(demo.nudge, demo.nudgePlan);
-  renderTodayPlan(demo.recommendation, demo.activeSession, demo.actionItems);
+  renderTodayPlan(demo.recommendation, demo.activeSession, demo.actionItems, demo.memorySummary);
   if (restoreScreen) {
     restorePreferredScreen();
   }
 }
 
-function renderDashboardShell({ profile, recommendation, streaks, actionItems, latestMood, activeSession }) {
+function renderDashboardShell({ profile, recommendation, streaks, actionItems, latestMood, activeSession, memorySummary }) {
   renderProfile(profile);
   renderRecommendation(recommendation);
+  renderMemorySummary(memorySummary);
   renderStreaks(streaks);
   renderActionItems(actionItems);
   renderLatestMood(latestMood);
@@ -330,6 +338,26 @@ function buildDemoScenarioData(scenario) {
         "Open action items suggest follow-through needs a little reinforcement.",
       ],
     },
+  };
+
+  const baseMemorySummary = {
+    user_id: "demo-user",
+    latest_summary: "Emmaus has been tracing how Christ moves toward discouraged people and calling the user to respond with concrete encouragement.",
+    recurring_themes: ["Christ's initiating love", "encouraging discouraged people"],
+    growth_areas: ["turning reflection into same-day obedience", "slowing down long enough to notice what the text says first"],
+    carry_forward_prompt: "Return to Christ's initiating love and take one concrete step of encouragement before moving on to a new thread.",
+    recent_references: ["John 3:16-17", "Luke 24:13-17"],
+    memory_count: 3,
+  };
+
+  const firstVisitMemorySummary = {
+    user_id: "demo-user",
+    latest_summary: null,
+    recurring_themes: [],
+    growth_areas: [],
+    carry_forward_prompt: null,
+    recent_references: [],
+    memory_count: 0,
   };
 
   const firstVisitProfile = {
@@ -508,6 +536,7 @@ function buildDemoScenarioData(scenario) {
       actionItems: [],
       latestMood: null,
       activeSession: null,
+      memorySummary: firstVisitMemorySummary,
       nudge: {
         ...scheduledNudge,
         nudge_type: "encouragement",
@@ -556,6 +585,14 @@ function buildDemoScenarioData(scenario) {
       actionItems: [completedActionHistory[1]],
       latestMood: { user_id: "demo-user", mood: "neutral", energy: "medium", notes: "I feel willing to study, but I keep realizing I move too fast through the meaning.", created_at: "2026-04-05T06:50:00-04:00" },
       activeSession: null,
+      memorySummary: {
+        ...baseMemorySummary,
+        latest_summary: "Emmaus noticed the user keeps reacting quickly, so the next step is to slow down and let Christ's words set the pace.",
+        recurring_themes: ["slowing down in Scripture", "Christ calming fear"],
+        growth_areas: ["reading for meaning before reaction", "naming what the text says about Jesus"],
+        carry_forward_prompt: "Return to Christ's calming presence and name what the passage says before you decide what to do with it.",
+        recent_references: ["Mark 4:35-41", "Luke 24:13-17"],
+      },
       nudge: {
         user_id: "demo-user",
         nudge_type: "encouragement",
@@ -644,6 +681,7 @@ function buildDemoScenarioData(scenario) {
       actionItems: completedActionHistory,
       latestMood: { user_id: "demo-user", mood: "peaceful", energy: "medium", notes: "Ready for a focused morning session, but I want the application to land somewhere concrete.", created_at: "2026-04-05T07:25:00-04:00" },
       activeSession,
+      memorySummary: baseMemorySummary,
       nudge: scheduledNudge,
       nudgePlan: scheduledPlan,
     };
@@ -657,6 +695,12 @@ function buildDemoScenarioData(scenario) {
       actionItems: overdueActionItems,
       latestMood: { user_id: "demo-user", mood: "neutral", energy: "medium", notes: "Need a simple next step to restart.", created_at: "2026-04-05T08:00:00-04:00" },
       activeSession: null,
+      memorySummary: {
+        ...baseMemorySummary,
+        latest_summary: "Emmaus is carrying forward a recent encouragement step that still needs follow-through.",
+        growth_areas: ["closing the loop on action items", "restarting gently after missing a few days"],
+        carry_forward_prompt: "Follow through on the encouragement Emmaus already surfaced before you begin something new.",
+      },
       nudge: {
         ...scheduledNudge,
         nudge_type: "follow_through",
@@ -685,6 +729,13 @@ function buildDemoScenarioData(scenario) {
       actionItems: scheduledActionHistory,
       latestMood: { user_id: "demo-user", mood: "encouraged", energy: "high", notes: "Open to a deeper challenge tomorrow morning and grateful for the last few concrete wins.", created_at: "2026-04-05T20:45:00-04:00" },
       activeSession: null,
+      memorySummary: {
+        ...baseMemorySummary,
+        latest_summary: "Emmaus has seen healthier momentum and is now inviting the user to go deeper instead of only staying practical.",
+        recurring_themes: ["Christ's faithfulness", "deeper reflection with follow-through"],
+        growth_areas: ["embracing a harder challenge without losing specificity"],
+        carry_forward_prompt: "Return to Christ's faithfulness and let the next session challenge one comfortable assumption.",
+      },
       nudge: scheduledNudge,
       nudgePlan: scheduledPlan,
     };
@@ -697,6 +748,7 @@ function buildDemoScenarioData(scenario) {
     actionItems: [completedActionHistory[0]],
     latestMood: { user_id: "demo-user", mood: "peaceful", energy: "medium", notes: "Ready for today's plan and encouraged by one recent follow-through win.", created_at: "2026-04-05T07:25:00-04:00" },
     activeSession: null,
+    memorySummary: baseMemorySummary,
     nudge: {
       ...scheduledNudge,
       timing_decision: "now",
@@ -738,7 +790,7 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
   state.userId = userId;
   localStorage.setItem("emmaus.userId", userId);
 
-  const [profile, recommendation, streaks, actionItemsResponse, latestMood, activeSession] = await Promise.all([
+  const [profile, recommendation, streaks, actionItemsResponse, latestMood, activeSession, memorySummary] = await Promise.all([
     fetchJson(`/v1/users/${encodeURIComponent(userId)}/profile`),
     fetchJson(`/v1/agent/recommendations/${encodeURIComponent(userId)}`),
     fetchJson(`/v1/engagement/streaks/${encodeURIComponent(userId)}`),
@@ -754,6 +806,7 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
   state.latestMood = latestMood;
   state.activeSessionPayload = activeSession;
   state.currentQuestion = activeSession?.current_question || null;
+  state.memorySummary = memorySummary;
   state.nudge = null;
   state.nudgePlan = null;
 
@@ -767,7 +820,7 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
   });
 
   await loadNudgeArtifacts();
-  renderTodayPlan(recommendation, activeSession, state.actionItems);
+  renderTodayPlan(recommendation, activeSession, state.actionItems, memorySummary);
   if (restoreScreen) {
     restorePreferredScreen();
   }
@@ -898,6 +951,40 @@ function renderRecommendation(recommendation) {
       </div>
       <p><strong>Suggested application:</strong> ${escapeHtml(recommendation.suggested_action)}</p>
       ${patterns ? `<div class="content-stack">${patterns}</div>` : ""}
+    </div>
+  `;
+}
+
+function renderMemorySummary(memorySummary) {
+  if (!memorySummary || !memorySummary.memory_count) {
+    elements.memoryThreadPill.textContent = "Ready";
+    elements.memoryThreadCard.innerHTML = `
+      <div class="memory-card">
+        <p><strong>Emmaus will start tracking your growth here.</strong></p>
+        <p class="today-plan-copy">Complete a session and Emmaus will carry forward the themes, growth edges, and next thread to revisit.</p>
+      </div>
+    `;
+    return;
+  }
+
+  elements.memoryThreadPill.textContent = `${memorySummary.memory_count} ${memorySummary.memory_count === 1 ? "thread" : "threads"}`;
+  const themes = safeArray(memorySummary.recurring_themes)
+    .map((theme) => `<span class="meta-pill">${escapeHtml(theme)}</span>`)
+    .join("");
+  const growthAreas = safeArray(memorySummary.growth_areas)
+    .map((area) => `<span class="meta-pill">${escapeHtml(area)}</span>`)
+    .join("");
+  const references = safeArray(memorySummary.recent_references)
+    .map((reference) => `<span class="meta-pill">${escapeHtml(reference)}</span>`)
+    .join("");
+
+  elements.memoryThreadCard.innerHTML = `
+    <div class="memory-card">
+      <p><strong>${escapeHtml(memorySummary.latest_summary || "Emmaus is carrying a recent thread forward.")}</strong></p>
+      ${themes ? `<div class="memory-theme-list">${themes}</div>` : ""}
+      ${growthAreas ? `<p><strong>Growth edges:</strong> ${growthAreas}</p>` : ""}
+      ${memorySummary.carry_forward_prompt ? `<p class="memory-prompt">${escapeHtml(memorySummary.carry_forward_prompt)}</p>` : ""}
+      ${references ? `<div class="today-plan-actions">${references}</div>` : ""}
     </div>
   `;
 }
@@ -1110,8 +1197,9 @@ function updateSessionEntryState(activeSession) {
     elements.textSourceSelect.value = preferredSource;
   }
 }
-function renderTodayPlan(recommendation, activeSession, actionItems) {
+function renderTodayPlan(recommendation, activeSession, actionItems, memorySummary) {
   const openAction = actionItems.find((item) => item.status === "open");
+  const carryForwardPrompt = memorySummary?.carry_forward_prompt || null;
 
   if (activeSession) {
     const session = activeSession.session;
@@ -1121,6 +1209,7 @@ function renderTodayPlan(recommendation, activeSession, actionItems) {
       <div class="today-plan-card">
         <p><strong>${escapeHtml(formatReference(session.reference))}</strong></p>
         <p class="today-plan-copy">${escapeHtml(session.latest_message)}</p>
+        ${carryForwardPrompt ? `<p class="memory-prompt">${escapeHtml(carryForwardPrompt)}</p>` : ""}
         <div class="today-plan-actions">
           <span class="meta-pill">${escapeHtml(buildQuestionProgress(session))}</span>
           <span class="meta-pill">${escapeHtml(sentenceCase(session.guide_mode))}</span>
@@ -1138,6 +1227,7 @@ function renderTodayPlan(recommendation, activeSession, actionItems) {
       <div class="today-plan-card">
         <p><strong>${escapeHtml(openAction.title)}</strong></p>
         <p class="today-plan-copy">${escapeHtml(openAction.detail)}</p>
+        ${carryForwardPrompt ? `<p class="memory-prompt">${escapeHtml(carryForwardPrompt)}</p>` : ""}
         <div class="today-plan-actions">
           <span class="meta-pill">Created ${escapeHtml(formatDateTime(openAction.created_at))}</span>
           <span class="meta-pill">Action item</span>
@@ -1155,6 +1245,7 @@ function renderTodayPlan(recommendation, activeSession, actionItems) {
       <div class="today-plan-card">
         <p><strong>${escapeHtml(formatReference(recommendation.recommended_reference))}</strong></p>
         <p class="today-plan-copy">${escapeHtml(recommendation.reason)}</p>
+        ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Continue this thread:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
         <div class="today-plan-actions">
           <span class="meta-pill">${escapeHtml(sentenceCase(recommendation.recommended_guide_mode))}</span>
           <span class="meta-pill">${escapeHtml(String(recommendation.recommended_minutes))} min</span>
