@@ -113,6 +113,7 @@ tests/            API and frontend smoke tests
 ### Agentic session lifecycle
 
 - `GET /v1/agent/recommendations/{user_id}`
+- `GET /v1/agent/session/active/{user_id}`
 - `POST /v1/agent/nudges/preview`
 - `POST /v1/agent/session`
 - `POST /v1/agent/session/start`
@@ -138,10 +139,12 @@ Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) to use the mobile-first
 
 Emmaus now includes a lightweight mobile web client served directly from the FastAPI app at `/`.
 
-The first frontend slice includes:
+The current frontend emphasizes:
 
-- a mobile-first home screen with recommendation, streak, mood, and identity surfaces
-- a guided session screen for session start, passage reading, question response, and completion
+- onboarding for first-time users so the guide starts with basic context
+- a return-to-today’s-plan home screen that highlights the next best step
+- session persistence that restores an in-progress study flow after refresh or return
+- a guided session screen for passage reading, question response, and completion
 - an action-item view for follow-through after study
 - a nudge preview screen that shows timing-aware re-engagement guidance
 

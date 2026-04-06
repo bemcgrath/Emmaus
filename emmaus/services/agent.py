@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -15,8 +15,8 @@ from emmaus.domain.models import (
     StudyPatternSummary,
     StudyPlanStep,
     StudyQuestion,
-    StudySession,
     StudyRecommendation,
+    StudySession,
 )
 from emmaus.providers.commentary import CommentaryProviderRegistry
 from emmaus.providers.llm import LLMProviderRegistry
@@ -68,6 +68,15 @@ class AdaptiveStudyAgent:
         self.study_service.get_or_create_profile(user_id)
         return self.personalization_service.build_recommendation(user_id)
 
+    def resume_active_session(self, user_id: str) -> AgentSessionStartResponse | None:
+        self.study_service.get_or_create_profile(user_id)
+        session = self.study_service.get_active_session(user_id)
+        if session is None:
+            return None
+        pattern_summary = self.study_service.summarize_patterns(user_id)
+        recommendation = self.personalization_service.build_recommendation(user_id)
+        return self._build_session_response(session, pattern_summary, recommendation)
+
     def start_session(
         self,
         user_id: str,
@@ -93,8 +102,6 @@ class AdaptiveStudyAgent:
         resolved_entry_point = entry_point if entry_point != "continue" else recommendation.recommended_entry_point
 
         passage = self.text_service.get_passage(reference, resolved_text_source)
-        commentary_provider = self.commentary_registry.get(resolved_commentary_source)
-        commentary = commentary_provider.get_commentary(reference)
         questions = self._generate_questions(pattern_summary, resolved_mode, resolved_entry_point, recommendation)
         plan = self._generate_plan(resolved_minutes, passage.text, resolved_mode, recommendation)
 
@@ -150,14 +157,7 @@ class AdaptiveStudyAgent:
                 notes=resolved_text_source,
             )
         )
-        return AgentSessionStartResponse(
-            session=session,
-            passage=passage,
-            commentary=commentary,
-            pattern_summary=pattern_summary,
-            recommendation=recommendation,
-            current_question=questions[0] if questions else None,
-        )
+        return self._build_session_response(session, pattern_summary, recommendation)
 
     def respond_to_session(
         self,
@@ -277,6 +277,26 @@ class AdaptiveStudyAgent:
             session=completed_session,
             action_item=created_action_item,
             engagement=self.study_service.get_engagement_summary(user_id),
+        )
+
+    def _build_session_response(
+        self,
+        session: StudySession,
+        pattern_summary: StudyPatternSummary,
+        recommendation: StudyRecommendation,
+    ) -> AgentSessionStartResponse:
+        passage = self.text_service.get_passage(session.reference, session.text_source_id)
+        commentary_source = session.commentary_source_id or self.default_commentary_source
+        commentary_provider = self.commentary_registry.get(commentary_source)
+        commentary = commentary_provider.get_commentary(session.reference)
+        current_question = session.questions[session.current_question_index] if session.current_question_index < len(session.questions) else None
+        return AgentSessionStartResponse(
+            session=session,
+            passage=passage,
+            commentary=commentary,
+            pattern_summary=pattern_summary,
+            recommendation=recommendation,
+            current_question=current_question,
         )
 
     def _generate_questions(

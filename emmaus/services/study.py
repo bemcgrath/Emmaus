@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections import Counter
 from datetime import UTC, datetime
@@ -123,6 +123,10 @@ class StudyService:
         if session is None:
             raise KeyError(f"Unknown session '{session_id}'.")
         return session
+
+    def get_active_session(self, user_id: str) -> StudySession | None:
+        sessions = self.repository.list_sessions(user_id, status="active")
+        return sessions[0] if sessions else None
 
     def list_sessions(self, user_id: str, status: str | None = None) -> list[StudySession]:
         return self.repository.list_sessions(user_id, status)

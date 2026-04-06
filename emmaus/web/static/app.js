@@ -1,8 +1,8 @@
 const state = {
   userId: localStorage.getItem("emmaus.userId") || "demo-user",
-  activeScreen: "home",
+  activeScreen: localStorage.getItem("emmaus.activeScreen") || "home",
   selectedMood: "neutral",
-  activeSession: null,
+  activeSessionPayload: null,
   currentQuestion: null,
   recommendation: null,
   nudge: null,
@@ -25,7 +25,12 @@ function cacheElements() {
     navButtons: Array.from(document.querySelectorAll("[data-nav-target]")),
     toast: document.getElementById("toast"),
     refreshButton: document.getElementById("refresh-button"),
+    heroPrimaryButton: document.getElementById("hero-primary-button"),
     previewNudgeButton: document.getElementById("preview-nudge-button"),
+    onboardingPanel: document.getElementById("onboarding-panel"),
+    onboardingCopy: document.getElementById("onboarding-copy"),
+    todayPlanPill: document.getElementById("today-plan-pill"),
+    todayPlanCard: document.getElementById("today-plan-card"),
     identityForm: document.getElementById("identity-form"),
     userIdInput: document.getElementById("user-id-input"),
     displayNameInput: document.getElementById("display-name-input"),
@@ -43,6 +48,8 @@ function cacheElements() {
     moodNotes: document.getElementById("mood-notes"),
     latestMoodCopy: document.getElementById("latest-mood-copy"),
     sessionForm: document.getElementById("session-form"),
+    sessionFormCopy: document.getElementById("session-form-copy"),
+    sessionFormButton: document.getElementById("session-form-button"),
     entryPointInput: document.getElementById("entry-point-input"),
     requestedMinutesInput: document.getElementById("requested-minutes-input"),
     sessionGuideMode: document.getElementById("session-guide-mode"),
@@ -64,7 +71,6 @@ function cacheElements() {
     summaryNotes: document.getElementById("summary-notes"),
     actionItemTitle: document.getElementById("action-item-title"),
     actionItemDetail: document.getElementById("action-item-detail"),
-    completeSessionButton: document.getElementById("complete-session-button"),
     actionSummaryPill: document.getElementById("action-summary-pill"),
     actionItemList: document.getElementById("action-item-list"),
     nudgeTimingPill: document.getElementById("nudge-timing-pill"),
@@ -81,7 +87,8 @@ function bindEvents() {
     button.addEventListener("click", () => showScreen(button.dataset.navTarget));
   });
 
-  elements.refreshButton.addEventListener("click", () => loadDashboard().catch(handleError));
+  elements.refreshButton.addEventListener("click", () => loadDashboard({ restoreScreen: false }).catch(handleError));
+  elements.heroPrimaryButton.addEventListener("click", onHeroPrimaryAction);
   elements.previewNudgeButton.addEventListener("click", () => {
     showScreen("nudges");
     loadNudgePreview().catch(handleError);
@@ -93,6 +100,8 @@ function bindEvents() {
   elements.responseForm.addEventListener("submit", onSubmitResponse);
   elements.completeForm.addEventListener("submit", onCompleteSession);
   elements.nudgePreviewForm.addEventListener("submit", onPreviewNudgeAtTime);
+  elements.todayPlanCard.addEventListener("click", onTodayPlanAction);
+  elements.onboardingPanel.addEventListener("click", onOnboardingAction);
 
   elements.moodChipRow.querySelectorAll(".choice-chip").forEach((chip) => {
     chip.addEventListener("click", () => selectMood(chip.dataset.value));
@@ -108,30 +117,48 @@ function initializeDefaults() {
 
 async function loadApp() {
   await loadTextSources();
-  await loadDashboard();
+  await loadDashboard({ restoreScreen: true });
 }
 
-async function loadDashboard() {
+async function loadDashboard({ restoreScreen = false } = {}) {
   const userId = getUserId();
   localStorage.setItem("emmaus.userId", userId);
 
-  const [profile, recommendation, streaks, openItems, latestMood] = await Promise.all([
+  const [profile, recommendation, streaks, openItems, latestMood, activeSession] = await Promise.all([
     fetchJson(`/v1/users/${encodeURIComponent(userId)}/profile`),
     fetchJson(`/v1/agent/recommendations/${encodeURIComponent(userId)}`),
     fetchJson(`/v1/engagement/streaks/${encodeURIComponent(userId)}`),
     fetchJson(`/v1/study/action-items/${encodeURIComponent(userId)}?status=open`),
     fetchJson(`/v1/study/mood/${encodeURIComponent(userId)}`, { allowNull: true }),
+    fetchJson(`/v1/agent/session/active/${encodeURIComponent(userId)}`, { allowNull: true }),
   ]);
 
   state.profile = profile;
   state.recommendation = recommendation;
+  state.activeSessionPayload = activeSession;
 
   renderProfile(profile);
   renderRecommendation(recommendation);
   renderStreaks(streaks);
   renderActionItems(openItems.items || []);
   renderLatestMood(latestMood);
+  renderOnboarding(profile, streaks, activeSession);
+  renderTodayPlan(recommendation, activeSession, openItems.items || []);
+  updateSessionEntryState(activeSession);
+
+  if (activeSession) {
+    renderSessionStart(activeSession, { navigate: false });
+    localStorage.setItem("emmaus.activeSessionId", activeSession.session.session_id);
+  } else {
+    clearSessionView();
+    localStorage.removeItem("emmaus.activeSessionId");
+  }
+
   await loadNudgePreview();
+
+  if (restoreScreen) {
+    restorePreferredScreen();
+  }
 }
 
 async function loadTextSources() {
@@ -182,6 +209,66 @@ function renderStreaks(streaks) {
   elements.streakCopy.textContent = streak > 0
     ? `You have completed ${streaks.completed_sessions} sessions and your longest streak is ${streaks.longest_streak}.`
     : "Complete a session today to establish a rhythm.";
+}
+
+function renderOnboarding(profile, streaks, activeSession) {
+  const isNew = !profile.display_name && streaks.completed_sessions === 0 && !activeSession;
+  elements.onboardingPanel.classList.toggle("hidden", !isNew);
+  if (!isNew) {
+    return;
+  }
+
+  elements.onboardingCopy.textContent = "Start with your name, a guide mode, and a short session. Emmaus will learn from there and begin shaping today’s plan around your real rhythm.";
+}
+
+function renderTodayPlan(recommendation, activeSession, actionItems) {
+  if (activeSession) {
+    const session = activeSession.session;
+    const totalQuestions = session.questions.length;
+    const answeredQuestions = session.current_question_index;
+    const completion = totalQuestions === 0 ? 0 : Math.round((answeredQuestions / totalQuestions) * 100);
+    const nextQuestion = activeSession.current_question ? activeSession.current_question.question : "Complete the session to receive your action step.";
+    elements.todayPlanPill.textContent = "In progress";
+    elements.heroPrimaryButton.textContent = "Resume Session";
+    elements.todayPlanCard.innerHTML = `
+      <article class="today-plan-card">
+        <div class="recommendation-meta">
+          <span class="meta-pill">${escapeHtml(formatReference(session.reference))}</span>
+          <span class="meta-pill">${escapeHtml(session.guide_mode)}</span>
+          <span class="meta-pill">${escapeHtml(`${session.requested_minutes} min`)}</span>
+        </div>
+        <h3>Keep going with the session you already started.</h3>
+        <p class="today-plan-copy">${escapeHtml(session.latest_message)}</p>
+        <div class="progress-track"><div class="progress-fill" style="width: ${completion}%"></div></div>
+        <p class="micro-copy">${answeredQuestions} of ${totalQuestions} questions answered. Next: ${escapeHtml(nextQuestion)}</p>
+        <div class="today-plan-actions">
+          <button class="primary-button" type="button" data-action="resume-session">Resume session</button>
+          <button class="secondary-button" type="button" data-action="open-actions">Action items</button>
+        </div>
+      </article>
+    `;
+    return;
+  }
+
+  const nextAction = actionItems[0]?.title || recommendation.suggested_action;
+  elements.todayPlanPill.textContent = "Ready";
+  elements.heroPrimaryButton.textContent = "Start Today's Plan";
+  elements.todayPlanCard.innerHTML = `
+    <article class="today-plan-card">
+      <div class="recommendation-meta">
+        <span class="meta-pill">${escapeHtml(formatReference(recommendation.recommended_reference))}</span>
+        <span class="meta-pill">${escapeHtml(recommendation.recommended_guide_mode)}</span>
+        <span class="meta-pill">${escapeHtml(`${recommendation.recommended_minutes} min`)}</span>
+      </div>
+      <h3>Today’s plan is ready.</h3>
+      <p class="today-plan-copy">${escapeHtml(recommendation.reason)}</p>
+      <p class="micro-copy">Start from “${escapeHtml(recommendation.recommended_entry_point)}” and end by acting on: ${escapeHtml(nextAction)}</p>
+      <div class="today-plan-actions">
+        <button class="primary-button" type="button" data-action="start-today-plan">Start today’s plan</button>
+        <button class="secondary-button" type="button" data-action="open-study">Review session setup</button>
+      </div>
+    </article>
+  `;
 }
 
 function renderActionItems(items) {
@@ -257,9 +344,25 @@ function renderNudge(nudge) {
   `;
 }
 
-function renderSessionStart(payload) {
-  state.activeSession = payload.session;
+function updateSessionEntryState(activeSession) {
+  const disabled = Boolean(activeSession);
+  elements.sessionFormButton.disabled = disabled;
+  elements.entryPointInput.disabled = disabled;
+  elements.requestedMinutesInput.disabled = disabled;
+  elements.sessionGuideMode.disabled = disabled;
+  elements.textSourceSelect.disabled = disabled;
+  elements.sessionFormCopy.textContent = disabled
+    ? "You already have a session in progress. Resume it below or finish it before starting a new one."
+    : "Start a fresh guided session when you are ready.";
+  elements.sessionFormButton.textContent = disabled ? "Session in progress" : "Begin guided session";
+}
+
+function renderSessionStart(payload, options = {}) {
+  const { navigate = true } = options;
+  state.activeSessionPayload = payload;
   state.currentQuestion = payload.current_question;
+  localStorage.setItem("emmaus.activeSessionId", payload.session.session_id);
+
   elements.sessionStatusPill.textContent = capitalize(payload.session.status);
   elements.sessionReference.textContent = formatReference(payload.session.reference);
   elements.sessionHero.innerHTML = `
@@ -295,12 +398,15 @@ function renderSessionStart(payload) {
     : '<p class="empty-state">No commentary note is attached to this session yet.</p>';
 
   renderCurrentQuestion(payload.current_question, payload.session.questions.length, payload.session.current_question_index);
-  showScreen("session");
+  if (navigate) {
+    showScreen("session");
+  }
 }
 
 function renderCurrentQuestion(question, totalQuestions, currentIndex) {
   state.currentQuestion = question;
-  elements.questionProgressPill.textContent = `${Math.min(currentIndex + (question ? 1 : 0), totalQuestions)} / ${totalQuestions}`;
+  const visibleProgress = question ? currentIndex + 1 : totalQuestions;
+  elements.questionProgressPill.textContent = `${visibleProgress} / ${totalQuestions}`;
   if (!question) {
     elements.currentQuestionHeading.textContent = "Ready to complete";
     elements.currentQuestionCopy.textContent = "You’ve answered the core questions. Complete the session to receive your action step.";
@@ -317,7 +423,7 @@ function renderCurrentQuestion(question, totalQuestions, currentIndex) {
 }
 
 function renderSessionTurn(payload) {
-  state.activeSession = payload.session;
+  state.activeSessionPayload = { ...state.activeSessionPayload, session: payload.session, current_question: payload.next_question };
   elements.sessionStatusPill.textContent = capitalize(payload.session.status);
   elements.sessionHero.innerHTML = `
     <article class="inline-card">
@@ -329,7 +435,10 @@ function renderSessionTurn(payload) {
 }
 
 function renderSessionComplete(payload) {
-  state.activeSession = payload.session;
+  state.activeSessionPayload = null;
+  state.currentQuestion = null;
+  localStorage.removeItem("emmaus.activeSessionId");
+
   elements.sessionStatusPill.textContent = "Completed";
   elements.sessionHero.innerHTML = `
     <article class="inline-card">
@@ -345,10 +454,121 @@ function renderSessionComplete(payload) {
   elements.responseText.value = "";
   elements.responseText.disabled = true;
   elements.submitResponseButton.disabled = true;
+  updateSessionEntryState(null);
   showToast("Session completed. Your action step is ready.");
-  loadDashboard().catch(handleError);
+  loadDashboard({ restoreScreen: false }).catch(handleError);
   showScreen("actions");
 }
+
+function clearSessionView() {
+  state.activeSessionPayload = null;
+  state.currentQuestion = null;
+  elements.sessionStatusPill.textContent = "Ready";
+  elements.sessionReference.textContent = "No active session yet";
+  elements.questionProgressPill.textContent = "0 / 0";
+  elements.sessionHero.innerHTML = '<article class="inline-card"><p>Emmaus will keep your place here when you return.</p></article>';
+  elements.passageText.textContent = "Start a session to see the passage, plan, and first question.";
+  elements.sessionPlan.innerHTML = "";
+  elements.commentaryBlock.innerHTML = "";
+  elements.currentQuestionHeading.textContent = "Current question";
+  elements.currentQuestionCopy.textContent = "Emmaus will place the next question here.";
+  elements.responseText.value = "";
+  elements.responseText.disabled = false;
+  elements.submitResponseButton.disabled = false;
+}
+function restorePreferredScreen() {
+  const preferred = localStorage.getItem("emmaus.activeScreen") || "home";
+  if (preferred === "session" && state.activeSessionPayload) {
+    showScreen("session");
+    return;
+  }
+  showScreen(preferred);
+}
+
+function showScreen(screenName) {
+  state.activeScreen = screenName;
+  localStorage.setItem("emmaus.activeScreen", screenName);
+  elements.screens.forEach((screen) => {
+    screen.classList.toggle("screen-active", screen.dataset.screen === screenName);
+  });
+  document.querySelectorAll(".nav-pill").forEach((button) => {
+    button.classList.toggle("nav-pill-active", button.dataset.navTarget === screenName);
+  });
+}
+
+function selectMood(mood) {
+  state.selectedMood = mood;
+  elements.moodChipRow.querySelectorAll(".choice-chip").forEach((chip) => {
+    chip.classList.toggle("choice-chip-active", chip.dataset.value === mood);
+  });
+}
+
+async function onHeroPrimaryAction() {
+  if (state.activeSessionPayload) {
+    showScreen("session");
+    return;
+  }
+  await startRecommendedSession();
+}
+
+async function onTodayPlanAction(event) {
+  const button = event.target.closest("[data-action]");
+  if (!button) {
+    return;
+  }
+  const action = button.dataset.action;
+  if (action === "resume-session") {
+    showScreen("session");
+    return;
+  }
+  if (action === "open-actions") {
+    showScreen("actions");
+    return;
+  }
+  if (action === "open-study") {
+    showScreen("session");
+    return;
+  }
+  if (action === "start-today-plan") {
+    await startRecommendedSession();
+  }
+}
+
+async function onOnboardingAction(event) {
+  const button = event.target.closest("[data-action]");
+  if (!button) {
+    return;
+  }
+  const action = button.dataset.action;
+  if (action === "focus-identity") {
+    elements.displayNameInput.focus();
+    return;
+  }
+  if (action === "start-today-plan") {
+    await startRecommendedSession();
+  }
+}
+
+async function startRecommendedSession() {
+  const payload = {
+    user_id: getUserId(),
+    display_name: elements.displayNameInput.value.trim() || null,
+    text_source_id: elements.textSourceSelect.value || null,
+    entry_point: state.recommendation?.recommended_entry_point || elements.entryPointInput.value.trim() || "continue where I left off",
+    requested_minutes: state.recommendation?.recommended_minutes || numberOrNull(elements.requestedMinutesInput.value),
+    guide_mode: null,
+  };
+
+  const session = await fetchJson("/v1/agent/session/start", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  renderSessionStart(session);
+  updateSessionEntryState(session);
+  renderTodayPlan(state.recommendation, session, []);
+  showToast("Session started.");
+}
+
 async function onSaveIdentity(event) {
   event.preventDefault();
   const userId = getUserId();
@@ -365,7 +585,7 @@ async function onSaveIdentity(event) {
   state.profile = profile;
   renderProfile(profile);
   showToast("Guide preferences saved.");
-  await loadDashboard();
+  await loadDashboard({ restoreScreen: false });
 }
 
 async function onSaveMood(event) {
@@ -380,11 +600,17 @@ async function onSaveMood(event) {
     }),
   });
   showToast("Mood check-in saved.");
-  await loadDashboard();
+  await loadDashboard({ restoreScreen: false });
 }
 
 async function onStartSession(event) {
   event.preventDefault();
+  if (state.activeSessionPayload) {
+    showToast("Resume or finish your current session before starting another.");
+    showScreen("session");
+    return;
+  }
+
   const payload = {
     user_id: getUserId(),
     display_name: elements.displayNameInput.value.trim() || null,
@@ -399,13 +625,15 @@ async function onStartSession(event) {
     body: JSON.stringify(payload),
   });
   renderSessionStart(session);
+  updateSessionEntryState(session);
+  renderTodayPlan(state.recommendation, session, []);
   showToast("Session started.");
 }
 
 async function onSubmitResponse(event) {
   event.preventDefault();
-  if (!state.activeSession || !state.currentQuestion) {
-    showToast("Start a session first.");
+  if (!state.activeSessionPayload || !state.currentQuestion) {
+    showToast("Start or resume a session first.");
     return;
   }
 
@@ -416,7 +644,7 @@ async function onSubmitResponse(event) {
   }
 
   const payload = {
-    session_id: state.activeSession.session_id,
+    session_id: state.activeSessionPayload.session.session_id,
     user_id: getUserId(),
     response_text: text,
     engagement_score: Number(elements.engagementInput.value || 4),
@@ -427,17 +655,18 @@ async function onSubmitResponse(event) {
     body: JSON.stringify(payload),
   });
   renderSessionTurn(turn);
+  await loadDashboard({ restoreScreen: false });
 }
 
 async function onCompleteSession(event) {
   event.preventDefault();
-  if (!state.activeSession) {
-    showToast("Start a session first.");
+  if (!state.activeSessionPayload) {
+    showToast("Start or resume a session first.");
     return;
   }
 
   const payload = {
-    session_id: state.activeSession.session_id,
+    session_id: state.activeSessionPayload.session.session_id,
     user_id: getUserId(),
     summary_notes: elements.summaryNotes.value.trim() || null,
     action_item_title: elements.actionItemTitle.value.trim() || null,
@@ -463,7 +692,7 @@ async function onActionListClick(event) {
     body: JSON.stringify({ user_id: getUserId() }),
   });
   showToast("Action item completed.");
-  await loadDashboard();
+  await loadDashboard({ restoreScreen: false });
 }
 
 async function onPreviewNudgeAtTime(event) {
@@ -472,23 +701,6 @@ async function onPreviewNudgeAtTime(event) {
   const previewAt = previewValue ? new Date(previewValue).toISOString() : null;
   await loadNudgePreview(previewAt);
   showToast("Nudge preview refreshed.");
-}
-
-function showScreen(screenName) {
-  state.activeScreen = screenName;
-  elements.screens.forEach((screen) => {
-    screen.classList.toggle("screen-active", screen.dataset.screen === screenName);
-  });
-  document.querySelectorAll(".nav-pill").forEach((button) => {
-    button.classList.toggle("nav-pill-active", button.dataset.navTarget === screenName);
-  });
-}
-
-function selectMood(mood) {
-  state.selectedMood = mood;
-  elements.moodChipRow.querySelectorAll(".choice-chip").forEach((chip) => {
-    chip.classList.toggle("choice-chip-active", chip.dataset.value === mood);
-  });
 }
 
 async function fetchJson(url, options = {}) {
@@ -521,6 +733,7 @@ function handleError(error) {
   console.error(error);
   showToast(typeof error?.message === "string" ? error.message : "Something went wrong.");
 }
+
 function getUserId() {
   return elements.userIdInput.value.trim() || "demo-user";
 }

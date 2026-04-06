@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -13,6 +13,14 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 @router.get("/recommendations/{user_id}")
 def get_agent_recommendation(user_id: str, container: Container = Depends(get_container)):
     return container.agent_service.recommend_next_session(user_id)
+
+
+@router.get("/session/active/{user_id}")
+def get_active_agent_session(user_id: str, container: Container = Depends(get_container)):
+    payload = container.agent_service.resume_active_session(user_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail=f"No active session for '{user_id}'.")
+    return payload
 
 
 @router.post("/nudges/preview")

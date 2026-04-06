@@ -28,10 +28,61 @@
               Emmaus adapts each session to your habits, understanding, and next step of obedience.
             </p>
             <div class="hero-actions">
-              <button class="primary-button" type="button" data-nav-target="session">Start Session</button>
+              <button class="primary-button" type="button" id="hero-primary-button">Start Today's Plan</button>
               <button class="secondary-button" type="button" id="preview-nudge-button">Preview Nudge</button>
             </div>
           </div>
+
+          <section class="panel accent-panel hidden" id="onboarding-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Welcome</p>
+                <h2>Set up your first guided rhythm</h2>
+              </div>
+            </div>
+            <p id="onboarding-copy" class="hero-copy">
+              Tell Emmaus a little about yourself, then begin with a short session that fits today.
+            </p>
+            <div class="button-row">
+              <button class="primary-button" type="button" data-action="focus-identity">Complete profile</button>
+              <button class="secondary-button" type="button" data-action="start-today-plan">Start first session</button>
+            </div>
+          </section>
+
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Today</p>
+                <h2>Return to today’s plan</h2>
+              </div>
+              <span class="status-pill" id="today-plan-pill">Loading</span>
+            </div>
+            <div id="today-plan-card" class="content-stack"></div>
+          </section>
+
+          <section class="dual-grid">
+            <article class="panel stat-card">
+              <p class="panel-label">Momentum</p>
+              <h2 id="streak-value">0 day streak</h2>
+              <p id="streak-copy">Complete a session to begin building momentum.</p>
+            </article>
+            <article class="panel stat-card">
+              <p class="panel-label">Open action</p>
+              <h2 id="open-action-count">0</h2>
+              <p id="open-action-copy">Your next step will show up here.</p>
+            </article>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Next study</p>
+                <h2>Recommended focus</h2>
+              </div>
+              <span class="status-pill" id="focus-pill">Loading</span>
+            </div>
+            <div id="recommendation-card" class="content-stack"></div>
+          </section>
 
           <section class="panel stack-panel">
             <div class="panel-heading">
@@ -64,30 +115,6 @@
               </label>
               <button class="secondary-button full-width" type="submit">Save preferences</button>
             </form>
-          </section>
-
-          <section class="dual-grid">
-            <article class="panel stat-card">
-              <p class="panel-label">Today</p>
-              <h2 id="streak-value">0 day streak</h2>
-              <p id="streak-copy">Complete a session to begin building momentum.</p>
-            </article>
-            <article class="panel stat-card">
-              <p class="panel-label">Open action</p>
-              <h2 id="open-action-count">0</h2>
-              <p id="open-action-copy">Your next step will show up here.</p>
-            </article>
-          </section>
-
-          <section class="panel">
-            <div class="panel-heading">
-              <div>
-                <p class="panel-label">Next study</p>
-                <h2>Recommended focus</h2>
-              </div>
-              <span class="status-pill" id="focus-pill">Loading</span>
-            </div>
-            <div id="recommendation-card" class="content-stack"></div>
           </section>
 
           <section class="panel">
@@ -133,6 +160,7 @@
               </div>
               <span class="status-pill" id="session-status-pill">Ready</span>
             </div>
+            <p class="micro-copy" id="session-form-copy">Start a fresh guided session when you are ready.</p>
             <form id="session-form" class="stack-form">
               <label>
                 <span>Entry point</span>
@@ -156,7 +184,7 @@
                 <span>Text source</span>
                 <select id="text-source-select" name="textSource"></select>
               </label>
-              <button class="primary-button full-width" type="submit">Begin guided session</button>
+              <button class="primary-button full-width" id="session-form-button" type="submit">Begin guided session</button>
             </form>
           </section>
 

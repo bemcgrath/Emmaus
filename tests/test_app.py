@@ -24,11 +24,12 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     response = client.get("/")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "Emmaus" in response.text
+    assert "Start Today's Plan" in response.text
+    assert "today-plan-card" in response.text
 
     asset = client.get("/static/app.js")
     assert asset.status_code == 200
-    assert "loadDashboard" in asset.text
+    assert "resume_active_session" in asset.text or "activeSessionPayload" in asset.text
 
 
 def test_update_preferences_and_profile(tmp_path, monkeypatch):
@@ -62,6 +63,40 @@ def test_update_preferences_and_profile(tmp_path, monkeypatch):
     assert fetched["user_id"] == "demo-user"
     assert fetched["preferences"]["preferred_translation_source_id"] == "sample_local"
     assert fetched["preferences"]["preferred_study_window_start"] == "08:00"
+
+
+def test_active_session_can_be_resumed(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "requested_minutes": 10,
+        },
+    )
+    assert start.status_code == 200
+    session_id = start.json()["session"]["session_id"]
+
+    turn = client.post(
+        "/v1/agent/session/respond",
+        json={
+            "session_id": session_id,
+            "user_id": "demo-user",
+            "response_text": "I notice Jesus moving toward people with grace.",
+            "engagement_score": 4,
+        },
+    )
+    assert turn.status_code == 200
+
+    resume = client.get("/v1/agent/session/active/demo-user")
+    assert resume.status_code == 200
+    payload = resume.json()
+    assert payload["session"]["session_id"] == session_id
+    assert payload["session"]["current_question_index"] == 1
+    assert payload["current_question"]["type"] in {"interpretation", "application", "reflection"}
+    assert payload["passage"]["source_id"] == "sample_local"
 
 
 def test_phase_one_guided_session_flow(tmp_path, monkeypatch):
@@ -114,6 +149,9 @@ def test_phase_one_guided_session_flow(tmp_path, monkeypatch):
     assert completed["action_item"]["status"] == "open"
     assert completed["engagement"]["completed_sessions"] == 1
     assert completed["engagement"]["current_streak"] == 1
+
+    no_active = client.get("/v1/agent/session/active/demo-user")
+    assert no_active.status_code == 404
 
     action_items = client.get("/v1/study/action-items/demo-user")
     assert action_items.status_code == 200
