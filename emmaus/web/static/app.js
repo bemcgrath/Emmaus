@@ -24,6 +24,9 @@ const state = {
   nudge: null,
   nudgePlan: null,
   profile: null,
+  streaks: null,
+  actionItems: [],
+  onboardingStep: 1,
   textSources: [],
 };
 
@@ -48,6 +51,8 @@ function cacheElements() {
     demoStatusCopy: document.getElementById("demo-status-copy"),
     onboardingPanel: document.getElementById("onboarding-panel"),
     onboardingCopy: document.getElementById("onboarding-copy"),
+    onboardingStepPill: document.getElementById("onboarding-step-pill"),
+    onboardingFlow: document.getElementById("onboarding-flow"),
     todayPlanPill: document.getElementById("today-plan-pill"),
     todayPlanCard: document.getElementById("today-plan-card"),
     identityForm: document.getElementById("identity-form"),
@@ -142,6 +147,7 @@ function bindEvents() {
 
 function initializeDefaults() {
   elements.userIdInput.value = state.userId;
+  state.onboardingStep = getStoredOnboardingStep();
   selectMood(state.selectedMood);
   const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if (browserTimezone) {
@@ -928,20 +934,152 @@ function renderLatestMood(latestMood) {
 }
 
 function renderOnboarding(profile, streaks, activeSession, actionItems) {
-  const preferences = profile?.preferences || {};
   const openActions = actionItems.filter((item) => item.status === "open");
-  const needsSetup = !profile?.display_name || !preferences.preferred_translation_source_id || !preferences.preferred_study_days?.length;
-  const shouldShow = (!streaks?.completed_sessions && !activeSession) || needsSetup;
+  const shouldShow = shouldShowOnboarding(profile, streaks, activeSession, openActions);
 
-  if (!shouldShow || openActions.length) {
+  if (!shouldShow) {
     elements.onboardingPanel.classList.add("hidden");
     return;
   }
 
+  const step = deriveOnboardingStep(profile);
+  state.onboardingStep = step;
   elements.onboardingPanel.classList.remove("hidden");
-  elements.onboardingCopy.textContent = !profile?.display_name
-    ? "Tell Emmaus how you prefer to study so the guide can start with a gentle first rhythm on mobile."
-    : "Tighten your preferences so Emmaus can time nudges well and shape a better first-week rhythm.";
+  elements.onboardingStepPill.textContent = `Step ${step} of 4`;
+
+  if (step === 1) {
+    elements.onboardingCopy.textContent = "Start by choosing a Bible. Emmaus includes one right away, so you can begin in one tap.";
+    elements.onboardingFlow.innerHTML = `
+      <div class="today-plan-card onboarding-step-card">
+        <p><strong>Choose your Bible</strong></p>
+        <p class="today-plan-copy">Most people should start with the included Bible and begin studying right away.</p>
+        <div class="source-quick-actions">
+          <button class="primary-button full-width" type="button" data-action="onboarding-use-starter">Use included starter Bible</button>
+          <button class="secondary-button full-width" type="button" data-action="onboarding-focus-upload">Upload Bible from this device</button>
+          <button class="secondary-button full-width" type="button" data-action="onboarding-focus-advanced">Use a licensed provider</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  if (step === 2) {
+    elements.onboardingCopy.textContent = "Pick a session length that feels realistic on your phone, even on a busy day.";
+    elements.onboardingFlow.innerHTML = `
+      <div class="today-plan-card onboarding-step-card">
+        <p><strong>How much time feels realistic?</strong></p>
+        <div class="chip-row onboarding-choice-row">
+          <button class="choice-chip" type="button" data-action="onboarding-set-minutes" data-minutes="10">10 min</button>
+          <button class="choice-chip" type="button" data-action="onboarding-set-minutes" data-minutes="15">15 min</button>
+          <button class="choice-chip" type="button" data-action="onboarding-set-minutes" data-minutes="20">20 min</button>
+        </div>
+        <p class="micro-copy">Emmaus will use this to shape your first sessions and future nudges.</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (step === 3) {
+    elements.onboardingCopy.textContent = "Tell Emmaus the best time of day to reach you so today?s plan and future nudges fit your rhythm.";
+    elements.onboardingFlow.innerHTML = `
+      <div class="today-plan-card onboarding-step-card">
+        <p><strong>When do you usually study best?</strong></p>
+        <div class="chip-row onboarding-choice-row">
+          <button class="choice-chip" type="button" data-action="onboarding-set-window" data-window="morning">Morning</button>
+          <button class="choice-chip" type="button" data-action="onboarding-set-window" data-window="midday">Midday</button>
+          <button class="choice-chip" type="button" data-action="onboarding-set-window" data-window="evening">Evening</button>
+        </div>
+        <p class="micro-copy">You can fine-tune quiet hours and study days later in your preferences.</p>
+      </div>
+    `;
+    return;
+  }
+
+  elements.onboardingCopy.textContent = "Your starter rhythm is ready. Emmaus can launch today?s first guided session now.";
+  const recommendation = state.recommendation;
+  elements.onboardingFlow.innerHTML = `
+    <div class="today-plan-card onboarding-step-card">
+      <p><strong>Start your first session</strong></p>
+      <p class="today-plan-copy">${escapeHtml(recommendation ? recommendation.reason : "Emmaus is ready with a first guided session.")}</p>
+      <div class="today-plan-actions">
+        <span class="meta-pill">${escapeHtml(String(recommendation?.recommended_minutes || state.profile?.preferences?.preferred_session_minutes || 15))} min</span>
+        <span class="meta-pill">${escapeHtml(sentenceCase(recommendation?.recommended_guide_mode || "guide"))}</span>
+      </div>
+      <div class="source-quick-actions">
+        <button class="primary-button full-width" type="button" data-action="onboarding-start-session">Start today's first session</button>
+        <button class="secondary-button full-width" type="button" data-action="focus-identity">Adjust more preferences first</button>
+      </div>
+    </div>
+  `;
+}
+
+function shouldShowOnboarding(profile, streaks, activeSession, openActions) {
+  if (isDemoMode()) {
+    return false;
+  }
+  if (activeSession || openActions.length) {
+    return false;
+  }
+  if (streaks?.completed_sessions > 0 || isOnboardingComplete()) {
+    return false;
+  }
+  return true;
+}
+
+function deriveOnboardingStep(profile) {
+  const preferences = profile?.preferences || {};
+  const storedStep = getStoredOnboardingStep();
+  if (!preferences.preferred_translation_source_id) {
+    return 1;
+  }
+  if (storedStep <= 1) {
+    return 2;
+  }
+  if (!preferences.preferred_study_window_start || !preferences.preferred_study_window_end) {
+    return Math.max(3, storedStep || 3);
+  }
+  return Math.max(4, storedStep || 4);
+}
+
+function onboardingStorageKey(name) {
+  return `emmaus.onboarding.${getUserId()}.${name}`;
+}
+
+function getStoredOnboardingStep() {
+  return Number(localStorage.getItem(onboardingStorageKey("step")) || "1");
+}
+
+function setStoredOnboardingStep(step) {
+  state.onboardingStep = step;
+  localStorage.setItem(onboardingStorageKey("step"), String(step));
+}
+
+function isOnboardingComplete() {
+  return localStorage.getItem(onboardingStorageKey("complete")) === "1";
+}
+
+function completeOnboarding() {
+  localStorage.setItem(onboardingStorageKey("complete"), "1");
+  localStorage.removeItem(onboardingStorageKey("step"));
+}
+
+async function saveOnboardingPreferences(updates, { successMessage, nextStep } = {}) {
+  if (!ensureLiveMode("Switch to Live to save real onboarding choices.")) {
+    return false;
+  }
+
+  await fetchJson(`/v1/users/${encodeURIComponent(getUserId())}/preferences`, {
+    method: "PATCH",
+    body: updates,
+  });
+  if (nextStep) {
+    setStoredOnboardingStep(nextStep);
+  }
+  await refreshExperience({ restoreScreen: false });
+  if (successMessage) {
+    showToast(successMessage);
+  }
+  return true;
 }
 
 function updateSessionEntryState(activeSession) {
@@ -1315,13 +1453,80 @@ function onTodayPlanAction() {
   showScreen("session");
 }
 
-function onOnboardingAction(event) {
+async function onOnboardingAction(event) {
   const button = event.target.closest("[data-action]");
   if (!button) {
     return;
   }
-  if (button.dataset.action === "focus-identity") {
+
+  const action = button.dataset.action;
+  if (action === "focus-identity") {
     focusIdentityForm();
+    return;
+  }
+  if (action === "onboarding-use-starter") {
+    setStoredOnboardingStep(2);
+    await setPreferredBibleSource("sample_local", { successMessage: "Starter Bible selected." });
+    return;
+  }
+  if (action === "onboarding-focus-upload") {
+    const uploadForm = document.getElementById("source-upload-form");
+    uploadForm?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById("source-upload-name")?.focus();
+    return;
+  }
+  if (action === "onboarding-focus-advanced") {
+    const sourceUi = bibleSourceElements();
+    if (sourceUi.advancedPanel?.classList.contains("hidden")) {
+      onToggleAdvancedBibleSetup();
+    }
+    sourceUi.advancedPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
+    sourceUi.apiName?.focus();
+    return;
+  }
+  if (action === "onboarding-set-minutes") {
+    const minutes = optionalNumber(button.dataset.minutes);
+    if (!minutes) {
+      return;
+    }
+    elements.preferredMinutesInput.value = String(minutes);
+    elements.requestedMinutesInput.value = String(minutes);
+    await saveOnboardingPreferences(
+      { preferred_session_minutes: minutes },
+      { successMessage: `Emmaus will plan around ${minutes} minutes.`, nextStep: 3 },
+    );
+    return;
+  }
+  if (action === "onboarding-set-window") {
+    const presets = {
+      morning: { preferred_study_window_start: "07:00", preferred_study_window_end: "09:00" },
+      midday: { preferred_study_window_start: "12:00", preferred_study_window_end: "14:00" },
+      evening: { preferred_study_window_start: "19:00", preferred_study_window_end: "21:00" },
+    };
+    const preset = presets[button.dataset.window];
+    if (!preset) {
+      return;
+    }
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || optionalText(elements.timezoneInput.value) || "UTC";
+    elements.timezoneInput.value = timezone;
+    elements.studyWindowStartInput.value = preset.preferred_study_window_start;
+    elements.studyWindowEndInput.value = preset.preferred_study_window_end;
+    state.selectedStudyDays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+    updateStudyDayChips();
+    await saveOnboardingPreferences(
+      {
+        timezone,
+        preferred_study_days: state.selectedStudyDays,
+        preferred_study_window_start: preset.preferred_study_window_start,
+        preferred_study_window_end: preset.preferred_study_window_end,
+      },
+      { successMessage: `Emmaus will aim for ${sentenceCase(button.dataset.window)} sessions.`, nextStep: 4 },
+    );
+    return;
+  }
+  if (action === "onboarding-start-session") {
+    completeOnboarding();
+    await startGuidedSession({ fromOnboarding: true });
     return;
   }
   showScreen("session");
@@ -1388,6 +1593,10 @@ async function onSaveMood(event) {
 
 async function onStartSession(event) {
   event.preventDefault();
+  await startGuidedSession();
+}
+
+async function startGuidedSession({ fromOnboarding = false } = {}) {
   if (isDemoMode()) {
     showScreen("session");
     showToast("Demo mode is read-only. Switch to Live to start a real session.");
@@ -1395,6 +1604,9 @@ async function onStartSession(event) {
   }
 
   if (state.activeSessionPayload?.session?.status === "active") {
+    if (fromOnboarding) {
+      completeOnboarding();
+    }
     showScreen("session");
     return;
   }
@@ -1411,10 +1623,13 @@ async function onStartSession(event) {
     },
   });
 
+  if (fromOnboarding) {
+    completeOnboarding();
+  }
   state.recommendation = payload.recommendation;
   renderSessionStart(payload, { navigate: true });
   renderTodayPlan(state.recommendation, payload, state.actionItems);
-  showToast("Session started.");
+  showToast(fromOnboarding ? "Your first session is ready." : "Session started.");
 }
 
 async function onSubmitResponse(event) {
@@ -1562,6 +1777,10 @@ function showScreen(screenName) {
 
 function focusIdentityForm() {
   showScreen("home");
+  if (!elements.onboardingPanel.classList.contains("hidden")) {
+    elements.onboardingPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
   elements.identityForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -1919,6 +2138,7 @@ async function onUploadBibleSource(event) {
     },
   });
 
+  setStoredOnboardingStep(2);
   await setPreferredBibleSource(descriptor.source_id, { successMessage: `${descriptor.name} is now your default Bible.` });
   sourceUi.uploadForm.reset();
 }
@@ -1948,6 +2168,7 @@ async function onConnectBibleApiSource(event) {
     },
   });
 
+  setStoredOnboardingStep(2);
   await setPreferredBibleSource(descriptor.source_id, { successMessage: `${descriptor.name} is now your default Bible.` });
   sourceUi.apiForm.reset();
 }

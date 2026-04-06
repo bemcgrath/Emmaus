@@ -99,6 +99,8 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "source-use-starter" in response.text
     assert "source-upload-form" in response.text
     assert "source-advanced-toggle" in response.text
+    assert "onboarding-step-pill" in response.text
+    assert "onboarding-flow" in response.text
     assert "follow-up-target-copy" in response.text
     assert "nudge-plan-card" in response.text
 
@@ -109,6 +111,8 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "comprehension_gap" in asset.text
     assert "setPreferredBibleSource" in asset.text
     assert "buildGeneratedSourceId" in asset.text
+    assert "deriveOnboardingStep" in asset.text
+    assert "startGuidedSession" in asset.text
     assert "source-use-starter" in response.text
     assert "source-upload-file" in asset.text
     assert "followUpOutcomeSelect" in asset.text

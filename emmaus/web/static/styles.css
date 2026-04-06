@@ -168,6 +168,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   display: grid;
   gap: 0.75rem;
 }
+.onboarding-step-card {
+  display: grid;
+  gap: 0.85rem;
+}
+.onboarding-choice-row {
+  flex-wrap: wrap;
+}
 .no-top-gap {
   padding-top: 0;
 }
