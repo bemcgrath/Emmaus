@@ -82,55 +82,46 @@
             <div class="panel-heading">
               <div>
                 <p class="panel-label">Bible</p>
-                <h2>Choose your source</h2>
+                <h2>Choose your Bible</h2>
               </div>
             </div>
-            <p class="micro-copy" id="source-manager-copy">Choose a connected Bible or add one from your phone or browser without leaving Emmaus.</p>
+            <p class="micro-copy" id="source-manager-copy">Pick a Bible and start studying. You can always change it later.</p>
+            <div class="source-quick-actions">
+              <button id="source-use-starter" class="primary-button full-width" type="button">Use included starter Bible</button>
+              <button id="source-advanced-toggle" class="secondary-button full-width" type="button" aria-expanded="false">More setup options</button>
+            </div>
             <div id="source-library" class="list-stack"></div>
             <form id="source-upload-form" class="stack-form compact-form">
-              <p class="panel-label">Add local JSON</p>
+              <p class="panel-label">Upload from device</p>
               <label>
-                <span>Source name</span>
-                <input id="source-upload-name" type="text" placeholder="My Public Domain Bible" />
-              </label>
-              <label>
-                <span>Source ID</span>
-                <input id="source-upload-id" type="text" placeholder="my_public_domain_bible" />
-              </label>
-              <label>
-                <span>License</span>
-                <input id="source-upload-license" type="text" value="User Supplied" />
+                <span>Bible name</span>
+                <input id="source-upload-name" type="text" placeholder="My Bible" />
               </label>
               <label>
                 <span>Bible JSON file</span>
                 <input id="source-upload-file" type="file" accept=".json,application/json" />
               </label>
-              <button class="secondary-button full-width" type="submit">Add local Bible</button>
+              <button class="secondary-button full-width" type="submit">Upload Bible file</button>
             </form>
-            <form id="source-api-form" class="stack-form compact-form">
-              <p class="panel-label">Connect API source</p>
-              <label>
-                <span>Source name</span>
-                <input id="source-api-name" type="text" placeholder="Licensed Bible API" />
-              </label>
-              <label>
-                <span>Source ID</span>
-                <input id="source-api-id" type="text" placeholder="licensed_bible_api" />
-              </label>
-              <label>
-                <span>Base URL</span>
-                <input id="source-api-url" type="url" placeholder="https://example.com/bible" />
-              </label>
-              <label>
-                <span>API key</span>
-                <input id="source-api-key" type="password" placeholder="Optional" />
-              </label>
-              <label>
-                <span>License</span>
-                <input id="source-api-license" type="text" value="User Supplied" />
-              </label>
-              <button class="secondary-button full-width" type="submit">Connect API Bible</button>
-            </form>
+            <section id="source-advanced-panel" class="stack-form compact-form hidden">
+              <p class="panel-label">Advanced setup</p>
+              <p class="micro-copy">Use this only if your Bible provider gave you an API URL and key.</p>
+              <form id="source-api-form" class="stack-form compact-form no-top-gap">
+                <label>
+                  <span>Provider name</span>
+                  <input id="source-api-name" type="text" placeholder="Licensed Bible provider" />
+                </label>
+                <label>
+                  <span>Base URL</span>
+                  <input id="source-api-url" type="url" placeholder="https://example.com/bible" />
+                </label>
+                <label>
+                  <span>API key</span>
+                  <input id="source-api-key" type="password" placeholder="Optional" />
+                </label>
+                <button class="secondary-button full-width" type="submit">Connect provider</button>
+              </form>
+            </section>
           </section>
 
           <section class="dual-grid">

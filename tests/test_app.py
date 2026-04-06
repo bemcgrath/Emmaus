@@ -96,7 +96,9 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "data-demo-scenario=\"comprehension_gap\"" in response.text
     assert "data-demo-scenario=\"scheduled_nudge\"" in response.text
     assert "source-library" in response.text
+    assert "source-use-starter" in response.text
     assert "source-upload-form" in response.text
+    assert "source-advanced-toggle" in response.text
     assert "follow-up-target-copy" in response.text
     assert "nudge-plan-card" in response.text
 
@@ -106,6 +108,8 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "buildDemoScenarioData" in asset.text
     assert "comprehension_gap" in asset.text
     assert "setPreferredBibleSource" in asset.text
+    assert "buildGeneratedSourceId" in asset.text
+    assert "source-use-starter" in response.text
     assert "source-upload-file" in asset.text
     assert "followUpOutcomeSelect" in asset.text
     assert "delivery_status" in asset.text

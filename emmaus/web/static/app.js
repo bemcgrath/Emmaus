@@ -1742,23 +1742,24 @@ function bibleSourceElements() {
   return {
     library: document.getElementById("source-library"),
     copy: document.getElementById("source-manager-copy"),
+    useStarterButton: document.getElementById("source-use-starter"),
+    advancedToggle: document.getElementById("source-advanced-toggle"),
+    advancedPanel: document.getElementById("source-advanced-panel"),
     uploadForm: document.getElementById("source-upload-form"),
     uploadName: document.getElementById("source-upload-name"),
-    uploadId: document.getElementById("source-upload-id"),
-    uploadLicense: document.getElementById("source-upload-license"),
     uploadFile: document.getElementById("source-upload-file"),
     apiForm: document.getElementById("source-api-form"),
     apiName: document.getElementById("source-api-name"),
-    apiId: document.getElementById("source-api-id"),
     apiUrl: document.getElementById("source-api-url"),
     apiKey: document.getElementById("source-api-key"),
-    apiLicense: document.getElementById("source-api-license"),
   };
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   const sourceUi = bibleSourceElements();
   sourceUi.library?.addEventListener("click", onSourceLibraryClick);
+  sourceUi.useStarterButton?.addEventListener("click", onUseStarterBible);
+  sourceUi.advancedToggle?.addEventListener("click", onToggleAdvancedBibleSetup);
   sourceUi.uploadForm?.addEventListener("submit", onUploadBibleSource);
   sourceUi.apiForm?.addEventListener("submit", onConnectBibleApiSource);
 });
@@ -1827,28 +1828,36 @@ function renderBibleSourceManager() {
   );
   const preferredSourceId = state.profile?.preferences?.preferred_translation_source_id || elements.preferredSourceSelect?.value || "";
   const preferredSource = sources.find((source) => source.source_id === preferredSourceId) || null;
+  const starterSource = sources.find((source) => source.source_id === "sample_local") || null;
 
   sourceUi.copy.textContent = preferredSource
-    ? `Current Bible: ${preferredSource.name}. Tap any source below to make it your default study text.`
-    : "Choose a connected Bible or add one from your phone or browser without leaving Emmaus.";
+    ? `Current Bible: ${preferredSource.name}. Pick another one any time.`
+    : "Pick a Bible and start studying. You can always change it later.";
 
-  if (!sources.length) {
-    sourceUi.library.innerHTML = '<p class="empty-state">No Bible sources are connected yet. Add one below to get started.</p>';
+  if (sourceUi.useStarterButton) {
+    const starterActive = preferredSourceId === "sample_local";
+    sourceUi.useStarterButton.disabled = !starterSource || starterActive;
+    sourceUi.useStarterButton.textContent = starterActive ? "Using included starter Bible" : "Use included starter Bible";
+  }
+
+  const connectedSources = sources.filter((source) => source.source_id !== "sample_local");
+  if (!connectedSources.length) {
+    sourceUi.library.innerHTML = '<p class="empty-state">No other Bibles are connected yet. You can start with the included Bible or upload one from this device.</p>';
     return;
   }
 
-  sourceUi.library.innerHTML = sources
+  sourceUi.library.innerHTML = connectedSources
     .map((source) => {
       const isPreferred = source.source_id === preferredSourceId;
-      const providerLabel = source.provider_type === "remote_api" ? "API source" : "Local file";
+      const providerLabel = source.provider_type === "remote_api" ? "Connected provider" : "Uploaded from this device";
       return `
         <article class="action-card ${isPreferred ? "selected" : ""}">
           <div class="action-card-header">
             <div>
               <p><strong>${escapeHtml(source.name)}</strong></p>
-              <p>${escapeHtml(providerLabel)}${source.license_name ? ` • ${escapeHtml(source.license_name)}` : ""}</p>
+              <p>${escapeHtml(providerLabel)}</p>
             </div>
-            <span class="status-pill">${isPreferred ? "Current" : "Available"}</span>
+            <span class="status-pill">${isPreferred ? "Current" : "Ready"}</span>
           </div>
           <div class="source-card-actions">
             <button class="action-button" type="button" data-source-prefer="${escapeHtml(source.source_id)}" ${isPreferred ? "disabled" : ""}>${isPreferred ? "Using this Bible" : "Use this Bible"}</button>
@@ -1867,6 +1876,21 @@ async function onSourceLibraryClick(event) {
   await setPreferredBibleSource(button.dataset.sourcePrefer);
 }
 
+async function onUseStarterBible() {
+  await setPreferredBibleSource("sample_local", { successMessage: "The included starter Bible is now your default." });
+}
+
+function onToggleAdvancedBibleSetup() {
+  const sourceUi = bibleSourceElements();
+  if (!sourceUi.advancedPanel || !sourceUi.advancedToggle) {
+    return;
+  }
+  const willShow = sourceUi.advancedPanel.classList.contains("hidden");
+  sourceUi.advancedPanel.classList.toggle("hidden", !willShow);
+  sourceUi.advancedToggle.setAttribute("aria-expanded", willShow ? "true" : "false");
+  sourceUi.advancedToggle.textContent = willShow ? "Hide setup options" : "More setup options";
+}
+
 async function onUploadBibleSource(event) {
   event.preventDefault();
   if (!ensureLiveMode("Switch to Live to connect a real Bible source.")) {
@@ -1881,8 +1905,7 @@ async function onUploadBibleSource(event) {
   }
 
   const sourceName = optionalText(sourceUi.uploadName.value) || file.name.replace(/\.json$/i, "");
-  const sourceId = optionalText(sourceUi.uploadId.value) || buildSourceIdCandidate(sourceName);
-  const licenseName = optionalText(sourceUi.uploadLicense.value) || "User Supplied";
+  const sourceId = buildGeneratedSourceId(sourceName);
   const fileContent = await file.text();
 
   const descriptor = await fetchJson("/v1/sources/text/upload", {
@@ -1892,13 +1915,12 @@ async function onUploadBibleSource(event) {
       name: sourceName,
       filename: file.name,
       file_content: fileContent,
-      license_name: licenseName,
+      license_name: "User Supplied",
     },
   });
 
   await setPreferredBibleSource(descriptor.source_id, { successMessage: `${descriptor.name} is now your default Bible.` });
   sourceUi.uploadForm.reset();
-  sourceUi.uploadLicense.value = "User Supplied";
 }
 
 async function onConnectBibleApiSource(event) {
@@ -1911,26 +1933,23 @@ async function onConnectBibleApiSource(event) {
   const sourceName = optionalText(sourceUi.apiName.value);
   const baseUrl = optionalText(sourceUi.apiUrl.value);
   if (!sourceName || !baseUrl) {
-    showToast("Add a source name and base URL first.");
+    showToast("Add a provider name and base URL first.");
     return;
   }
 
-  const sourceId = optionalText(sourceUi.apiId.value) || buildSourceIdCandidate(sourceName);
-  const licenseName = optionalText(sourceUi.apiLicense.value) || "User Supplied";
   const descriptor = await fetchJson("/v1/sources/text/api", {
     method: "POST",
     body: {
-      source_id: sourceId,
+      source_id: buildGeneratedSourceId(sourceName),
       name: sourceName,
       base_url: baseUrl,
       api_key: optionalText(sourceUi.apiKey.value),
-      license_name: licenseName,
+      license_name: "User Supplied",
     },
   });
 
   await setPreferredBibleSource(descriptor.source_id, { successMessage: `${descriptor.name} is now your default Bible.` });
   sourceUi.apiForm.reset();
-  sourceUi.apiLicense.value = "User Supplied";
 }
 
 async function setPreferredBibleSource(sourceId, { successMessage = "Bible source updated." } = {}) {
@@ -1957,4 +1976,8 @@ function buildSourceIdCandidate(value) {
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     || "source";
+}
+
+function buildGeneratedSourceId(value) {
+  return `${buildSourceIdCandidate(value)}_${Date.now()}`;
 }
