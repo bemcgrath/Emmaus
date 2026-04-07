@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 
 from emmaus.api.deps import get_container
-from emmaus.api.schemas import AgentSessionRequest, CompleteAgentSessionRequest, NudgePreviewRequest, RespondAgentSessionRequest, StartAgentSessionRequest
+from emmaus.api.schemas import AgentSessionRequest, CompleteAgentSessionRequest, NudgePreviewRequest, RespondAgentSessionRequest, StartAgentSessionRequest, UpdateActiveSessionRequest
 from emmaus.core.bootstrap import Container
 
 
@@ -76,6 +76,20 @@ def respond_agent_session(payload: RespondAgentSessionRequest, container: Contai
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.post("/session/update")
+def update_agent_session(payload: UpdateActiveSessionRequest, container: Container = Depends(get_container)):
+    try:
+        return container.agent_service.update_active_session(
+            session_id=payload.session_id,
+            user_id=payload.user_id,
+            requested_minutes=payload.requested_minutes,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/session/complete")
 def complete_agent_session(payload: CompleteAgentSessionRequest, container: Container = Depends(get_container)):
     try:
@@ -91,3 +105,5 @@ def complete_agent_session(payload: CompleteAgentSessionRequest, container: Cont
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+

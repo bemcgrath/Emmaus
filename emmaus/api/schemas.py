@@ -131,6 +131,12 @@ class RespondAgentSessionRequest(BaseModel):
     engagement_score: int = Field(ge=1, le=5, default=3)
 
 
+class UpdateActiveSessionRequest(BaseModel):
+    session_id: str
+    user_id: str
+    requested_minutes: int = Field(ge=5, le=60)
+
+
 class CompleteAgentSessionRequest(BaseModel):
     session_id: str
     user_id: str
@@ -201,3 +207,4 @@ class UpdatePrayerItemRequest(BaseModel):
 class NudgePreviewRequest(BaseModel):
     user_id: str
     preview_at: str | None = None
+

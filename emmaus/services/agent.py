@@ -83,6 +83,59 @@ class AdaptiveStudyAgent:
         recommendation = self.personalization_service.build_recommendation(user_id)
         return self._build_session_response(session, pattern_summary, recommendation)
 
+    def update_active_session(
+        self,
+        session_id: str,
+        user_id: str,
+        requested_minutes: int,
+    ) -> AgentSessionStartResponse:
+        session = self.study_service.get_session(session_id)
+        if session.user_id != user_id:
+            raise KeyError(f"Session '{session_id}' does not belong to user '{user_id}'.")
+        if session.status != "active":
+            raise ValueError(f"Session '{session_id}' is already completed.")
+
+        if requested_minutes == session.requested_minutes:
+            pattern_summary = self.study_service.summarize_patterns(user_id)
+            recommendation = self.personalization_service.build_recommendation(user_id)
+            return self._build_session_response(session, pattern_summary, recommendation)
+
+        cache: dict[str, object] = {}
+        pattern_summary = self.study_service.summarize_patterns(user_id)
+        recommendation = self.personalization_service.build_recommendation(user_id, cache=cache)
+        style_profile = self.personalization_service.build_style_profile(user_id, recommendation=recommendation, cache=cache)
+        passage = self.text_service.get_passage(session.reference, session.text_source_id)
+        questions = self._generate_questions(
+            pattern_summary=pattern_summary,
+            guide_mode=session.guide_mode,
+            entry_point=session.entry_point,
+            recommendation=recommendation,
+            passage=passage,
+            llm_source_id=session.llm_source_id,
+            requested_minutes=requested_minutes,
+            style_profile=style_profile,
+        )
+        plan = self._generate_plan(requested_minutes, passage.text, session.guide_mode, recommendation)
+        current_question_index = min(session.current_question_index, len(questions))
+        next_question = questions[current_question_index] if current_question_index < len(questions) else None
+        latest_message = self._build_updated_session_message(
+            requested_minutes=requested_minutes,
+            session=session,
+            next_question=next_question,
+        )
+
+        updated_session = session.model_copy(
+            update={
+                "requested_minutes": requested_minutes,
+                "questions": questions,
+                "plan": plan,
+                "current_question_index": current_question_index,
+                "latest_message": latest_message,
+            }
+        )
+        updated_session = self.study_service.save_session(updated_session)
+        return self._build_session_response(updated_session, pattern_summary, recommendation)
+
     def start_session(
         self,
         user_id: str,
@@ -778,6 +831,22 @@ class AdaptiveStudyAgent:
             ),
         ]
 
+    def _build_updated_session_message(
+        self,
+        requested_minutes: int,
+        session: StudySession,
+        next_question: StudyQuestion | None,
+    ) -> str:
+        if next_question is None:
+            return (
+                f"Emmaus adjusted the rest of this session for about {requested_minutes} minutes. "
+                "You've already worked through the questions, so take a breath and finish the session with one clear response."
+            )
+        return (
+            f"Emmaus adjusted the rest of this session for about {requested_minutes} minutes. "
+            f"We'll keep moving in {session.guide_mode} mode and pick up with the next {next_question.type} question."
+        )
+
     def _build_start_message(
         self,
         display_name: str | None,
@@ -1096,4 +1165,5 @@ class AdaptiveStudyAgent:
     def _format_reference(self, reference: PassageReference) -> str:
         ending = f"-{reference.end_verse}" if reference.end_verse else ""
         return f"{reference.book} {reference.chapter}:{reference.start_verse}{ending}"
+
 

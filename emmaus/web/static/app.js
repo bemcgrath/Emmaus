@@ -1460,9 +1460,9 @@ async function saveOnboardingPreferences(updates, { successMessage, nextStep } =
   return true;
 }
 
-function setSessionEntryFormLocked(locked) {
+function setSessionEntryFormLocked(locked, { allowMinutes = false } = {}) {
   elements.entryPointInput.readOnly = locked;
-  elements.requestedMinutesInput.disabled = locked;
+  elements.requestedMinutesInput.disabled = locked && !allowMinutes;
   elements.sessionGuideMode.disabled = locked;
   elements.textSourceSelect.disabled = locked;
 }
@@ -1472,15 +1472,15 @@ function updateSessionEntryState(activeSession) {
     const session = activeSession.session;
     const sessionSourceName = getSourceById(session.text_source_id)?.name || "the Bible chosen for this session";
     elements.sessionStatusPill.textContent = "Active";
-    elements.sessionFormCopy.textContent = `You already have an active session in ${formatReference(session.reference)}. This session is still using ${sessionSourceName}. Finish it before changing your Bible or guide settings.`;
-    elements.sessionFormButton.textContent = "Resume active session";
+    elements.sessionFormCopy.textContent = `You already have an active session in ${formatReference(session.reference)}. This session will keep using ${sessionSourceName}, but you can still adjust the time you have left and Emmaus will reshape the rest of today's plan.`;
+    elements.sessionFormButton.textContent = "Adjust time and resume";
     elements.entryPointInput.value = humanizeEntryPoint(session.entry_point || state.recommendation?.recommended_entry_point || "continue where I left off");
     elements.requestedMinutesInput.value = session.requested_minutes || state.recommendation?.recommended_minutes || "";
     elements.sessionGuideMode.value = session.guide_mode || "";
     if (session.text_source_id) {
       elements.textSourceSelect.value = session.text_source_id;
     }
-    setSessionEntryFormLocked(true);
+    setSessionEntryFormLocked(true, { allowMinutes: true });
     return;
   }
 
@@ -2453,10 +2453,23 @@ async function startGuidedSession({ fromOnboarding = false } = {}) {
   }
 
   if (state.activeSessionPayload?.session?.status === "active") {
+    const activeSession = state.activeSessionPayload.session;
+    const requestedMinutes = optionalNumber(elements.requestedMinutesInput.value) || activeSession.requested_minutes;
+    const payload = await fetchJson("/v1/agent/session/update", {
+      method: "POST",
+      body: {
+        session_id: activeSession.session_id,
+        user_id: getUserId(),
+        requested_minutes: requestedMinutes,
+      },
+    });
     if (fromOnboarding) {
       completeOnboarding();
     }
-    showScreen("session");
+    state.recommendation = payload.recommendation;
+    renderSessionStart(payload, { navigate: true });
+    renderTodayPlan(state.recommendation, payload, state.actionItems, state.memorySummary);
+    showToast(requestedMinutes === activeSession.requested_minutes ? "Session resumed." : `Emmaus adjusted the rest of this session for about ${requestedMinutes} minutes.`);
     return;
   }
 
@@ -3248,6 +3261,7 @@ function buildSourceIdCandidate(value) {
 function buildGeneratedSourceId(value) {
   return `${buildSourceIdCandidate(value)}_${Date.now()}`;
 }
+
 
 
 

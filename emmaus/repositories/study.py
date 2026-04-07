@@ -750,3 +750,4 @@ class SQLiteStudyRepository:
 
     def _dt_or_none(self, value: datetime | None) -> str | None:
         return value.isoformat() if value is not None else None
+

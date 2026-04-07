@@ -233,18 +233,7 @@ class ESVPassageHelpsProvider(CommentaryProvider):
         if notes:
             return notes
 
-        fallback = self._summarize_plain_text(html_payload)
-        if not fallback:
-            fallback = "The ESV API did not return extra headings, footnotes, or cross-reference cues for this passage."
-        return [
-            CommentaryNote(
-                source_id=self.source_id,
-                title="From the ESV",
-                body=fallback,
-                reference=reference,
-                metadata={"kind": "passage_helps", "section": "summary"},
-            )
-        ]
+        return []
 
     def _format_reference(self, reference: PassageReference) -> str:
         formatted = f"{reference.book} {reference.chapter}:{reference.start_verse}"

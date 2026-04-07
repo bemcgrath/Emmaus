@@ -68,6 +68,36 @@ class StrongResponseProvider(LLMProvider):
 
 
 
+class CountingEvaluationProvider(LLMProvider):
+    source_id = "local_rules"
+
+    def __init__(self) -> None:
+        self.evaluate_calls = 0
+
+    def generate_guidance(self, prompt: str) -> str:
+        return "Let's stay close to the passage and keep moving one clear step at a time."
+
+    def evaluate_response(
+        self,
+        passage_reference: str,
+        passage_text: str,
+        question: str,
+        question_type: str,
+        response_text: str,
+    ) -> StudyResponseEvaluation:
+        self.evaluate_calls += 1
+        return StudyResponseEvaluation(
+            question_type=question_type,
+            comprehension_score=0.74,
+            application_score=0.71,
+            clarity_score=0.73,
+            recommended_focus="application",
+            encouragement="Stay specific and keep your answer anchored in what the passage is calling for.",
+            observed_patterns=["The response is moving in a healthy direction."],
+        )
+
+
+
 def build_client(tmp_path, monkeypatch):
     monkeypatch.setenv("EMMAUS_DATABASE_PATH", str(tmp_path / "emmaus.sqlite3"))
     import emmaus.main as main_module
@@ -339,6 +369,58 @@ def test_esv_session_includes_passage_helps(tmp_path, monkeypatch):
     combined = " ".join(f"{note['title']} {note['body']}" for note in payload["commentary"])
     assert "footnote" in combined.lower() or "cross-reference" in combined.lower() or "section headings" in combined.lower()
     assert "heart of god" in combined.lower() or "sent so that those who believe might live" in combined.lower()
+def test_esv_session_omits_plain_text_passage_help_fallback(tmp_path, monkeypatch):
+    def fake_text_urlopen(req, timeout=15):
+        class DummyResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                url = req.full_url if hasattr(req, "full_url") else str(req)
+                if "passage/html" in url:
+                    return json.dumps({
+                        "canonical": "John 3:16-17",
+                        "passages": [
+                            "<p>For God so loved the world, that he gave his only Son.</p>"
+                        ],
+                    }).encode("utf-8")
+                return json.dumps({
+                    "canonical": "John 3:16-17",
+                    "passages": ["For God so loved the world, that he gave his only Son."],
+                }).encode("utf-8")
+
+        return DummyResponse()
+
+    monkeypatch.setenv("EMMAUS_ESV_API_KEY", "configured-esv-key")
+    monkeypatch.setattr("emmaus.providers.text.request.urlopen", fake_text_urlopen)
+    monkeypatch.setattr("emmaus.providers.commentary.request.urlopen", fake_text_urlopen)
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "esv",
+            "reference": {
+                "book": "John",
+                "chapter": 3,
+                "start_verse": 16,
+                "end_verse": 17,
+            },
+            "requested_minutes": 15,
+        },
+    )
+    assert start.status_code == 200
+    payload = start.json()
+    assert any(note["metadata"].get("kind") == "commentary" for note in payload["commentary"])
+    assert not any(note["metadata"].get("kind") == "passage_helps" for note in payload["commentary"])
+
+
 def test_existing_esv_session_with_placeholder_commentary_uses_jfb(tmp_path, monkeypatch):
     def fake_text_urlopen(req, timeout=15):
         class DummyResponse:
@@ -767,6 +849,58 @@ def test_prayer_items_can_be_created_prayed_and_answered(tmp_path, monkeypatch):
     assert active_items.json()["items"] == []
 
 
+def test_active_session_minutes_can_be_updated(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "reference": {
+                "book": "John",
+                "chapter": 3,
+                "start_verse": 16,
+                "end_verse": 17,
+            },
+            "requested_minutes": 30,
+        },
+    )
+    assert start.status_code == 200
+    session_id = start.json()["session"]["session_id"]
+
+    first_turn = client.post(
+        "/v1/agent/session/respond",
+        json={
+            "session_id": session_id,
+            "user_id": "demo-user",
+            "response_text": "I notice God's love moves toward people before they can fix themselves.",
+            "engagement_score": 4,
+        },
+    )
+    assert first_turn.status_code == 200
+
+    updated = client.post(
+        "/v1/agent/session/update",
+        json={
+            "session_id": session_id,
+            "user_id": "demo-user",
+            "requested_minutes": 10,
+        },
+    )
+    assert updated.status_code == 200
+    payload = updated.json()
+    assert payload["session"]["requested_minutes"] == 10
+    assert payload["session"]["current_question_index"] == 1
+    assert len(payload["session"]["questions"]) == 2
+    assert payload["current_question"] is not None
+    assert [step["title"] for step in payload["session"]["plan"]] == [
+        "Read Slowly",
+        "Notice One Thing",
+        "Answer Two Focused Questions",
+        "Take One Next Step",
+    ]
+
 def test_phase_one_guided_session_flow(tmp_path, monkeypatch):
     client = build_client(tmp_path, monkeypatch)
 
@@ -1039,13 +1173,69 @@ def test_nudge_delivery_plan_is_notification_ready(tmp_path, monkeypatch):
 
 
 
+def test_personalization_shared_cache_reuses_recent_response_evaluations(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    provider = CountingEvaluationProvider()
+    client.app.state.container.llm_registry.register(provider)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "requested_minutes": 15,
+        },
+    )
+    assert start.status_code == 200
+    session_id = start.json()["session"]["session_id"]
+
+    for answer in [
+        "I notice the passage calls me to receive the word honestly before I move too quickly.",
+        "It means hearing alone is not enough; the word is meant to become obedience.",
+        "Today I need to follow through on one clear act instead of staying vague.",
+    ]:
+        turn = client.post(
+            "/v1/agent/session/respond",
+            json={
+                "session_id": session_id,
+                "user_id": "demo-user",
+                "response_text": answer,
+                "engagement_score": 4,
+            },
+        )
+        assert turn.status_code == 200
+
+    complete = client.post(
+        "/v1/agent/session/complete",
+        json={
+            "session_id": session_id,
+            "user_id": "demo-user",
+            "summary_notes": "I want to respond to Scripture with clearer follow-through.",
+        },
+    )
+    assert complete.status_code == 200
+
+    personalization = client.app.state.container.personalization_service
+    shared_cache = {}
+    provider.evaluate_calls = 0
+
+    recommendation = personalization.build_recommendation("demo-user", cache=shared_cache)
+    style_profile = personalization.build_style_profile("demo-user", cache=shared_cache)
+    preview = personalization.preview_nudge("demo-user", cache=shared_cache)
+
+    assert recommendation.focus_area in {"application", "growth", "comprehension", "consistency"}
+    assert style_profile.reason
+    assert preview.title
+    assert provider.evaluate_calls == 3
+
+
 def test_recommendations_rotate_curated_passages_after_one_is_seen(tmp_path, monkeypatch):
     client = build_client(tmp_path, monkeypatch)
     service = client.app.state.container.personalization_service
     monkeypatch.setattr(
         service,
         "build_gap_report",
-        lambda user_id: StudyGapReport(
+        lambda user_id, cache=None: StudyGapReport(
             user_id=user_id,
             comprehension_gap=0.2,
             application_gap=0.78,
@@ -1248,3 +1438,4 @@ def test_requested_minutes_changes_question_count_and_plan(tmp_path, monkeypatch
         "Work Through Three Questions",
         "Respond and Pray",
     ]
+

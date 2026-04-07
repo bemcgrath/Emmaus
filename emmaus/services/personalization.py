@@ -60,14 +60,35 @@ class PersonalizationService:
         self.text_service = text_service
         self.llm_registry = llm_registry
 
-    def build_gap_report(self, user_id: str) -> StudyGapReport:
-        profile = self.study_service.get_profile(user_id)
-        pattern_summary = self.study_service.summarize_patterns(user_id)
-        recent_evaluations = self._evaluate_recent_responses(user_id)
-        open_action_items = self.study_service.list_action_items(user_id, status="open")
-        events = self.study_service.list_events(user_id)
-        latest_mood = self.study_service.get_latest_mood_checkin(user_id)
-        memory_summary = self.study_service.summarize_spiritual_memory(user_id)
+    def build_gap_report(self, user_id: str, cache: dict[str, object] | None = None) -> StudyGapReport:
+        cache = self._resolve_cache(cache)
+        cache_key = f"gap_report:{user_id}"
+        if cache_key in cache:
+            return cache[cache_key]  # type: ignore[return-value]
+
+        profile = self._get_cached(cache, f"profile:{user_id}", lambda: self.study_service.get_profile(user_id))
+        pattern_summary = self._get_cached(
+            cache,
+            f"pattern_summary:{user_id}",
+            lambda: self.study_service.summarize_patterns(user_id),
+        )
+        recent_evaluations = self._evaluate_recent_responses(user_id, cache=cache)
+        open_action_items = self._get_cached(
+            cache,
+            f"open_action_items:{user_id}",
+            lambda: self.study_service.list_action_items(user_id, status="open"),
+        )
+        events = self._get_cached(cache, f"events:{user_id}", lambda: self.study_service.list_events(user_id))
+        latest_mood = self._get_cached(
+            cache,
+            f"latest_mood:{user_id}",
+            lambda: self.study_service.get_latest_mood_checkin(user_id),
+        )
+        memory_summary = self._get_cached(
+            cache,
+            f"memory_summary:{user_id}",
+            lambda: self.study_service.summarize_spiritual_memory(user_id),
+        )
 
         observed_patterns: list[str] = []
         focus_votes: Counter[str] = Counter()
@@ -180,7 +201,7 @@ class PersonalizationService:
             focus_area = "growth"
             self._append_pattern(observed_patterns, "Recent engagement and response quality are healthy enough to support a deeper challenge.")
 
-        return StudyGapReport(
+        report = StudyGapReport(
             user_id=user_id,
             comprehension_gap=comprehension_gap,
             application_gap=application_gap,
@@ -188,13 +209,32 @@ class PersonalizationService:
             focus_area=focus_area,
             observed_patterns=observed_patterns[:5],
         )
+        cache[cache_key] = report
+        return report
 
-    def build_recommendation(self, user_id: str) -> StudyRecommendation:
-        profile = self.study_service.get_profile(user_id)
-        pattern_summary = self.study_service.summarize_patterns(user_id)
-        gap_report = self.build_gap_report(user_id)
-        latest_mood = self.study_service.get_latest_mood_checkin(user_id)
-        memory_summary = self.study_service.summarize_spiritual_memory(user_id)
+    def build_recommendation(self, user_id: str, cache: dict[str, object] | None = None) -> StudyRecommendation:
+        cache = self._resolve_cache(cache)
+        cache_key = f"recommendation:{user_id}"
+        if cache_key in cache:
+            return cache[cache_key]  # type: ignore[return-value]
+
+        profile = self._get_cached(cache, f"profile:{user_id}", lambda: self.study_service.get_profile(user_id))
+        pattern_summary = self._get_cached(
+            cache,
+            f"pattern_summary:{user_id}",
+            lambda: self.study_service.summarize_patterns(user_id),
+        )
+        gap_report = self.build_gap_report(user_id, cache=cache)
+        latest_mood = self._get_cached(
+            cache,
+            f"latest_mood:{user_id}",
+            lambda: self.study_service.get_latest_mood_checkin(user_id),
+        )
+        memory_summary = self._get_cached(
+            cache,
+            f"memory_summary:{user_id}",
+            lambda: self.study_service.summarize_spiritual_memory(user_id),
+        )
 
         focus = gap_report.focus_area
         lead_pattern = gap_report.observed_patterns[0] if gap_report.observed_patterns else None
@@ -250,7 +290,7 @@ class PersonalizationService:
             elif latest_mood.energy == "high" and focus == "growth":
                 minutes = min(30, minutes + 5)
 
-        return StudyRecommendation(
+        recommendation = StudyRecommendation(
             user_id=user_id,
             focus_area=focus,
             recommended_reference=reference,
@@ -261,17 +301,33 @@ class PersonalizationService:
             suggested_action=suggested_action,
             gap_report=gap_report,
         )
+        cache[cache_key] = recommendation
+        return recommendation
 
     def build_style_profile(
         self,
         user_id: str,
         recommendation: StudyRecommendation | None = None,
+        cache: dict[str, object] | None = None,
     ) -> StudyStyleProfile:
-        profile = self.study_service.get_profile(user_id)
-        pattern_summary = self.study_service.summarize_patterns(user_id)
-        latest_mood = self.study_service.get_latest_mood_checkin(user_id)
-        open_action_items = self.study_service.list_action_items(user_id, status="open")
-        recommendation = recommendation or self.build_recommendation(user_id)
+        cache = self._resolve_cache(cache)
+        profile = self._get_cached(cache, f"profile:{user_id}", lambda: self.study_service.get_profile(user_id))
+        pattern_summary = self._get_cached(
+            cache,
+            f"pattern_summary:{user_id}",
+            lambda: self.study_service.summarize_patterns(user_id),
+        )
+        latest_mood = self._get_cached(
+            cache,
+            f"latest_mood:{user_id}",
+            lambda: self.study_service.get_latest_mood_checkin(user_id),
+        )
+        open_action_items = self._get_cached(
+            cache,
+            f"open_action_items:{user_id}",
+            lambda: self.study_service.list_action_items(user_id, status="open"),
+        )
+        recommendation = recommendation or self.build_recommendation(user_id, cache=cache)
 
         question_style = profile.preferences.preferred_question_style
         guidance_tone = profile.preferences.preferred_guidance_tone
@@ -311,13 +367,35 @@ class PersonalizationService:
             reason=" ".join(reasons[:2]),
         )
 
-    def preview_nudge(self, user_id: str, preview_at: datetime | None = None) -> NudgePreview:
-        recommendation = self.build_recommendation(user_id)
-        profile = self.study_service.get_profile(user_id)
-        latest_mood = self.study_service.get_latest_mood_checkin(user_id)
-        open_action_items = self.study_service.list_action_items(user_id, status="open")
-        recent_action_items = self.study_service.list_action_items(user_id)
-        memory_summary = self.study_service.summarize_spiritual_memory(user_id)
+    def preview_nudge(
+        self,
+        user_id: str,
+        preview_at: datetime | None = None,
+        cache: dict[str, object] | None = None,
+    ) -> NudgePreview:
+        cache = self._resolve_cache(cache)
+        recommendation = self.build_recommendation(user_id, cache=cache)
+        profile = self._get_cached(cache, f"profile:{user_id}", lambda: self.study_service.get_profile(user_id))
+        latest_mood = self._get_cached(
+            cache,
+            f"latest_mood:{user_id}",
+            lambda: self.study_service.get_latest_mood_checkin(user_id),
+        )
+        open_action_items = self._get_cached(
+            cache,
+            f"open_action_items:{user_id}",
+            lambda: self.study_service.list_action_items(user_id, status="open"),
+        )
+        recent_action_items = self._get_cached(
+            cache,
+            f"recent_action_items:{user_id}",
+            lambda: self.study_service.list_action_items(user_id),
+        )
+        memory_summary = self._get_cached(
+            cache,
+            f"memory_summary:{user_id}",
+            lambda: self.study_service.summarize_spiritual_memory(user_id),
+        )
         recent_follow_through = self._latest_completed_follow_through(recent_action_items)
 
         if latest_mood is not None and latest_mood.mood in {"anxious", "stressed", "discouraged"}:
@@ -399,8 +477,14 @@ class PersonalizationService:
         next_step = carry_forward_prompt or suggested_action or "Return to that same thread and ask what Christ is inviting next."
         return f"{lead} {next_step}"
 
-    def build_nudge_delivery_plan(self, user_id: str, preview_at: datetime | None = None) -> NudgeDeliveryPlan:
-        preview = self.preview_nudge(user_id, preview_at=preview_at)
+    def build_nudge_delivery_plan(
+        self,
+        user_id: str,
+        preview_at: datetime | None = None,
+        cache: dict[str, object] | None = None,
+    ) -> NudgeDeliveryPlan:
+        cache = self._resolve_cache(cache)
+        preview = self.preview_nudge(user_id, preview_at=preview_at, cache=cache)
         if preview.timing_decision == "now":
             deliver_at = preview_at or datetime.now(UTC)
             return NudgeDeliveryPlan(
@@ -438,7 +522,16 @@ class PersonalizationService:
             nudge=preview,
         )
 
-    def _evaluate_recent_responses(self, user_id: str, limit_sessions: int = 5) -> list[tuple[StudySession, SessionResponse, StudyResponseEvaluation]]:
+    def _evaluate_recent_responses(
+        self,
+        user_id: str,
+        limit_sessions: int = 5,
+        cache: dict[str, object] | None = None,
+    ) -> list[tuple[StudySession, SessionResponse, StudyResponseEvaluation]]:
+        cache = self._resolve_cache(cache)
+        cache_key = f"recent_evaluations:{user_id}:{limit_sessions}"
+        if cache_key in cache:
+            return cache[cache_key]  # type: ignore[return-value]
         evaluated_responses: list[tuple[StudySession, SessionResponse, StudyResponseEvaluation]] = []
         sessions = self.study_service.list_sessions(user_id, status="completed")[:limit_sessions]
         for session in sessions:
@@ -454,6 +547,7 @@ class PersonalizationService:
                     response_text=response.response_text,
                 )
                 evaluated_responses.append((session, response, evaluation))
+        cache[cache_key] = evaluated_responses
         return evaluated_responses
 
     def _average_score(self, evaluations: list[StudyResponseEvaluation], attribute: str) -> float:
@@ -621,3 +715,11 @@ class PersonalizationService:
     def _idempotency_key(self, user_id: str, preview: NudgePreview, deliver_at: datetime | None) -> str:
         stamp = deliver_at.isoformat() if deliver_at is not None else "none"
         return f"{user_id}:{preview.nudge_type}:{preview.recommended_entry_point}:{stamp}"
+
+    def _resolve_cache(self, cache: dict[str, object] | None) -> dict[str, object]:
+        return cache if cache is not None else {}
+
+    def _get_cached(self, cache: dict[str, object], key: str, factory):
+        if key not in cache:
+            cache[key] = factory()
+        return cache[key]
