@@ -178,6 +178,30 @@
               </div>
             </div>
             <p class="micro-copy">A quick check-in helps Emmaus shape today's study with the right tone and pace.</p>
+            <form id="mood-form" class="stack-form compact-form">
+              <div class="chip-row" id="mood-chip-row">
+                <button type="button" class="choice-chip" data-value="encouraged">Encouraged</button>
+                <button type="button" class="choice-chip" data-value="peaceful">Peaceful</button>
+                <button type="button" class="choice-chip" data-value="neutral">Neutral</button>
+                <button type="button" class="choice-chip" data-value="anxious">Anxious</button>
+                <button type="button" class="choice-chip" data-value="stressed">Stressed</button>
+                <button type="button" class="choice-chip" data-value="discouraged">Discouraged</button>
+              </div>
+              <label>
+                <span>Energy</span>
+                <select id="energy-select" name="energy">
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+              <label>
+                <span>Notes</span>
+                <textarea id="mood-notes" name="notes" rows="3" placeholder="What is weighing on you or encouraging you today?"></textarea>
+              </label>
+              <button class="secondary-button full-width" type="submit">Save check-in</button>
+              <p class="micro-copy" id="latest-mood-copy">No mood check-in saved yet.</p>
+            </form>
           </section>
 
           <section class="panel">
@@ -464,38 +488,6 @@
             </form>
           </section>
 
-          <section class="panel">
-            <div class="panel-heading">
-              <div>
-                <p class="panel-label">Check-in</p>
-                <h2>Mood and energy</h2>
-              </div>
-            </div>
-            <form id="mood-form" class="stack-form compact-form">
-              <div class="chip-row" id="mood-chip-row">
-                <button type="button" class="choice-chip" data-value="encouraged">Encouraged</button>
-                <button type="button" class="choice-chip" data-value="peaceful">Peaceful</button>
-                <button type="button" class="choice-chip" data-value="neutral">Neutral</button>
-                <button type="button" class="choice-chip" data-value="anxious">Anxious</button>
-                <button type="button" class="choice-chip" data-value="stressed">Stressed</button>
-                <button type="button" class="choice-chip" data-value="discouraged">Discouraged</button>
-              </div>
-              <label>
-                <span>Energy</span>
-                <select id="energy-select" name="energy">
-                  <option value="low">Low</option>
-                  <option value="medium" selected>Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </label>
-              <label>
-                <span>Notes</span>
-                <textarea id="mood-notes" name="notes" rows="3" placeholder="What is weighing on you or encouraging you today?"></textarea>
-              </label>
-              <button class="secondary-button full-width" type="submit">Save check-in</button>
-              <p class="micro-copy" id="latest-mood-copy">No mood check-in saved yet.</p>
-            </form>
-          </section>
         </section>
         <section class="screen" data-screen="nudges">
           <section class="panel stack-panel">

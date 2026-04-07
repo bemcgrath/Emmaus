@@ -177,6 +177,7 @@ function bindEvents() {
   elements.onboardingPanel.addEventListener("click", onOnboardingAction);
   elements.actionItemList.addEventListener("click", onActionListClick);
   elements.prayerItemList?.addEventListener("click", onPrayerListClick);
+  elements.sessionHero?.addEventListener("click", onPrayerListClick);
   elements.prayerForm?.addEventListener("submit", onSubmitPrayerItem);
   elements.moodChipRow.querySelectorAll(".choice-chip").forEach((chip) => chip.addEventListener("click", () => selectMood(chip.dataset.value)));
   elements.studyDaysRow.querySelectorAll(".choice-chip").forEach((chip) => chip.addEventListener("click", () => toggleStudyDay(chip.dataset.day)));
@@ -1631,23 +1632,27 @@ function renderCompletionSummary(memorySummary, actionItems) {
   const actionCreatedAt = anchorAction?.created_at ? formatDateTime(anchorAction.created_at) : null;
   const beforeSummary = followThroughUpdate?.beforeMemorySummary?.latest_summary || null;
   const beforePrompt = followThroughUpdate?.beforeMemorySummary?.carry_forward_prompt || null;
+  const activePrayer = state.prayerItems.find((item) => item.status === "active") || null;
   const changeSummary = beforeSummary && beforeSummary !== latestSummary
-    ? `<p class="session-context-copy"><strong>Updated thread:</strong> ${escapeHtml(beforeSummary)} -> ${escapeHtml(latestSummary)}</p>`
+    ? `<p class="session-context-copy"><strong>What changed:</strong> ${escapeHtml(latestSummary)}</p>`
     : "";
   const changePrompt = beforePrompt && beforePrompt !== carryForwardPrompt
-    ? `<p class="session-context-copy"><strong>New carry-forward:</strong> ${escapeHtml(carryForwardPrompt || "")}</p>`
+    ? `<p class="session-context-copy"><strong>Keep carrying this:</strong> ${escapeHtml(carryForwardPrompt || "")}</p>`
     : "";
   const followThroughNote = followThroughUpdate?.actionItem?.follow_up_note
     ? `<p class="session-context-copy"><strong>What landed:</strong> ${escapeHtml(followThroughUpdate.actionItem.follow_up_note)}</p>`
     : "";
+  const prayerPrompt = activePrayer
+    ? `Bring ${activePrayer.title} before Christ as you take this next step.`
+    : "Ask Christ to help this passage move from reflection into obedience.";
 
   elements.completionSummaryCard.innerHTML = `
     <div class="completion-card">
       <p><strong>${followThroughUpdate ? "Emmaus updated this thread" : "What Emmaus noticed"}</strong></p>
       <p class="today-plan-copy">${escapeHtml(latestSummary)}</p>
+      ${growthArea ? `<p><strong>Keep strengthening:</strong> ${escapeHtml(growthArea)}</p>` : ""}
+      ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Keep building here:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
       ${changeSummary}
-      ${growthArea ? `<p><strong>Area to keep strengthening:</strong> ${escapeHtml(growthArea)}</p>` : ""}
-      ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Emmaus will carry forward:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
       ${changePrompt}
       ${followThroughNote}
       <div class="inline-card">
@@ -1656,6 +1661,7 @@ function renderCompletionSummary(memorySummary, actionItems) {
         ${actionCreatedAt ? `<span class="meta-pill">Created ${escapeHtml(actionCreatedAt)}</span>` : ""}
         ${followThroughUpdate?.actionItem?.follow_up_outcome ? `<span class="meta-pill">${escapeHtml(sentenceCase(followThroughUpdate.actionItem.follow_up_outcome.replaceAll("_", " ")))}</span>` : ""}
       </div>
+      <p class="session-context-copy"><strong>Close in prayer:</strong> ${escapeHtml(prayerPrompt)}</p>
     </div>
   `;
 }
@@ -1780,6 +1786,45 @@ function buildSessionContextCard(payload) {
   `;
 }
 
+function findRelevantSessionPrayer(payload) {
+  const activePrayerItems = safeArray(state.prayerItems).filter((item) => item.status === "active");
+  if (!activePrayerItems.length) {
+    return null;
+  }
+  const sessionId = payload?.session?.session_id || null;
+  return activePrayerItems.find((item) => item.related_session_id === sessionId) || activePrayerItems[0];
+}
+
+function buildSessionPrayerCard(payload) {
+  const prayerItem = findRelevantSessionPrayer(payload);
+  if (!prayerItem) {
+    return `
+      <div class="inline-card prayer-session-card">
+        <p><strong>Pray before you continue</strong></p>
+        <p class="session-context-copy">Ask Christ to open your eyes, steady your heart, and help you obey what this passage is saying.</p>
+      </div>
+    `;
+  }
+
+  const prayedCopy = prayerItem.last_prayed_at
+    ? `Last prayed ${formatDateTime(prayerItem.last_prayed_at)}`
+    : "Not marked prayed yet";
+  const relatedCopy = prayerItem.related_session_id === payload?.session?.session_id
+    ? "This prayer began in this session."
+    : "Carry this prayer with you as you read and respond.";
+  return `
+    <div class="inline-card prayer-session-card">
+      <p><strong>Carry this prayer into the session</strong></p>
+      <p>${escapeHtml(prayerItem.title)}</p>
+      <p class="session-context-copy">${escapeHtml(truncateGuideCopy(prayerItem.detail, 160))}</p>
+      <p class="micro-copy">${escapeHtml(relatedCopy)} ${escapeHtml(prayedCopy)}</p>
+      <div class="button-row">
+        <button class="action-button" type="button" data-prayer-pray="${escapeHtml(prayerItem.prayer_item_id)}">Prayed today</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderSessionStart(payload, { navigate = true } = {}) {
   state.activeSessionPayload = payload;
   state.currentQuestion = payload.current_question || null;
@@ -1801,6 +1846,7 @@ function renderSessionStart(payload, { navigate = true } = {}) {
   elements.questionProgressPill.textContent = buildQuestionProgress(session);
   elements.sessionHero.innerHTML = `
     ${buildSessionContextCard(payload)}
+    ${buildSessionPrayerCard(payload)}
     <div class="inline-card">
       <p><strong>${escapeHtml(guideLabel)}</strong></p>
       <p>${escapeHtml(guideIntro)}</p>
@@ -1825,26 +1871,7 @@ function renderSessionStart(payload, { navigate = true } = {}) {
         .join("")
     : '<p class="empty-state">No study plan is available yet.</p>';
   const commentaryNotes = safeArray(payload.commentary);
-  const showsPassageHelps = commentaryNotes.some((note) => note?.metadata?.kind === "passage_helps");
-  elements.commentaryBlock.innerHTML = commentaryNotes.length
-    ? `
-        <div class="inline-card">
-          <p><strong>${showsPassageHelps ? "Passage helps" : "Commentary"}</strong></p>
-          <p class="micro-copy">${showsPassageHelps ? "Emmaus is showing ESV passage helps here. Full commentary can be plugged in separately." : "Emmaus can layer in modular commentary notes here as you connect them."}</p>
-        </div>
-        ${commentaryNotes
-          .map(
-            (note) => `
-              <div class="commentary-note">
-                <p><strong>${escapeHtml(note.title)}</strong></p>
-                <p>${escapeHtml(note.body)}</p>
-                ${note?.metadata?.section ? `<span class="meta-pill">${escapeHtml(sentenceCase(String(note.metadata.section).replaceAll("_", " ")))}</span>` : ""}
-              </div>
-            `,
-          )
-          .join("")}
-      `
-    : "";
+  elements.commentaryBlock.innerHTML = buildCommentaryMarkup(commentaryNotes);
 
   if (state.currentQuestion) {
     elements.currentQuestionHeading.textContent = humanizeQuestionType(state.currentQuestion.type);
@@ -1918,6 +1945,107 @@ async function loadNudgeArtifacts(previewAt = null) {
   state.nudge = preview;
   state.nudgePlan = plan;
   renderNudge(preview, plan);
+}
+
+function buildCommentaryMarkup(commentaryNotes) {
+  if (!commentaryNotes.length) {
+    return "";
+  }
+
+  const showsPassageHelps = commentaryNotes.some((note) => note?.metadata?.kind === "passage_helps");
+  if (showsPassageHelps) {
+    return buildPassageHelpsMarkup(commentaryNotes);
+  }
+
+  return `
+    <div class="inline-card commentary-overview-card">
+      <p><strong>Commentary</strong></p>
+      <p class="micro-copy">Emmaus can layer in modular commentary notes here as you connect them.</p>
+    </div>
+    ${commentaryNotes
+      .map(
+        (note) => `
+          <div class="commentary-note">
+            <p><strong>${escapeHtml(note.title)}</strong></p>
+            <p>${escapeHtml(note.body)}</p>
+            ${note?.metadata?.section ? `<span class="meta-pill">${escapeHtml(humanizeCommentarySection(note.metadata.section))}</span>` : ""}
+          </div>
+        `,
+      )
+      .join("")}
+  `;
+}
+
+function buildPassageHelpsMarkup(commentaryNotes) {
+  const sections = commentaryNotes
+    .map((note, index) => {
+      const section = String(note?.metadata?.section || "summary");
+      const items = buildCommentaryNoteItems(note.body, section);
+      const bodyMarkup = items.length > 1
+        ? `<ul class="commentary-list">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+        : `<p>${escapeHtml(items[0] || note.body)}</p>`;
+      return `
+        <details class="commentary-details" ${index === 0 ? "open" : ""}>
+          <summary>
+            <span>${escapeHtml(humanizeCommentarySection(section))}</span>
+            <span class="meta-pill">${escapeHtml(note.title)}</span>
+          </summary>
+          <div class="commentary-details-body">
+            ${bodyMarkup}
+          </div>
+        </details>
+      `;
+    })
+    .join("");
+
+  return `
+    <div class="inline-card commentary-overview-card passage-helps-overview-card">
+      <p><strong>Passage helps</strong></p>
+      <p class="micro-copy">Open only what you need as you read. Emmaus is using ESV headings, footnotes, and cross-reference cues here, not full commentary.</p>
+    </div>
+    <div class="commentary-section-stack">
+      ${sections}
+    </div>
+  `;
+}
+
+function buildCommentaryNoteItems(body, section) {
+  const cleaned = String(body || "").trim();
+  if (!cleaned) {
+    return [];
+  }
+
+  if (section === "headings") {
+    return cleaned
+      .replace(/^Section headings in the ESV:\s*/i, "")
+      .split(/\s*;\s*/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (section === "crossrefs") {
+    return cleaned
+      .replace(/^See\s+/i, "")
+      .split(/\s*;\s*/)
+      .map((item) => item.trim().replace(/[.]$/, ""))
+      .filter(Boolean);
+  }
+
+  return [cleaned];
+}
+
+function humanizeCommentarySection(value) {
+  const normalized = String(value || "summary").replaceAll("_", " ");
+  if (normalized === "crossrefs") {
+    return "Cross-references";
+  }
+  if (normalized === "footnotes") {
+    return "Footnotes";
+  }
+  if (normalized === "headings") {
+    return "Headings";
+  }
+  return sentenceCase(normalized);
 }
 
 function renderNudge(nudge, nudgePlan) {
@@ -2166,8 +2294,9 @@ async function onPrayerListClick(event) {
     method: "POST",
     body: { user_id: getUserId() },
   });
+  const destinationScreen = state.activeScreen === "session" ? "session" : "actions";
   await refreshExperience({ restoreScreen: false });
-  showScreen("actions");
+  showScreen(destinationScreen);
   showToast(prayButton ? "Prayer updated." : "Prayer marked answered.");
 }
 

@@ -135,6 +135,10 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "deriveOnboardingStep" in asset.text
     assert "renderMemorySummary" in asset.text
     assert "buildSessionContextCard" in asset.text
+    assert "buildSessionPrayerCard" in asset.text
+    assert "buildPassageHelpsMarkup" in asset.text
+    assert "commentary-details" in asset.text
+    assert "Pray before you continue" in asset.text
     assert "Why Emmaus brought you here today" in asset.text
     assert "renderCompletionSummary" in asset.text
     assert "Emmaus updated this thread" in asset.text
@@ -310,6 +314,8 @@ def test_esv_session_includes_passage_helps(tmp_path, monkeypatch):
     assert start.status_code == 200
     payload = start.json()
     assert payload["session"]["commentary_source_id"] == "esv_passage_helps"
+    assert any(note["metadata"].get("section") == "headings" for note in payload["commentary"])
+    assert any(note["metadata"].get("section") == "crossrefs" for note in payload["commentary"])
     assert payload["commentary"]
     assert any(note["metadata"].get("kind") == "passage_helps" for note in payload["commentary"])
     combined = " ".join(f"{note['title']} {note['body']}" for note in payload["commentary"])
