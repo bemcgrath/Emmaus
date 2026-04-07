@@ -138,15 +138,17 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "Keep building here:" in asset.text
     assert "Growth edge:" in asset.text
     assert "buildSessionContextCard" in asset.text
+    assert "question-transition-copy" in response.text
     assert "buildSessionPrayerCard" in asset.text
     assert "buildPassageHelpsMarkup" in asset.text
     assert "buildCommentaryNotesMarkup" in asset.text
     assert "scripture-adjacent-note" in asset.text
+    assert "commentary-handoff" in asset.text
     assert "commentary-details" in asset.text
     assert "Pray before you continue" in asset.text
-    assert "Why Emmaus brought you here today" in asset.text
+    assert "Where Emmaus is leading today" in asset.text
     assert "renderCompletionSummary" in asset.text
-    assert "Emmaus updated this thread" in asset.text
+    assert "Carry this with you today" in asset.text
     assert "lastFollowThroughUpdate" in asset.text
     assert "buildNudgeThreadContext" in asset.text
     assert "Why Emmaus is reaching out" in asset.text

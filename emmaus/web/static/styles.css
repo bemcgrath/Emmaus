@@ -110,6 +110,7 @@ button:disabled { cursor: not-allowed; opacity: 0.6; transform: none; }
 .nudge-thread-card { margin: 0.2rem 0 0.3rem; background: linear-gradient(145deg, rgba(255, 245, 226, 0.95), rgba(244, 231, 202, 0.92)); }
 .memory-theme-list { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .memory-prompt { padding: 0.9rem 1rem; border-radius: 18px; background: rgba(240, 212, 170, 0.34); color: var(--accent-deep); }
+.commentary-handoff { margin: 0.15rem 0 0.35rem; color: var(--text-muted); }
 .session-context-card { background: linear-gradient(145deg, rgba(255, 248, 232, 0.96), rgba(244, 232, 204, 0.92)); }
 .session-context-copy { color: var(--text-muted); line-height: 1.5; }
 .session-passage { line-height: 1.7; white-space: pre-wrap; }

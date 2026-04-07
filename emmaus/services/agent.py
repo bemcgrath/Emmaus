@@ -760,16 +760,16 @@ class AdaptiveStudyAgent:
             ),
             StudyPlanStep(
                 title="Use Passage Helps",
-                instruction="If you need it, use the guide or passage helps to slow down and see the structure more clearly.",
+                instruction="Use the guide or passage helps to slow down and see the structure more clearly before you answer.",
                 estimated_minutes=3,
             ),
             StudyPlanStep(
                 title="Work Through Three Questions",
-                instruction="Answer the guide's questions with honest, specific responses.",
+                instruction="Answer the guide's questions with honest, specific responses that stay close to the passage.",
                 estimated_minutes=reflect_minutes,
             ),
             StudyPlanStep(
-                title="Respond",
+                title="Respond and Pray",
                 instruction=closing_instruction,
                 estimated_minutes=4,
             ),
@@ -795,7 +795,7 @@ class AdaptiveStudyAgent:
             f"{greeting} We'll spend about {requested_minutes} minutes in {reference.book} "
             f"{reference.chapter}:{reference.start_verse}"
             f"{'-' + str(reference.end_verse) if reference.end_verse else ''}. "
-            f"This session starts from '{entry_point}' and focuses on {recommendation.focus_area}. "
+            f"We'll begin from '{entry_point}' and stay attentive to what Christ may be pressing home today. "
             f"{tone_line} {guidance}"
         )
 
@@ -826,9 +826,12 @@ class AdaptiveStudyAgent:
         if next_question is None:
             return (
                 f"{evaluation.encouragement} {tone_prefix} {guide_prefix} {focus_hint} "
-                "You've worked through the main questions for this session. Complete the session to receive your action step."
+                "You've worked through the main questions for this session. Take a breath, then finish the session so Emmaus can help you carry one response into today."
             )
-        return f"{evaluation.encouragement} {tone_prefix} {guide_prefix} {focus_hint} Next question: {next_question.question}"
+        return (
+            f"{evaluation.encouragement} {tone_prefix} {guide_prefix} {focus_hint} "
+            "Carry that forward into the next question."
+        )
 
     def _create_action_item(
         self,

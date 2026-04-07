@@ -121,6 +121,7 @@ function cacheElements() {
     sessionPlan: document.getElementById("session-plan"),
     commentaryBlock: document.getElementById("commentary-block"),
     currentQuestionHeading: document.getElementById("current-question-heading"),
+    questionTransitionCopy: document.getElementById("question-transition-copy"),
     currentQuestionCopy: document.getElementById("current-question-copy"),
     responseForm: document.getElementById("response-form"),
     responseText: document.getElementById("response-text"),
@@ -1648,7 +1649,7 @@ function renderCompletionSummary(memorySummary, actionItems) {
 
   elements.completionSummaryCard.innerHTML = `
     <div class="completion-card">
-      <p><strong>${followThroughUpdate ? "Emmaus updated this thread" : "What Emmaus noticed"}</strong></p>
+      <p><strong>${followThroughUpdate ? "Emmaus updated this thread" : "Carry this with you today"}</strong></p>
       <p class="today-plan-copy">${escapeHtml(latestSummary)}</p>
       ${growthArea ? `<p><strong>Keep strengthening:</strong> ${escapeHtml(growthArea)}</p>` : ""}
       ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Keep building here:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
@@ -1662,6 +1663,7 @@ function renderCompletionSummary(memorySummary, actionItems) {
         ${followThroughUpdate?.actionItem?.follow_up_outcome ? `<span class="meta-pill">${escapeHtml(sentenceCase(followThroughUpdate.actionItem.follow_up_outcome.replaceAll("_", " ")))}</span>` : ""}
       </div>
       <p class="session-context-copy"><strong>Close in prayer:</strong> ${escapeHtml(prayerPrompt)}</p>
+      <p class="micro-copy">Go in peace, and let this passage stay with you as you take the next faithful step.</p>
     </div>
   `;
 }
@@ -1763,12 +1765,9 @@ function syncSelectedActionItem(actionItems) {
 function buildSessionContextCard(payload) {
   const recommendation = payload.recommendation || state.recommendation;
   const memorySummary = state.memorySummary;
-  const reason = polishGuideCopy(recommendation?.reason) || "Emmaus has shaped this session around what seems most helpful for your next step with Christ.";
-  const carryForwardPrompt = memorySummary?.carry_forward_prompt || null;
   const leadingPattern = safeArray(recommendation?.gap_report?.observed_patterns)[0] || null;
-  const shortReason = truncateGuideCopy(reason, 170);
-  const shortCarryForward = carryForwardPrompt ? truncateGuideCopy(carryForwardPrompt, 120) : null;
-  const shortPattern = leadingPattern ? truncateGuideCopy(polishGuideCopy(leadingPattern), 110) : null;
+  const shortReason = buildPastoralSessionReason(recommendation, memorySummary);
+  const shortPattern = leadingPattern ? truncateGuideCopy(polishGuideCopy(leadingPattern), 100) : null;
   const meta = [
     recommendation?.focus_area ? `<span class="meta-pill">${escapeHtml(humanizeFocusArea(recommendation.focus_area))}</span>` : "",
     recommendation?.recommended_guide_mode ? `<span class="meta-pill">${escapeHtml(humanizeGuideMode(recommendation.recommended_guide_mode))}</span>` : "",
@@ -1777,10 +1776,9 @@ function buildSessionContextCard(payload) {
 
   return `
     <div class="session-context-card">
-      <p><strong>Why Emmaus brought you here today</strong></p>
+      <p><strong>Where Emmaus is leading today</strong></p>
       <p class="session-context-copy">${escapeHtml(shortReason)}</p>
-      ${shortCarryForward ? `<p class="memory-prompt"><strong>Building on:</strong> ${escapeHtml(shortCarryForward)}</p>` : ""}
-      ${shortPattern ? `<p class="session-context-copy"><strong>Today's focus:</strong> ${escapeHtml(shortPattern)}</p>` : ""}
+      ${shortPattern ? `<p class="session-context-copy"><strong>Pay attention to:</strong> ${escapeHtml(shortPattern)}</p>` : ""}
       ${meta ? `<div class="session-meta">${meta}</div>` : ""}
     </div>
   `;
@@ -1856,13 +1854,33 @@ function buildSessionLengthCopy(session, commentaryNotes) {
   return "This session gives you enough space to read carefully, use passage helps, and work through three guided questions.";
 }
 
+function buildPastoralSessionReason(recommendation, memorySummary) {
+  const focus = humanizeFocusArea(recommendation?.focus_area || "growth").toLowerCase();
+  const carryForwardPrompt = memorySummary?.carry_forward_prompt ? truncateGuideCopy(polishGuideCopy(memorySummary.carry_forward_prompt), 110) : null;
+  const reason = truncateGuideCopy(polishGuideCopy(recommendation?.reason || "Emmaus is helping you stay close to Christ in this passage."), 145);
+  if (carryForwardPrompt) {
+    return `Today Emmaus is guiding you toward ${focus}. ${carryForwardPrompt}`;
+  }
+  return reason;
+}
+
+function buildQuestionTransitionCopy(session, currentQuestion) {
+  const latestMessage = truncateGuideCopy(polishGuideCopy(session?.latest_message || ""), 150);
+  if (latestMessage) {
+    return latestMessage.replace(/^Next question:\s*/i, "");
+  }
+  if (!currentQuestion) {
+    return "You?ve worked through the questions. Finish the session and let Emmaus help you carry one response into today.";
+  }
+  return `Take this next question slowly and keep your answer close to the passage.`;
+}
+
 function renderSessionStart(payload, { navigate = true } = {}) {
   state.activeSessionPayload = payload;
   state.currentQuestion = payload.current_question || null;
 
   const session = payload.session;
   const commentaryNotes = safeArray(payload.commentary);
-  const nextQuestionLabel = state.currentQuestion ? sentenceCase(state.currentQuestion.type).toLowerCase() : "next";
   const guideIntro = state.currentQuestion
     ? `Emmaus will guide this session one question at a time to help you ${humanizeQuestionType(state.currentQuestion.type).toLowerCase()}.`
     : "Emmaus is ready to guide this session one step at a time as you read and respond.";
@@ -1907,6 +1925,7 @@ function renderSessionStart(payload, { navigate = true } = {}) {
     : '<p class="empty-state">No study plan is available yet.</p>';
   elements.commentaryBlock.innerHTML = buildCommentaryMarkup(commentaryNotes);
 
+  elements.questionTransitionCopy.textContent = buildQuestionTransitionCopy(session, state.currentQuestion);
   if (state.currentQuestion) {
     elements.currentQuestionHeading.textContent = humanizeQuestionType(state.currentQuestion.type);
     elements.currentQuestionCopy.textContent = state.currentQuestion.question;
@@ -1938,6 +1957,7 @@ function clearSessionView() {
   elements.sessionPlan.innerHTML = '<p class="empty-state">Your study plan will appear here once a session starts.</p>';
   elements.commentaryBlock.innerHTML = "";
   elements.currentQuestionHeading.textContent = "Current question";
+  elements.questionTransitionCopy.textContent = "Emmaus will guide you one step at a time.";
   elements.currentQuestionCopy.textContent = "Emmaus will place the next question here.";
   elements.responseText.value = "";
   elements.responseText.disabled = true;
@@ -2001,7 +2021,7 @@ function buildCommentaryMarkup(commentaryNotes) {
 }
 
 function buildCommentaryNotesMarkup(commentaryNotes) {
-  return commentaryNotes
+  const notesMarkup = commentaryNotes
     .map((note) => {
       const sourceName = note?.metadata?.source_name || "Commentary";
       const heading = note?.title ? `${sourceName}: ${note.title}` : sourceName;
@@ -2014,6 +2034,10 @@ function buildCommentaryNotesMarkup(commentaryNotes) {
       `;
     })
     .join("");
+  return `
+    <p class="micro-copy commentary-handoff">Before you answer, let this note help you linger over the passage a little longer.</p>
+    ${notesMarkup}
+  `;
 }
 
 function buildPassageHelpsMarkup(commentaryNotes) {
