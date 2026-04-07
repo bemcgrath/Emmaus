@@ -202,9 +202,8 @@ function initializeDefaults() {
   elements.userIdInput.value = state.userId;
   state.onboardingStep = getStoredOnboardingStep();
   selectMood(state.selectedMood);
-  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if (browserTimezone) {
-    elements.timezoneInput.placeholder = browserTimezone;
+  if (elements.timezoneInput && !elements.timezoneInput.value) {
+    elements.timezoneInput.value = "America/New_York";
   }
   renderDemoControls();
 }
@@ -1198,7 +1197,7 @@ function renderProfile(profile) {
   elements.questionStyleSelect.value = preferences.preferred_question_style || "reflective";
   elements.guidanceToneSelect.value = preferences.preferred_guidance_tone || "steady";
   elements.nudgeIntensitySelect.value = preferences.nudge_intensity || "balanced";
-  elements.timezoneInput.value = preferences.timezone || "";
+  elements.timezoneInput.value = preferences.timezone || "America/New_York";
   elements.studyWindowStartInput.value = preferences.preferred_study_window_start || "";
   elements.studyWindowEndInput.value = preferences.preferred_study_window_end || "";
   elements.quietHoursStartInput.value = preferences.quiet_hours_start || "";
@@ -1249,31 +1248,32 @@ function renderMemorySummary(memorySummary) {
     elements.memoryThreadPill.textContent = "Ready";
     elements.memoryThreadCard.innerHTML = `
       <div class="memory-card">
-        <p><strong>Emmaus will start tracking your growth here.</strong></p>
-        <p class="today-plan-copy">Complete a session and Emmaus will carry forward the themes, areas to keep strengthening, and next thread to revisit.</p>
+        <p><strong>Emmaus will start noticing your growth here.</strong></p>
+        <p class="today-plan-copy">Complete a few sessions and this card will show the themes Christ keeps bringing back into view.</p>
       </div>
     `;
     return;
   }
 
   elements.memoryThreadPill.textContent = `${memorySummary.memory_count} ${memorySummary.memory_count === 1 ? "thread" : "threads"}`;
-  const themes = safeArray(memorySummary.recurring_themes)
+  const latestSummary = truncateGuideCopy(polishGuideCopy(memorySummary.latest_summary || "Emmaus is carrying a recent thread forward."), 145);
+  const carryForwardPrompt = truncateGuideCopy(polishGuideCopy(memorySummary.carry_forward_prompt || ""), 120);
+  const primaryTheme = safeArray(memorySummary.recurring_themes)[0] || null;
+  const secondaryTheme = safeArray(memorySummary.recurring_themes)[1] || null;
+  const mainGrowthArea = safeArray(memorySummary.growth_areas)[0] || null;
+  const latestReference = safeArray(memorySummary.recent_references)[0] || null;
+  const themeChips = [primaryTheme, secondaryTheme]
+    .filter(Boolean)
     .map((theme) => `<span class="meta-pill">${escapeHtml(theme)}</span>`)
-    .join("");
-  const growthAreas = safeArray(memorySummary.growth_areas)
-    .map((area) => `<span class="meta-pill">${escapeHtml(area)}</span>`)
-    .join("");
-  const references = safeArray(memorySummary.recent_references)
-    .map((reference) => `<span class="meta-pill">${escapeHtml(reference)}</span>`)
     .join("");
 
   elements.memoryThreadCard.innerHTML = `
-    <div class="memory-card">
-      <p><strong>${escapeHtml(memorySummary.latest_summary || "Emmaus is carrying a recent thread forward.")}</strong></p>
-      ${themes ? `<div class="memory-theme-list">${themes}</div>` : ""}
-      ${growthAreas ? `<p><strong>Areas to keep strengthening:</strong> ${growthAreas}</p>` : ""}
-      ${memorySummary.carry_forward_prompt ? `<p class="memory-prompt">${escapeHtml(memorySummary.carry_forward_prompt)}</p>` : ""}
-      ${references ? `<div class="today-plan-actions">${references}</div>` : ""}
+    <div class="memory-card compact-memory-card">
+      <p><strong>${escapeHtml(latestSummary)}</strong></p>
+      ${themeChips ? `<div class="memory-theme-list">${themeChips}</div>` : ""}
+      ${mainGrowthArea ? `<p class="today-plan-copy"><strong>Growth edge:</strong> ${escapeHtml(mainGrowthArea)}</p>` : ""}
+      ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Keep building here:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
+      ${latestReference ? `<p class="micro-copy">Recent thread: ${escapeHtml(latestReference)}</p>` : ""}
     </div>
   `;
 }
@@ -2359,7 +2359,7 @@ async function onSaveIdentity(event) {
     preferred_guidance_tone: optionalText(elements.guidanceToneSelect.value),
     preferred_translation_source_id: optionalText(elements.preferredSourceSelect.value),
     nudge_intensity: optionalText(elements.nudgeIntensitySelect.value),
-    timezone: optionalText(elements.timezoneInput.value) || Intl.DateTimeFormat().resolvedOptions().timeZone || null,
+    timezone: optionalText(elements.timezoneInput.value) || "America/New_York",
     preferred_study_days: state.selectedStudyDays,
     preferred_study_window_start: optionalText(elements.studyWindowStartInput.value),
     preferred_study_window_end: optionalText(elements.studyWindowEndInput.value),

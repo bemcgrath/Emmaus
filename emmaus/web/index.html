@@ -450,7 +450,16 @@
               </label>
               <label>
                 <span>Timezone</span>
-                <input id="timezone-input" name="timezone" type="text" placeholder="America/New_York" />
+                <select id="timezone-input" name="timezone">
+                  <option value="America/New_York">Eastern Time (EST/EDT)</option>
+                  <option value="America/Chicago">Central Time (CST/CDT)</option>
+                  <option value="America/Denver">Mountain Time (MST/MDT)</option>
+                  <option value="America/Los_Angeles">Pacific Time (PST/PDT)</option>
+                  <option value="America/Phoenix">Arizona Time (MST)</option>
+                  <option value="America/Anchorage">Alaska Time (AKST/AKDT)</option>
+                  <option value="Pacific/Honolulu">Hawaii Time (HST)</option>
+                  <option value="UTC">UTC</option>
+                </select>
               </label>
               <div class="stack-form compact-form">
                 <p class="panel-label">Preferred study days</p>

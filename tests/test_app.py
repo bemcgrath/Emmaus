@@ -111,6 +111,7 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "follow-up-target-copy" in response.text
     assert "question-style-select" in response.text
     assert "guidance-tone-select" in response.text
+    assert '<option value="America/New_York">Eastern Time (EST/EDT)</option>' in response.text
     assert "prayer-item-list" in response.text
     assert "prayer-form" in response.text
     assert "nudge-plan-card" in response.text
@@ -134,6 +135,8 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "buildPassageMarkup" in asset.text
     assert "deriveOnboardingStep" in asset.text
     assert "renderMemorySummary" in asset.text
+    assert "Keep building here:" in asset.text
+    assert "Growth edge:" in asset.text
     assert "buildSessionContextCard" in asset.text
     assert "buildSessionPrayerCard" in asset.text
     assert "buildPassageHelpsMarkup" in asset.text
@@ -333,6 +336,60 @@ def test_esv_session_includes_passage_helps(tmp_path, monkeypatch):
     combined = " ".join(f"{note['title']} {note['body']}" for note in payload["commentary"])
     assert "footnote" in combined.lower() or "cross-reference" in combined.lower() or "section headings" in combined.lower()
     assert "heart of god" in combined.lower() or "sent so that those who believe might live" in combined.lower()
+def test_existing_esv_session_with_placeholder_commentary_uses_jfb(tmp_path, monkeypatch):
+    def fake_text_urlopen(req, timeout=15):
+        class DummyResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                url = req.full_url if hasattr(req, "full_url") else str(req)
+                if "passage/html" in url:
+                    return json.dumps({
+                        "canonical": "John 3:16-17",
+                        "passages": [
+                            '<h2>The New Birth</h2><p>For God so loved the world.</p><div class="crossrefs"><p>See Rom. 5:8.</p></div>'
+                        ],
+                    }).encode("utf-8")
+                return json.dumps({
+                    "canonical": "John 3:16-17",
+                    "passages": ["For God so loved the world, that he gave his only Son."],
+                }).encode("utf-8")
+
+        return DummyResponse()
+
+    monkeypatch.setenv("EMMAUS_ESV_API_KEY", "configured-esv-key")
+    monkeypatch.setattr("emmaus.providers.text.request.urlopen", fake_text_urlopen)
+    monkeypatch.setattr("emmaus.providers.commentary.request.urlopen", fake_text_urlopen)
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "esv",
+            "commentary_source_id": "notes_placeholder",
+            "reference": {
+                "book": "John",
+                "chapter": 3,
+                "start_verse": 16,
+                "end_verse": 17,
+            },
+            "requested_minutes": 15,
+        },
+    )
+    assert start.status_code == 200
+    payload = start.json()
+    assert payload["session"]["commentary_source_id"] == "notes_placeholder"
+    assert any(note["source_id"] == "jfb_commentary" for note in payload["commentary"])
+    assert any(note["metadata"].get("kind") == "passage_helps" for note in payload["commentary"])
+
+
 def test_configured_esv_becomes_effective_default_source(tmp_path, monkeypatch):
     def fake_urlopen(req, timeout=15):
         class DummyResponse:

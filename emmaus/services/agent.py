@@ -345,6 +345,12 @@ class AdaptiveStudyAgent:
     def _collect_commentary(self, session: StudySession) -> list[CommentaryNote]:
         notes: list[CommentaryNote] = []
         commentary_source = session.commentary_source_id or self.default_commentary_source
+        if (
+            commentary_source == "notes_placeholder"
+            and session.text_source_id == "esv"
+            and self.commentary_registry.has("jfb_commentary")
+        ):
+            commentary_source = "jfb_commentary"
         if self.commentary_registry.has(commentary_source):
             notes.extend(self.commentary_registry.get(commentary_source).get_commentary(session.reference))
         if session.text_source_id == "esv" and self.commentary_registry.has("esv_passage_helps") and commentary_source != "esv_passage_helps":
