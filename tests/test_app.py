@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from emmaus.domain.models import StudyGapReport, StudyResponseEvaluation
 from emmaus.providers.llm import LLMProvider
+from emmaus.services.personalization import CURATED_PASSAGE_BANK
 
 
 class WeakComprehensionProvider(LLMProvider):
@@ -1272,7 +1273,7 @@ def test_recommendations_rotate_curated_passages_after_one_is_seen(tmp_path, mon
     second_payload = second.json()
     assert second_payload["focus_area"] == "application"
     assert second_payload["recommended_reference"] != first_payload["recommended_reference"]
-    assert second_payload["recommended_reference"]["book"] in {"Micah", "Colossians"}
+    assert second_payload["recommended_reference"]["book"] in {"Micah", "Colossians", "Luke", "Romans", "Ephesians", "Philippians", "1 John"}
 
 
 def test_mood_shapes_recommendation_and_nudge_preview(tmp_path, monkeypatch):
@@ -1441,3 +1442,8 @@ def test_requested_minutes_changes_question_count_and_plan(tmp_path, monkeypatch
     ]
 
 
+
+
+def test_curated_passage_bank_is_expanded_for_each_focus():
+    assert set(CURATED_PASSAGE_BANK) == {"consistency", "application", "comprehension", "growth"}
+    assert all(len(bank) >= 8 for bank in CURATED_PASSAGE_BANK.values())

@@ -20,6 +20,22 @@
         "1": "The LORD is my shepherd; I shall not want.",
         "2": "He maketh me to lie down in green pastures: he leadeth me beside the still waters.",
         "3": "He restoreth my soul: he leadeth me in the paths of righteousness for his name's sake."
+      },
+      "27": {
+        "13": "I had fainted, unless I had believed to see the goodness of the LORD in the land of the living.",
+        "14": "Wait on the LORD: be of good courage, and he shall strengthen thine heart: wait, I say, on the LORD."
+      },
+      "1": {
+        "1": "Blessed is the man that walketh not in the counsel of the ungodly, nor standeth in the way of sinners, nor sitteth in the seat of the scornful.",
+        "2": "But his delight is in the law of the LORD; and in his law doth he meditate day and night.",
+        "3": "And he shall be like a tree planted by the rivers of water, that bringeth forth his fruit in his season; his leaf also shall not wither; and whatsoever he doeth shall prosper."
+      },
+      "119": {
+        "33": "Teach me, O LORD, the way of thy statutes; and I shall keep it unto the end.",
+        "34": "Give me understanding, and I shall keep thy law; yea, I shall observe it with my whole heart.",
+        "35": "Make me to go in the path of thy commandments; for therein do I delight.",
+        "36": "Incline my heart unto thy testimonies, and not to covetousness.",
+        "37": "Turn away mine eyes from beholding vanity; and quicken thou me in thy way."
       }
     },
     "Matthew": {
@@ -62,6 +78,10 @@
         "15": "And let the peace of God rule in your hearts, to the which also ye are called in one body; and be ye thankful.",
         "16": "Let the word of Christ dwell in you richly in all wisdom; teaching and admonishing one another in psalms and hymns and spiritual songs, singing with grace in your hearts to the Lord.",
         "17": "And whatsoever ye do in word or deed, do all in the name of the Lord Jesus, giving thanks to God and the Father by him."
+      },
+      "2": {
+        "6": "As ye have therefore received Christ Jesus the Lord, so walk ye in him:",
+        "7": "Rooted and built up in him, and stablished in the faith, as ye have been taught, abounding therein with thanksgiving."
       }
     },
     "Luke": {
@@ -74,6 +94,12 @@
         "25": "Then he said unto them, O fools, and slow of heart to believe all that the prophets have spoken:",
         "26": "Ought not Christ to have suffered these things, and to enter into his glory?",
         "27": "And beginning at Moses and all the prophets, he expounded unto them in all the scriptures the things concerning himself."
+      },
+      "6": {
+        "46": "And why call ye me, Lord, Lord, and do not the things which I say?",
+        "47": "Whosoever cometh to me, and heareth my sayings, and doeth them, I will shew you to whom he is like:",
+        "48": "He is like a man which built an house, and digged deep, and laid the foundation on a rock: and when the flood arose, the stream beat vehemently upon that house, and could not shake it: for it was founded upon a rock.",
+        "49": "But he that heareth, and doeth not, is like a man that without a foundation built an house upon the earth; against which the stream did beat vehemently, and immediately it fell; and the ruin of that house was great."
       }
     },
     "Philippians": {
@@ -86,6 +112,124 @@
         "12": "Not as though I had already attained, either were already perfect: but I follow after, if that I may apprehend that for which also I am apprehended of Christ Jesus.",
         "13": "Brethren, I count not myself to have apprehended: but this one thing I do, forgetting those things which are behind, and reaching forth unto those things which are before,",
         "14": "I press toward the mark for the prize of the high calling of God in Christ Jesus."
+      },
+      "2": {
+        "3": "Let nothing be done through strife or vainglory; but in lowliness of mind let each esteem other better than themselves.",
+        "4": "Look not every man on his own things, but every man also on the things of others.",
+        "5": "Let this mind be in you, which was also in Christ Jesus:"
+      }
+    },
+    "Isaiah": {
+      "40": {
+        "29": "He giveth power to the faint; and to them that have no might he increaseth strength.",
+        "30": "Even the youths shall faint and be weary, and the young men shall utterly fall:",
+        "31": "But they that wait upon the LORD shall renew their strength; they shall mount up with wings as eagles; they shall run, and not be weary; and they shall walk, and not faint."
+      }
+    },
+    "Lamentations": {
+      "3": {
+        "22": "It is of the LORD's mercies that we are not consumed, because his compassions fail not.",
+        "23": "They are new every morning: great is thy faithfulness.",
+        "24": "The LORD is my portion, saith my soul; therefore will I hope in him."
+      }
+    },
+    "Galatians": {
+      "6": {
+        "9": "And let us not be weary in well doing: for in due season we shall reap, if we faint not.",
+        "10": "As we have therefore opportunity, let us do good unto all men, especially unto them who are of the household of faith."
+      },
+      "5": {
+        "22": "But the fruit of the Spirit is love, joy, peace, longsuffering, gentleness, goodness, faith,",
+        "23": "Meekness, temperance: against such there is no law.",
+        "24": "And they that are Christ's have crucified the flesh with the affections and lusts.",
+        "25": "If we live in the Spirit, let us also walk in the Spirit."
+      }
+    },
+    "Romans": {
+      "12": {
+        "9": "Let love be without dissimulation. Abhor that which is evil; cleave to that which is good.",
+        "10": "Be kindly affectioned one to another with brotherly love; in honour preferring one another;",
+        "11": "Not slothful in business; fervent in spirit; serving the Lord;",
+        "12": "Rejoicing in hope; patient in tribulation; continuing instant in prayer;",
+        "13": "Distributing to the necessity of saints; given to hospitality."
+      },
+      "8": {
+        "31": "What shall we then say to these things? If God be for us, who can be against us?",
+        "32": "He that spared not his own Son, but delivered him up for us all, how shall he not with him also freely give us all things?",
+        "33": "Who shall lay any thing to the charge of God's elect? It is God that justifieth.",
+        "34": "Who is he that condemneth? It is Christ that died, yea rather, that is risen again, who is even at the right hand of God, who also maketh intercession for us.",
+        "35": "Who shall separate us from the love of Christ? shall tribulation, or distress, or persecution, or famine, or nakedness, or peril, or sword?",
+        "36": "As it is written, For thy sake we are killed all the day long; we are accounted as sheep for the slaughter.",
+        "37": "Nay, in all these things we are more than conquerors through him that loved us.",
+        "38": "For I am persuaded, that neither death, nor life, nor angels, nor principalities, nor powers, nor things present, nor things to come,",
+        "39": "Nor height, nor depth, nor any other creature, shall be able to separate us from the love of God, which is in Christ Jesus our Lord."
+      }
+    },
+    "Ephesians": {
+      "4": {
+        "29": "Let no corrupt communication proceed out of your mouth, but that which is good to the use of edifying, that it may minister grace unto the hearers.",
+        "30": "And grieve not the holy Spirit of God, whereby ye are sealed unto the day of redemption.",
+        "31": "Let all bitterness, and wrath, and anger, and clamour, and evil speaking, be put away from you, with all malice:",
+        "32": "And be ye kind one to another, tenderhearted, forgiving one another, even as God for Christ's sake hath forgiven you."
+      },
+      "3": {
+        "16": "That he would grant you, according to the riches of his glory, to be strengthened with might by his Spirit in the inner man;",
+        "17": "That Christ may dwell in your hearts by faith; that ye, being rooted and grounded in love,",
+        "18": "May be able to comprehend with all saints what is the breadth, and length, and depth, and height;",
+        "19": "And to know the love of Christ, which passeth knowledge, that ye might be filled with all the fulness of God."
+      }
+    },
+    "1 John": {
+      "3": {
+        "16": "Hereby perceive we the love of God, because he laid down his life for us: and we ought to lay down our lives for the brethren.",
+        "17": "But whoso hath this world's good, and seeth his brother have need, and shutteth up his bowels of compassion from him, how dwelleth the love of God in him?",
+        "18": "My little children, let us not love in word, neither in tongue; but in deed and in truth."
+      }
+    },
+    "Nehemiah": {
+      "8": {
+        "8": "So they read in the book in the law of God distinctly, and gave the sense, and caused them to understand the reading.",
+        "9": "And Nehemiah, which is the Tirshatha, and Ezra the priest the scribe, and the Levites that taught the people, said unto all the people, This day is holy unto the LORD your God; mourn not, nor weep. For all the people wept, when they heard the words of the law.",
+        "10": "Then he said unto them, Go your way, eat the fat, and drink the sweet, and send portions unto them for whom nothing is prepared: for this day is holy unto our Lord: neither be ye sorry; for the joy of the LORD is your strength."
+      }
+    },
+    "Mark": {
+      "4": {
+        "35": "And the same day, when the even was come, he saith unto them, Let us pass over unto the other side.",
+        "36": "And when they had sent away the multitude, they took him even as he was in the ship. And there were also with him other little ships.",
+        "37": "And there arose a great storm of wind, and the waves beat into the ship, so that it was now full.",
+        "38": "And he was in the hinder part of the ship, asleep on a pillow: and they awake him, and say unto him, Master, carest thou not that we perish?",
+        "39": "And he arose, and rebuked the wind, and said unto the sea, Peace, be still. And the wind ceased, and there was a great calm.",
+        "40": "And he said unto them, Why are ye so fearful? how is it that ye have no faith?",
+        "41": "And they feared exceedingly, and said one to another, What manner of man is this, that even the wind and the sea obey him?"
+      }
+    },
+    "Acts": {
+      "8": {
+        "30": "And Philip ran thither to him, and heard him read the prophet Esaias, and said, Understandest thou what thou readest?",
+        "31": "And he said, How can I, except some man should guide me? And he desired Philip that he would come up and sit with him.",
+        "32": "The place of the scripture which he read was this, He was led as a sheep to the slaughter; and like a lamb dumb before his shearer, so opened he not his mouth:",
+        "33": "In his humiliation his judgment was taken away: and who shall declare his generation? for his life is taken from the earth.",
+        "34": "And the eunuch answered Philip, and said, I pray thee, of whom speaketh the prophet this? of himself, or of some other man?",
+        "35": "Then Philip opened his mouth, and began at the same scripture, and preached unto him Jesus."
+      }
+    },
+    "2 Timothy": {
+      "3": {
+        "14": "But continue thou in the things which thou hast learned and hast been assured of, knowing of whom thou hast learned them;",
+        "15": "And that from a child thou hast known the holy scriptures, which are able to make thee wise unto salvation through faith which is in Christ Jesus.",
+        "16": "All scripture is given by inspiration of God, and is profitable for doctrine, for reproof, for correction, for instruction in righteousness:",
+        "17": "That the man of God may be perfect, throughly furnished unto all good works."
+      }
+    },
+    "2 Peter": {
+      "1": {
+        "3": "According as his divine power hath given unto us all things that pertain unto life and godliness, through the knowledge of him that hath called us to glory and virtue:",
+        "4": "Whereby are given unto us exceeding great and precious promises: that by these ye might be partakers of the divine nature, having escaped the corruption that is in the world through lust.",
+        "5": "And beside this, giving all diligence, add to your faith virtue; and to virtue knowledge;",
+        "6": "And to knowledge temperance; and to temperance patience; and to patience godliness;",
+        "7": "And to godliness brotherly kindness; and to brotherly kindness charity.",
+        "8": "For if these things be in you, and abound, they make you that ye shall neither be barren nor unfruitful in the knowledge of our Lord Jesus Christ."
       }
     }
   }
