@@ -1825,15 +1825,48 @@ function buildSessionPrayerCard(payload) {
   `;
 }
 
+function sessionLengthLabel(minutes) {
+  if (minutes <= 12) {
+    return "Focused session";
+  }
+  if (minutes >= 23) {
+    return "Deeper session";
+  }
+  return "Balanced session";
+}
+
+function buildSessionLengthCopy(session, commentaryNotes) {
+  const minutes = Number(session?.requested_minutes || 0);
+  const hasPassageHelps = commentaryNotes.some((note) => note?.metadata?.kind === "passage_helps");
+  const hasCommentary = commentaryNotes.some((note) => note?.metadata?.kind === "commentary");
+  if (minutes <= 12) {
+    return "This shorter session keeps you close to the passage with two focused questions and one clear next step.";
+  }
+  if (minutes >= 23) {
+    const extras = [];
+    if (hasCommentary) {
+      extras.push("commentary");
+    }
+    if (hasPassageHelps) {
+      extras.push("passage helps");
+    }
+    const extrasCopy = extras.length ? `, with space to use ${extras.join(" and ")},` : "";
+    return `This longer session gives you room for four questions${extrasCopy} and a more prayerful response at the end.`;
+  }
+  return "This session gives you enough space to read carefully, use passage helps, and work through three guided questions.";
+}
+
 function renderSessionStart(payload, { navigate = true } = {}) {
   state.activeSessionPayload = payload;
   state.currentQuestion = payload.current_question || null;
 
   const session = payload.session;
+  const commentaryNotes = safeArray(payload.commentary);
   const nextQuestionLabel = state.currentQuestion ? sentenceCase(state.currentQuestion.type).toLowerCase() : "next";
   const guideIntro = state.currentQuestion
     ? `Emmaus will guide this session one question at a time to help you ${humanizeQuestionType(state.currentQuestion.type).toLowerCase()}.`
     : "Emmaus is ready to guide this session one step at a time as you read and respond.";
+  const lengthIntro = buildSessionLengthCopy(session, commentaryNotes);
   const guideLabelMap = {
     guide: "Guided study",
     peer: "Conversation guide",
@@ -1850,8 +1883,10 @@ function renderSessionStart(payload, { navigate = true } = {}) {
     <div class="inline-card">
       <p><strong>${escapeHtml(guideLabel)}</strong></p>
       <p>${escapeHtml(guideIntro)}</p>
+      <p class="session-context-copy">${escapeHtml(lengthIntro)}</p>
       <div class="session-meta">
         <span class="meta-pill">${escapeHtml(String(session.requested_minutes))} min</span>
+        <span class="meta-pill">${escapeHtml(sessionLengthLabel(session.requested_minutes))}</span>
         <span class="meta-pill">${escapeHtml(humanizeEntryPoint(session.entry_point))}</span>
       </div>
     </div>
@@ -1870,7 +1905,6 @@ function renderSessionStart(payload, { navigate = true } = {}) {
         )
         .join("")
     : '<p class="empty-state">No study plan is available yet.</p>';
-  const commentaryNotes = safeArray(payload.commentary);
   elements.commentaryBlock.innerHTML = buildCommentaryMarkup(commentaryNotes);
 
   if (state.currentQuestion) {
@@ -1967,26 +2001,19 @@ function buildCommentaryMarkup(commentaryNotes) {
 }
 
 function buildCommentaryNotesMarkup(commentaryNotes) {
-  return `
-    <div class="inline-card commentary-overview-card">
-      <p><strong>Commentary</strong></p>
-      <p class="micro-copy">Emmaus is layering in a public-domain commentary alongside the passage so you can slow down without leaving the study flow.</p>
-    </div>
-    ${commentaryNotes
-      .map(
-        (note) => `
-          <div class="commentary-note">
-            <p><strong>${escapeHtml(note.title)}</strong></p>
-            <p>${escapeHtml(note.body)}</p>
-            <div class="chip-row">
-              ${note?.metadata?.source_name ? `<span class="meta-pill">${escapeHtml(note.metadata.source_name)}</span>` : ""}
-              ${note?.metadata?.section ? `<span class="meta-pill">${escapeHtml(humanizeCommentarySection(note.metadata.section))}</span>` : ""}
-            </div>
-          </div>
-        `,
-      )
-      .join("")}
-  `;
+  return commentaryNotes
+    .map((note) => {
+      const sourceName = note?.metadata?.source_name || "Commentary";
+      const heading = note?.title ? `${sourceName}: ${note.title}` : sourceName;
+      return `
+        <div class="commentary-note scripture-adjacent-note">
+          <p><strong>${escapeHtml(heading)}</strong></p>
+          <p>${escapeHtml(note.body)}</p>
+          ${note?.metadata?.source_name ? `<span class="meta-pill">${escapeHtml(note.metadata.source_name)}</span>` : ""}
+        </div>
+      `;
+    })
+    .join("");
 }
 
 function buildPassageHelpsMarkup(commentaryNotes) {

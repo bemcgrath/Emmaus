@@ -141,7 +141,7 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "buildSessionPrayerCard" in asset.text
     assert "buildPassageHelpsMarkup" in asset.text
     assert "buildCommentaryNotesMarkup" in asset.text
-    assert "public-domain commentary" in asset.text
+    assert "scripture-adjacent-note" in asset.text
     assert "commentary-details" in asset.text
     assert "Pray before you continue" in asset.text
     assert "Why Emmaus brought you here today" in asset.text
@@ -1150,6 +1150,7 @@ def test_requested_minutes_changes_question_count_and_plan(tmp_path, monkeypatch
         "Answer Two Focused Questions",
         "Take One Next Step",
     ]
+    assert all(step["title"] != "Use Passage Helps" for step in brief_payload["session"]["plan"])
 
     deep = client.post(
         "/v1/agent/session/start",
@@ -1173,5 +1174,29 @@ def test_requested_minutes_changes_question_count_and_plan(tmp_path, monkeypatch
         "Trace the Passage",
         "Work Through Four Questions",
         "Revisit with Passage Helps",
+        "Respond and Pray",
+    ]
+
+    standard = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "standard-user",
+            "text_source_id": "sample_local",
+            "reference": {
+                "book": "John",
+                "chapter": 3,
+                "start_verse": 16,
+                "end_verse": 17,
+            },
+            "requested_minutes": 20,
+        },
+    )
+    assert standard.status_code == 200
+    standard_payload = standard.json()
+    assert len(standard_payload["session"]["questions"]) == 3
+    assert [step["title"] for step in standard_payload["session"]["plan"]] == [
+        "Read Slowly",
+        "Use Passage Helps",
+        "Work Through Three Questions",
         "Respond and Pray",
     ]

@@ -114,7 +114,8 @@ button:disabled { cursor: not-allowed; opacity: 0.6; transform: none; }
 .session-context-copy { color: var(--text-muted); line-height: 1.5; }
 .session-passage { line-height: 1.7; white-space: pre-wrap; }
 .passage-notice { margin-top: 0.9rem; font-size: 0.82rem; line-height: 1.45; color: var(--text-muted); }
-.commentary-note { border-left: 4px solid var(--accent); padding-left: 0.9rem; }
+.commentary-note { border-left: 4px solid var(--accent); padding-left: 0.9rem; background: rgba(255, 250, 241, 0.96); border-radius: 0 18px 18px 0; padding-top: 0.9rem; padding-bottom: 0.9rem; display: grid; gap: 0.7rem; }
+.scripture-adjacent-note { margin-top: 0.35rem; }
 .commentary-overview-card { gap: 0.55rem; }
 .commentary-section-stack { display: grid; gap: 0.7rem; }
 .commentary-details {
