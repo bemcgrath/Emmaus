@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "Sample KJV Excerpt",
   "copyright": "Public Domain sample excerpt for local development only.",
   "books": {
@@ -6,6 +6,13 @@
       "3": {
         "16": "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.",
         "17": "For God sent not his Son into the world to condemn the world; but that the world through him might be saved."
+      },
+      "15": {
+        "1": "I am the true vine, and my Father is the husbandman.",
+        "2": "Every branch in me that beareth not fruit he taketh away: and every branch that beareth fruit, he purgeth it, that it may bring forth more fruit.",
+        "3": "Now ye are clean through the word which I have spoken unto you.",
+        "4": "Abide in me, and I in you. As the branch cannot bear fruit of itself, except it abide in the vine; no more can ye, except ye abide in me.",
+        "5": "I am the vine, ye are the branches: He that abideth in me, and I in him, the same bringeth forth much fruit: for without me ye can do nothing."
       }
     },
     "Psalm": {
@@ -13,6 +20,72 @@
         "1": "The LORD is my shepherd; I shall not want.",
         "2": "He maketh me to lie down in green pastures: he leadeth me beside the still waters.",
         "3": "He restoreth my soul: he leadeth me in the paths of righteousness for his name's sake."
+      }
+    },
+    "Matthew": {
+      "11": {
+        "28": "Come unto me, all ye that labour and are heavy laden, and I will give you rest.",
+        "29": "Take my yoke upon you, and learn of me; for I am meek and lowly in heart: and ye shall find rest unto your souls.",
+        "30": "For my yoke is easy, and my burden is light."
+      }
+    },
+    "Hebrews": {
+      "4": {
+        "14": "Seeing then that we have a great high priest, that is passed into the heavens, Jesus the Son of God, let us hold fast our profession.",
+        "15": "For we have not an high priest which cannot be touched with the feeling of our infirmities; but was in all points tempted like as we are, yet without sin.",
+        "16": "Let us therefore come boldly unto the throne of grace, that we may obtain mercy, and find grace to help in time of need."
+      },
+      "12": {
+        "1": "Wherefore seeing we also are compassed about with so great a cloud of witnesses, let us lay aside every weight, and the sin which doth so easily beset us, and let us run with patience the race that is set before us,",
+        "2": "Looking unto Jesus the author and finisher of our faith; who for the joy that was set before him endured the cross, despising the shame, and is set down at the right hand of the throne of God.",
+        "3": "For consider him that endured such contradiction of sinners against himself, lest ye be wearied and faint in your minds."
+      }
+    },
+    "James": {
+      "1": {
+        "22": "But be ye doers of the word, and not hearers only, deceiving your own selves.",
+        "23": "For if any be a hearer of the word, and not a doer, he is like unto a man beholding his natural face in a glass:",
+        "24": "For he beholdeth himself, and goeth his way, and straightway forgetteth what manner of man he was.",
+        "25": "But whoso looketh into the perfect law of liberty, and continueth therein, he being not a forgetful hearer, but a doer of the work, this man shall be blessed in his deed."
+      }
+    },
+    "Micah": {
+      "6": {
+        "8": "He hath shewed thee, O man, what is good; and what doth the LORD require of thee, but to do justly, and to love mercy, and to walk humbly with thy God?"
+      }
+    },
+    "Colossians": {
+      "3": {
+        "12": "Put on therefore, as the elect of God, holy and beloved, bowels of mercies, kindness, humbleness of mind, meekness, longsuffering;",
+        "13": "Forbearing one another, and forgiving one another, if any man have a quarrel against any: even as Christ forgave you, so also do ye.",
+        "14": "And above all these things put on charity, which is the bond of perfectness.",
+        "15": "And let the peace of God rule in your hearts, to the which also ye are called in one body; and be ye thankful.",
+        "16": "Let the word of Christ dwell in you richly in all wisdom; teaching and admonishing one another in psalms and hymns and spiritual songs, singing with grace in your hearts to the Lord.",
+        "17": "And whatsoever ye do in word or deed, do all in the name of the Lord Jesus, giving thanks to God and the Father by him."
+      }
+    },
+    "Luke": {
+      "24": {
+        "13": "And, behold, two of them went that same day to a village called Emmaus, which was from Jerusalem about threescore furlongs.",
+        "14": "And they talked together of all these things which had happened.",
+        "15": "And it came to pass, that, while they communed together and reasoned, Jesus himself drew near, and went with them.",
+        "16": "But their eyes were holden that they should not know him.",
+        "17": "And he said unto them, What manner of communications are these that ye have one to another, as ye walk, and are sad?",
+        "25": "Then he said unto them, O fools, and slow of heart to believe all that the prophets have spoken:",
+        "26": "Ought not Christ to have suffered these things, and to enter into his glory?",
+        "27": "And beginning at Moses and all the prophets, he expounded unto them in all the scriptures the things concerning himself."
+      }
+    },
+    "Philippians": {
+      "3": {
+        "7": "But what things were gain to me, those I counted loss for Christ.",
+        "8": "Yea doubtless, and I count all things but loss for the excellency of the knowledge of Christ Jesus my Lord: for whom I have suffered the loss of all things, and do count them but dung, that I may win Christ,",
+        "9": "And be found in him, not having mine own righteousness, which is of the law, but that which is through the faith of Christ, the righteousness which is of God by faith:",
+        "10": "That I may know him, and the power of his resurrection, and the fellowship of his sufferings, being made conformable unto his death;",
+        "11": "If by any means I might attain unto the resurrection of the dead.",
+        "12": "Not as though I had already attained, either were already perfect: but I follow after, if that I may apprehend that for which also I am apprehended of Christ Jesus.",
+        "13": "Brethren, I count not myself to have apprehended: but this one thing I do, forgetting those things which are behind, and reaching forth unto those things which are before,",
+        "14": "I press toward the mark for the prize of the high calling of God in Christ Jesus."
       }
     }
   }

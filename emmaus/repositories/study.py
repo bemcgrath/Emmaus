@@ -10,6 +10,7 @@ from emmaus.domain.models import (
     ActionItem,
     MoodCheckIn,
     PrayerItem,
+    SeenPassageRecord,
     SessionResponse,
     SpiritualMemoryEntry,
     StudyEvent,
@@ -128,6 +129,17 @@ class SQLiteStudyRepository:
                     growth_areas_json TEXT NOT NULL,
                     carry_forward_prompt TEXT NOT NULL,
                     created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS user_passages_seen (
+                    user_id TEXT NOT NULL,
+                    focus_area TEXT NOT NULL,
+                    reference_key TEXT NOT NULL,
+                    reference_json TEXT NOT NULL,
+                    first_seen_at TEXT NOT NULL,
+                    last_seen_at TEXT NOT NULL,
+                    session_count INTEGER NOT NULL DEFAULT 1,
+                    PRIMARY KEY (user_id, focus_area, reference_key)
                 );
                 """
             )
@@ -557,6 +569,46 @@ class SQLiteStudyRepository:
             rows = connection.execute(query, tuple(params)).fetchall()
         return [self._row_to_memory(row) for row in rows]
 
+    def record_passage_seen(
+        self,
+        user_id: str,
+        focus_area: str,
+        reference: dict,
+        seen_at: datetime,
+    ) -> None:
+        reference_key = self._reference_key(reference)
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO user_passages_seen (
+                    user_id, focus_area, reference_key, reference_json, first_seen_at, last_seen_at, session_count
+                ) VALUES (?, ?, ?, ?, ?, ?, 1)
+                ON CONFLICT(user_id, focus_area, reference_key) DO UPDATE SET
+                    reference_json = excluded.reference_json,
+                    last_seen_at = excluded.last_seen_at,
+                    session_count = user_passages_seen.session_count + 1
+                """,
+                (
+                    user_id,
+                    focus_area,
+                    reference_key,
+                    json.dumps(reference),
+                    seen_at.isoformat(),
+                    seen_at.isoformat(),
+                ),
+            )
+
+    def list_seen_passages(self, user_id: str, focus_area: str | None = None) -> list[SeenPassageRecord]:
+        query = "SELECT * FROM user_passages_seen WHERE user_id = ?"
+        params: list[object] = [user_id]
+        if focus_area is not None:
+            query += " AND focus_area = ?"
+            params.append(focus_area)
+        query += " ORDER BY last_seen_at ASC"
+        with self._connect() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [self._row_to_seen_passage(row) for row in rows]
+
     def list_completed_session_dates(self, user_id: str) -> Sequence[date]:
         with self._connect() as connection:
             rows = connection.execute(
@@ -646,6 +698,16 @@ class SQLiteStudyRepository:
             created_at=self._parse_datetime(row["created_at"]),
         )
 
+    def _row_to_seen_passage(self, row: sqlite3.Row) -> SeenPassageRecord:
+        return SeenPassageRecord(
+            user_id=row["user_id"],
+            focus_area=row["focus_area"],
+            reference=json.loads(row["reference_json"]),
+            first_seen_at=self._parse_datetime(row["first_seen_at"]),
+            last_seen_at=self._parse_datetime(row["last_seen_at"]),
+            session_count=row["session_count"],
+        )
+
     def _compute_streaks(self, completed_dates: Sequence[date]) -> tuple[int, int]:
         if not completed_dates:
             return 0, 0
@@ -676,6 +738,10 @@ class SQLiteStudyRepository:
         existing_columns = {row[1] for row in rows}
         if column_name not in existing_columns:
             connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+
+    def _reference_key(self, reference: dict) -> str:
+        end_verse = reference.get("end_verse")
+        return f"{reference['book']}|{reference['chapter']}|{reference['start_verse']}|{end_verse or reference['start_verse']}"
 
     def _parse_datetime(self, value: str | None) -> datetime | None:
         if value is None:

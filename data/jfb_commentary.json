@@ -16,15 +16,27 @@
       }
     },
     {
-      "book": "Luke",
-      "chapter": 24,
-      "start_verse": 13,
-      "end_verse": 17,
-      "title": "The risen Christ draws near before He explains",
-      "body": "JFB notes that Jesus joins the disciples while they are confused and sad, drawing out their grief before opening the Scriptures. The scene shows Christ's gentle way of meeting discouraged hearts and leading them from perplexity into understanding.",
+      "book": "Matthew",
+      "chapter": 11,
+      "start_verse": 28,
+      "end_verse": 30,
+      "title": "Christ's rest is received by coming to Him",
+      "body": "JFB emphasizes that the rest Christ offers is not passive ease, but relief for burdened souls who come under His gracious rule. His yoke is easy because He Himself carries the weight and teaches His people gently.",
       "metadata": {
         "section": "commentary",
         "author": "David Brown"
+      }
+    },
+    {
+      "book": "Hebrews",
+      "chapter": 4,
+      "start_verse": 14,
+      "end_verse": 16,
+      "title": "Boldness grows from Christ's priestly sympathy",
+      "body": "JFB points out that confidence before the throne of grace rests on Christ's priesthood and His real sympathy with human weakness. The passage invites weary believers not to withdraw, but to come boldly for mercy and timely help.",
+      "metadata": {
+        "section": "commentary",
+        "author": "Robert Jamieson"
       }
     },
     {
@@ -40,12 +52,96 @@
       }
     },
     {
+      "book": "Micah",
+      "chapter": 6,
+      "start_verse": 8,
+      "end_verse": 8,
+      "title": "God asks for humble obedience, not display",
+      "body": "JFB reads Micah's answer as a summary of true religion: justice toward others, mercy from the heart, and a humble walk with God. The verse strips away religious show and brings the soul back to simple, covenant faithfulness.",
+      "metadata": {
+        "section": "commentary",
+        "author": "Robert Jamieson"
+      }
+    },
+    {
+      "book": "Colossians",
+      "chapter": 3,
+      "start_verse": 12,
+      "end_verse": 17,
+      "title": "The Word must clothe the whole life",
+      "body": "JFB notes that Paul moves from doctrine to the garments of a renewed life: mercy, forgiveness, love, peace, and thanksgiving. The dwelling of Christ's word within the church is meant to overflow in worship and in ordinary obedience.",
+      "metadata": {
+        "section": "commentary",
+        "author": "A. R. Fausset"
+      }
+    },
+    {
+      "book": "Luke",
+      "chapter": 24,
+      "start_verse": 13,
+      "end_verse": 17,
+      "title": "The risen Christ draws near before He explains",
+      "body": "JFB notes that Jesus joins the disciples while they are confused and sad, drawing out their grief before opening the Scriptures. The scene shows Christ's gentle way of meeting discouraged hearts and leading them from perplexity into understanding.",
+      "metadata": {
+        "section": "commentary",
+        "author": "David Brown"
+      }
+    },
+    {
+      "book": "Luke",
+      "chapter": 24,
+      "start_verse": 25,
+      "end_verse": 27,
+      "title": "Christ interprets all Scripture through Himself",
+      "body": "JFB treats this moment as a rebuke full of mercy: Christ corrects slow hearts by tracing the necessity of His sufferings and glory through the Scriptures. The point is not bare information, but a renewed reading of the whole Bible in the light of Christ.",
+      "metadata": {
+        "section": "commentary",
+        "author": "David Brown"
+      }
+    },
+    {
       "book": "John",
       "chapter": 3,
       "start_verse": 16,
       "end_verse": 17,
       "title": "The gift of the Son reveals the heart of God",
       "body": "JFB reads these verses as the fullest declaration of God's love in the giving of His Son. The point is not merely that salvation is offered, but that condemnation is not Christ's mission here; He is sent so that those who believe might live.",
+      "metadata": {
+        "section": "commentary",
+        "author": "David Brown"
+      }
+    },
+    {
+      "book": "John",
+      "chapter": 15,
+      "start_verse": 1,
+      "end_verse": 5,
+      "title": "Fruitfulness depends on abiding union",
+      "body": "JFB emphasizes that fruit does not come from self-effort alone, but from living union with Christ the true vine. The repeated call to abide means dependence, perseverance, and the abandonment of self-sufficiency.",
+      "metadata": {
+        "section": "commentary",
+        "author": "A. R. Fausset"
+      }
+    },
+    {
+      "book": "Philippians",
+      "chapter": 3,
+      "start_verse": 7,
+      "end_verse": 14,
+      "title": "Pressing on means counting Christ as greater",
+      "body": "JFB highlights Paul's holy dissatisfaction: he has gained Christ, yet still presses on to know Him more fully. The passage calls believers away from self-confidence and toward a forward-leaning pursuit of Christ.",
+      "metadata": {
+        "section": "commentary",
+        "author": "Robert Jamieson"
+      }
+    },
+    {
+      "book": "Hebrews",
+      "chapter": 12,
+      "start_verse": 1,
+      "end_verse": 3,
+      "title": "Endurance comes from looking to Jesus",
+      "body": "JFB points to the race imagery as a summons to cast off hindrances and endure by fixing the eye on Christ. The believer's strength is not found in self-generated resolve, but in considering the endurance of Jesus Himself.",
       "metadata": {
         "section": "commentary",
         "author": "David Brown"

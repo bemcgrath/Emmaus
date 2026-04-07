@@ -239,7 +239,7 @@ class ESVPassageHelpsProvider(CommentaryProvider):
         return [
             CommentaryNote(
                 source_id=self.source_id,
-                title="Passage helps from ESV",
+                title="From the ESV",
                 body=fallback,
                 reference=reference,
                 metadata={"kind": "passage_helps", "section": "summary"},

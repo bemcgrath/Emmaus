@@ -95,6 +95,7 @@ class AdaptiveStudyAgent:
         guide_mode: str | None = None,
         display_name: str | None = None,
     ) -> AgentSessionStartResponse:
+        explicit_reference = reference
         profile = self.study_service.get_or_create_profile(user_id, display_name)
         pattern_summary = self.study_service.summarize_patterns(user_id)
         recommendation = self.personalization_service.build_recommendation(user_id)
@@ -154,6 +155,8 @@ class AdaptiveStudyAgent:
             latest_message=latest_message,
         )
         session = self.study_service.create_session(session)
+        if explicit_reference is None or explicit_reference.model_dump() == recommendation.recommended_reference.model_dump():
+            self.study_service.record_passage_seen(user_id, recommendation.focus_area, reference.model_dump())
         self.study_service.record_event(
             StudyEvent(
                 user_id=user_id,

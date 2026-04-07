@@ -190,6 +190,15 @@ class SpiritualMemorySummary(BaseModel):
     memory_count: int = 0
 
 
+class SeenPassageRecord(BaseModel):
+    user_id: str
+    focus_area: Literal["comprehension", "application", "consistency", "growth"]
+    reference: PassageReference
+    first_seen_at: datetime
+    last_seen_at: datetime
+    session_count: int = 1
+
+
 class StudySession(BaseModel):
     session_id: str
     user_id: str

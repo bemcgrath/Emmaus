@@ -21,6 +21,34 @@ from emmaus.services.study import StudyService
 from emmaus.services.text import TextSourceService
 
 
+def _reference(book: str, chapter: int, start_verse: int, end_verse: int | None = None) -> PassageReference:
+    return PassageReference(book=book, chapter=chapter, start_verse=start_verse, end_verse=end_verse)
+
+
+CURATED_PASSAGE_BANK: dict[str, list[PassageReference]] = {
+    "consistency": [
+        _reference("Psalm", 23, 1, 3),
+        _reference("Matthew", 11, 28, 30),
+        _reference("Hebrews", 4, 14, 16),
+    ],
+    "application": [
+        _reference("James", 1, 22, 25),
+        _reference("Micah", 6, 8),
+        _reference("Colossians", 3, 12, 17),
+    ],
+    "comprehension": [
+        _reference("Luke", 24, 13, 17),
+        _reference("Luke", 24, 25, 27),
+        _reference("John", 3, 16, 17),
+    ],
+    "growth": [
+        _reference("John", 15, 1, 5),
+        _reference("Philippians", 3, 7, 14),
+        _reference("Hebrews", 12, 1, 3),
+    ],
+}
+
+
 class PersonalizationService:
     def __init__(
         self,
@@ -170,29 +198,26 @@ class PersonalizationService:
 
         focus = gap_report.focus_area
         lead_pattern = gap_report.observed_patterns[0] if gap_report.observed_patterns else None
+        reference = self._select_reference_for_focus(user_id, focus)
         if focus == "consistency":
-            reference = PassageReference(book="Psalm", chapter=23, start_verse=1, end_verse=3)
             guide_mode = "coach"
             entry_point = "help me restart after missing a few days"
             minutes = min(15, pattern_summary.recommended_session_minutes)
             reason = "A gentle restart will help rebuild rhythm without overwhelming the user."
             suggested_action = "Finish one short session and keep one practical encouragement in view today."
         elif focus == "application":
-            reference = PassageReference(book="James", chapter=1, start_verse=22, end_verse=25)
             guide_mode = "coach"
             entry_point = "continue where I left off"
             minutes = max(10, min(20, pattern_summary.recommended_session_minutes))
             reason = "Recent study shows the user needs stronger follow-through and clearer next steps."
             suggested_action = "Focus the next session on one concrete act of obedience, encouragement, or prayer."
         elif focus == "comprehension":
-            reference = PassageReference(book="Luke", chapter=24, start_verse=13, end_verse=17)
             guide_mode = "guide"
             entry_point = "I want to understand this passage better"
             minutes = max(15, pattern_summary.recommended_session_minutes)
             reason = "Recent answers suggest the user needs more interpretive depth and clearer understanding."
             suggested_action = "Slow down the next session and strengthen observation and interpretation before moving on."
         else:
-            reference = PassageReference(book="Luke", chapter=24, start_verse=25, end_verse=27)
             guide_mode = "challenger"
             entry_point = "I want a deeper challenge"
             minutes = max(20, pattern_summary.recommended_session_minutes)
@@ -446,6 +471,24 @@ class PersonalizationService:
     def _format_reference(self, reference: PassageReference) -> str:
         ending = f"-{reference.end_verse}" if reference.end_verse else ""
         return f"{reference.book} {reference.chapter}:{reference.start_verse}{ending}"
+
+    def _select_reference_for_focus(self, user_id: str, focus: str) -> PassageReference:
+        bank = CURATED_PASSAGE_BANK.get(focus) or CURATED_PASSAGE_BANK["growth"]
+        seen_records = {
+            self._format_reference(record.reference): record
+            for record in self.study_service.list_seen_passages(user_id, focus)
+        }
+        unseen = [reference for reference in bank if self._format_reference(reference) not in seen_records]
+        if unseen:
+            return unseen[0]
+        return min(
+            bank,
+            key=lambda reference: (
+                seen_records[self._format_reference(reference)].session_count,
+                seen_records[self._format_reference(reference)].last_seen_at,
+                bank.index(reference),
+            ),
+        )
 
     def _decide_nudge_timing(
         self,

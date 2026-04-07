@@ -9,6 +9,7 @@ from emmaus.domain.models import (
     EngagementSummary,
     MoodCheckIn,
     PrayerItem,
+    SeenPassageRecord,
     SessionResponse,
     SpiritualMemoryEntry,
     SpiritualMemorySummary,
@@ -189,6 +190,12 @@ class StudyService:
             recent_references=recent_references[:5],
             memory_count=len(memories),
         )
+
+    def record_passage_seen(self, user_id: str, focus_area: str, reference: dict) -> None:
+        self.repository.record_passage_seen(user_id, focus_area, reference, datetime.now(UTC))
+
+    def list_seen_passages(self, user_id: str, focus_area: str | None = None) -> list[SeenPassageRecord]:
+        return self.repository.list_seen_passages(user_id, focus_area)
 
     def create_action_item(self, action_item: ActionItem) -> ActionItem:
         return self.repository.create_action_item(action_item)

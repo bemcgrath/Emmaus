@@ -2062,15 +2062,7 @@ function buildPassageHelpsMarkup(commentaryNotes) {
     })
     .join("");
 
-  return `
-    <div class="inline-card commentary-overview-card passage-helps-overview-card">
-      <p><strong>Passage helps</strong></p>
-      <p class="micro-copy">Open only what you need as you read. Emmaus is using ESV headings, footnotes, and cross-reference cues here, not full commentary.</p>
-    </div>
-    <div class="commentary-section-stack">
-      ${sections}
-    </div>
-  `;
+  return `<div class="commentary-section-stack scripture-adjacent-helps">${sections}</div>`;
 }
 
 function buildCommentaryNoteItems(body, section) {
@@ -2108,6 +2100,9 @@ function humanizeCommentarySection(value) {
   }
   if (normalized === "headings") {
     return "Headings";
+  }
+  if (normalized === "summary") {
+    return "From the ESV";
   }
   return sentenceCase(normalized);
 }

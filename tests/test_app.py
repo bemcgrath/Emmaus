@@ -3,7 +3,7 @@ import json
 
 from fastapi.testclient import TestClient
 
-from emmaus.domain.models import StudyResponseEvaluation
+from emmaus.domain.models import StudyGapReport, StudyResponseEvaluation
 from emmaus.providers.llm import LLMProvider
 
 
@@ -144,6 +144,7 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "buildCommentaryNotesMarkup" in asset.text
     assert "scripture-adjacent-note" in asset.text
     assert "commentary-handoff" in asset.text
+    assert "scripture-adjacent-helps" in asset.text
     assert "commentary-details" in asset.text
     assert "Pray before you continue" in asset.text
     assert "Where Emmaus is leading today" in asset.text
@@ -1036,6 +1037,51 @@ def test_nudge_delivery_plan_is_notification_ready(tmp_path, monkeypatch):
     assert suppressed_payload["delivery_channel"] == "in_app"
     assert suppressed_payload["fallback_at"] is not None
 
+
+
+def test_recommendations_rotate_curated_passages_after_one_is_seen(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    service = client.app.state.container.personalization_service
+    monkeypatch.setattr(
+        service,
+        "build_gap_report",
+        lambda user_id: StudyGapReport(
+            user_id=user_id,
+            comprehension_gap=0.2,
+            application_gap=0.78,
+            consistency_gap=0.18,
+            focus_area="application",
+            observed_patterns=["There are unfinished action items from prior sessions."],
+        ),
+    )
+
+    first = client.get("/v1/agent/recommendations/demo-user")
+    assert first.status_code == 200
+    first_payload = first.json()
+    assert first_payload["focus_area"] == "application"
+    assert first_payload["recommended_reference"] == {
+        "book": "James",
+        "chapter": 1,
+        "start_verse": 22,
+        "end_verse": 25,
+    }
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "requested_minutes": 15,
+        },
+    )
+    assert start.status_code == 200
+
+    second = client.get("/v1/agent/recommendations/demo-user")
+    assert second.status_code == 200
+    second_payload = second.json()
+    assert second_payload["focus_area"] == "application"
+    assert second_payload["recommended_reference"] != first_payload["recommended_reference"]
+    assert second_payload["recommended_reference"]["book"] in {"Micah", "Colossians"}
 
 
 def test_mood_shapes_recommendation_and_nudge_preview(tmp_path, monkeypatch):
