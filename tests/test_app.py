@@ -1,4 +1,4 @@
-import importlib
+﻿import importlib
 import json
 
 from fastapi.testclient import TestClient
@@ -170,6 +170,7 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "buildSessionContextCard" in asset.text
     assert "question-transition-copy" in response.text
     assert "buildSessionPrayerCard" in asset.text
+    assert "bindActionFieldTabFill" in asset.text
     assert "buildPassageHelpsMarkup" in asset.text
     assert "buildCommentaryNotesMarkup" in asset.text
     assert "scripture-adjacent-note" in asset.text
@@ -1438,4 +1439,5 @@ def test_requested_minutes_changes_question_count_and_plan(tmp_path, monkeypatch
         "Work Through Three Questions",
         "Respond and Pray",
     ]
+
 

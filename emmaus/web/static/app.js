@@ -1,4 +1,4 @@
-const STARTER_SOURCE_ID = "sample_local";
+ï»¿const STARTER_SOURCE_ID = "sample_local";
 const ESV_SOURCE_ID = "esv";
 const DEFAULT_TEXT_SOURCES = [
   { source_id: STARTER_SOURCE_ID, name: "Included Starter Bible" },
@@ -182,8 +182,45 @@ function bindEvents() {
   elements.prayerForm?.addEventListener("submit", onSubmitPrayerItem);
   elements.moodChipRow.querySelectorAll(".choice-chip").forEach((chip) => chip.addEventListener("click", () => selectMood(chip.dataset.value)));
   elements.studyDaysRow.querySelectorAll(".choice-chip").forEach((chip) => chip.addEventListener("click", () => toggleStudyDay(chip.dataset.day)));
+  bindActionFieldTabFill();
 }
 
+function bindActionFieldTabFill() {
+  [
+    elements.responseText,
+    elements.summaryNotes,
+    elements.actionItemTitle,
+    elements.actionItemDetail,
+    elements.prayerTitleInput,
+    elements.prayerDetailInput,
+    elements.followUpNoteInput,
+  ].filter(Boolean).forEach((field) => {
+    field.addEventListener("keydown", onActionFieldTabFill);
+  });
+}
+
+function onActionFieldTabFill(event) {
+  if (event.key !== "Tab" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
+    return;
+  }
+
+  const field = event.currentTarget;
+  const placeholder = optionalText(field?.getAttribute("placeholder"));
+  const currentValue = optionalText(field?.value);
+  if (!placeholder || currentValue) {
+    return;
+  }
+
+  event.preventDefault();
+  field.value = placeholder;
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+
+  const caretPosition = field.value.length;
+  if (typeof field.setSelectionRange === "function") {
+    field.setSelectionRange(caretPosition, caretPosition);
+  }
+}
 async function onRefreshClick() {
   const originalLabel = elements.refreshButton.textContent;
   elements.refreshButton.disabled = true;
@@ -1870,7 +1907,7 @@ function buildQuestionTransitionCopy(session, currentQuestion) {
     return latestMessage.replace(/^Next question:\s*/i, "");
   }
   if (!currentQuestion) {
-    return "You?ve worked through the questions. Finish the session and let Emmaus help you carry one response into today.";
+    return "You've worked through the questions. Finish the session and let Emmaus help you carry one response into today.";
   }
   return `Take this next question slowly and keep your answer close to the passage.`;
 }
@@ -2856,7 +2893,7 @@ function truncateGuideCopy(value, maxLength = 150) {
   const shortened = trimmed.slice(0, Math.max(0, maxLength - 1));
   const lastSpace = shortened.lastIndexOf(" ");
   const safeCut = lastSpace > 60 ? shortened.slice(0, lastSpace) : shortened;
-  return `${safeCut}…`;
+  return `${safeCut}...`;
 }
 
 function formatDateTime(value, timezone = undefined) {
@@ -3261,6 +3298,10 @@ function buildSourceIdCandidate(value) {
 function buildGeneratedSourceId(value) {
   return `${buildSourceIdCandidate(value)}_${Date.now()}`;
 }
+
+
+
+
 
 
 
