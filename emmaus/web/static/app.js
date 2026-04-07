@@ -1952,15 +1952,25 @@ function buildCommentaryMarkup(commentaryNotes) {
     return "";
   }
 
-  const showsPassageHelps = commentaryNotes.some((note) => note?.metadata?.kind === "passage_helps");
-  if (showsPassageHelps) {
-    return buildPassageHelpsMarkup(commentaryNotes);
+  const passageHelpNotes = commentaryNotes.filter((note) => note?.metadata?.kind === "passage_helps");
+  const commentaryOnlyNotes = commentaryNotes.filter((note) => note?.metadata?.kind !== "passage_helps");
+  const blocks = [];
+
+  if (commentaryOnlyNotes.length) {
+    blocks.push(buildCommentaryNotesMarkup(commentaryOnlyNotes));
+  }
+  if (passageHelpNotes.length) {
+    blocks.push(buildPassageHelpsMarkup(passageHelpNotes));
   }
 
+  return blocks.join("");
+}
+
+function buildCommentaryNotesMarkup(commentaryNotes) {
   return `
     <div class="inline-card commentary-overview-card">
       <p><strong>Commentary</strong></p>
-      <p class="micro-copy">Emmaus can layer in modular commentary notes here as you connect them.</p>
+      <p class="micro-copy">Emmaus is layering in a public-domain commentary alongside the passage so you can slow down without leaving the study flow.</p>
     </div>
     ${commentaryNotes
       .map(
@@ -1968,7 +1978,10 @@ function buildCommentaryMarkup(commentaryNotes) {
           <div class="commentary-note">
             <p><strong>${escapeHtml(note.title)}</strong></p>
             <p>${escapeHtml(note.body)}</p>
-            ${note?.metadata?.section ? `<span class="meta-pill">${escapeHtml(humanizeCommentarySection(note.metadata.section))}</span>` : ""}
+            <div class="chip-row">
+              ${note?.metadata?.source_name ? `<span class="meta-pill">${escapeHtml(note.metadata.source_name)}</span>` : ""}
+              ${note?.metadata?.section ? `<span class="meta-pill">${escapeHtml(humanizeCommentarySection(note.metadata.section))}</span>` : ""}
+            </div>
           </div>
         `,
       )

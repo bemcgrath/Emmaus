@@ -1,0 +1,55 @@
+{
+  "source_id": "jfb_commentary",
+  "name": "Jamieson-Fausset-Brown Commentary",
+  "license_name": "Public Domain via CCEL",
+  "entries": [
+    {
+      "book": "Psalm",
+      "chapter": 23,
+      "start_verse": 1,
+      "end_verse": 3,
+      "title": "The Shepherd's present care",
+      "body": "JFB highlights the Psalmist's confidence in the Lord's constant provision. The green pastures and still waters picture not mere rest, but the Shepherd's wise care that restores, guides, and keeps His people in the right path for His name's sake.",
+      "metadata": {
+        "section": "commentary",
+        "author": "A. R. Fausset"
+      }
+    },
+    {
+      "book": "Luke",
+      "chapter": 24,
+      "start_verse": 13,
+      "end_verse": 17,
+      "title": "The risen Christ draws near before He explains",
+      "body": "JFB notes that Jesus joins the disciples while they are confused and sad, drawing out their grief before opening the Scriptures. The scene shows Christ's gentle way of meeting discouraged hearts and leading them from perplexity into understanding.",
+      "metadata": {
+        "section": "commentary",
+        "author": "David Brown"
+      }
+    },
+    {
+      "book": "James",
+      "chapter": 1,
+      "start_verse": 22,
+      "end_verse": 25,
+      "title": "Hearing must become doing",
+      "body": "JFB stresses that the danger is not simply forgetting information but deceiving oneself by stopping at hearing. The Word is meant to be looked into with perseverance until it shapes obedient action, and the blessing promised is tied to doing what God says.",
+      "metadata": {
+        "section": "commentary",
+        "author": "A. R. Fausset"
+      }
+    },
+    {
+      "book": "John",
+      "chapter": 3,
+      "start_verse": 16,
+      "end_verse": 17,
+      "title": "The gift of the Son reveals the heart of God",
+      "body": "JFB reads these verses as the fullest declaration of God's love in the giving of His Son. The point is not merely that salvation is offered, but that condemnation is not Christ's mission here; He is sent so that those who believe might live.",
+      "metadata": {
+        "section": "commentary",
+        "author": "David Brown"
+      }
+    }
+  ]
+}

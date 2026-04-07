@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     data_dir: Path = Field(default=Path("data"))
     database_path: Path = Field(default=Path("data/emmaus.sqlite3"))
     default_text_source: str = "sample_local"
-    default_commentary_source: str = "notes_placeholder"
+    default_commentary_source: str = "jfb_commentary"
     study_history_limit: int = 30
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "phi3.5"

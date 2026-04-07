@@ -1,5 +1,5 @@
 from emmaus.core.config import Settings
-from emmaus.providers.commentary import CommentaryProviderRegistry, ESVPassageHelpsProvider, NotesPlaceholderCommentaryProvider
+from emmaus.providers.commentary import CommentaryProviderRegistry, ESVPassageHelpsProvider, LocalJsonCommentaryProvider, NotesPlaceholderCommentaryProvider
 from emmaus.providers.llm import LLMProviderRegistry, NullLLMProvider, OllamaProvider
 from emmaus.providers.text import ESVBibleTextProvider, LocalJsonBibleTextProvider, RemoteApiBibleTextProvider, TextProviderRegistry
 from emmaus.repositories.study import SQLiteStudyRepository
@@ -59,6 +59,17 @@ def build_container() -> Container:
                 name="Included Starter Bible",
                 file_path=sample_file,
                 license_name="Public Domain",
+            )
+        )
+
+    jfb_file = data_dir / "jfb_commentary.json"
+    if jfb_file.exists():
+        container.commentary_registry.register(
+            LocalJsonCommentaryProvider(
+                source_id="jfb_commentary",
+                name="Jamieson-Fausset-Brown Commentary",
+                file_path=jfb_file,
+                license_name="Public Domain via CCEL",
             )
         )
 

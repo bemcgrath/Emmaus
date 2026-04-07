@@ -4,6 +4,7 @@ import html
 import json
 import re
 from abc import ABC, abstractmethod
+from pathlib import Path
 from urllib import error, parse, request
 
 from emmaus.domain.models import CommentaryNote, PassageReference
@@ -59,6 +60,74 @@ class NotesPlaceholderCommentaryProvider(CommentaryProvider):
                 metadata={"integration_status": "placeholder"},
             )
         ]
+
+
+class LocalJsonCommentaryProvider(CommentaryProvider):
+    def __init__(
+        self,
+        source_id: str,
+        name: str,
+        file_path: Path,
+        license_name: str = "Public Domain",
+    ) -> None:
+        self.source_id = source_id
+        self.name = name
+        self.file_path = Path(file_path)
+        self.license_name = license_name
+
+    def get_commentary(self, reference: PassageReference) -> list[CommentaryNote]:
+        payload = self._load_payload()
+        matches = []
+        for entry in payload.get("entries", []):
+            if not self._matches_reference(entry, reference):
+                continue
+            matches.append(
+                CommentaryNote(
+                    source_id=self.source_id,
+                    title=entry.get("title") or f"{self.name} note",
+                    body=entry.get("body") or "",
+                    reference=reference,
+                    metadata={
+                        "kind": "commentary",
+                        "source_name": self.name,
+                        "license_name": payload.get("license_name", self.license_name),
+                        **(entry.get("metadata") or {}),
+                    },
+                )
+            )
+        if matches:
+            return matches
+        return [
+            CommentaryNote(
+                source_id=self.source_id,
+                title=f"{self.name} not available for this passage yet",
+                body=(
+                    "Emmaus does not have a bundled note for this exact passage yet. "
+                    "Add more public-domain commentary entries to extend coverage without changing app logic."
+                ),
+                reference=reference,
+                metadata={"kind": "commentary", "status": "unavailable"},
+            )
+        ]
+
+    def _load_payload(self) -> dict:
+        try:
+            return json.loads(self.file_path.read_text(encoding="utf-8-sig"))
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {"entries": []}
+
+    def _matches_reference(self, entry: dict, reference: PassageReference) -> bool:
+        if self._normalize_book(entry.get("book")) != self._normalize_book(reference.book):
+            return False
+        if int(entry.get("chapter", 0)) != reference.chapter:
+            return False
+        start = int(entry.get("start_verse", 1))
+        end = int(entry.get("end_verse") or start)
+        ref_end = reference.end_verse or reference.start_verse
+        return not (end < reference.start_verse or start > ref_end)
+
+    def _normalize_book(self, value: str | None) -> str:
+        return re.sub(r"[^a-z0-9]", "", (value or "").lower())
 
 
 class ESVPassageHelpsProvider(CommentaryProvider):

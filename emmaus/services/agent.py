@@ -320,8 +320,8 @@ class AdaptiveStudyAgent:
     def _resolve_commentary_source(self, requested_commentary_source: str | None, text_source_id: str) -> str:
         if requested_commentary_source:
             return requested_commentary_source
-        if text_source_id == "esv" and self.commentary_registry.has("esv_passage_helps"):
-            return "esv_passage_helps"
+        if text_source_id == "esv" and self.commentary_registry.has("jfb_commentary"):
+            return "jfb_commentary"
         return self.default_commentary_source
 
     def _build_session_response(
@@ -331,9 +331,7 @@ class AdaptiveStudyAgent:
         recommendation: StudyRecommendation,
     ) -> AgentSessionStartResponse:
         passage = self.text_service.get_passage(session.reference, session.text_source_id)
-        commentary_source = session.commentary_source_id or self.default_commentary_source
-        commentary_provider = self.commentary_registry.get(commentary_source)
-        commentary = commentary_provider.get_commentary(session.reference)
+        commentary = self._collect_commentary(session)
         current_question = session.questions[session.current_question_index] if session.current_question_index < len(session.questions) else None
         return AgentSessionStartResponse(
             session=session,
@@ -343,6 +341,15 @@ class AdaptiveStudyAgent:
             recommendation=recommendation,
             current_question=current_question,
         )
+
+    def _collect_commentary(self, session: StudySession) -> list[CommentaryNote]:
+        notes: list[CommentaryNote] = []
+        commentary_source = session.commentary_source_id or self.default_commentary_source
+        if self.commentary_registry.has(commentary_source):
+            notes.extend(self.commentary_registry.get(commentary_source).get_commentary(session.reference))
+        if session.text_source_id == "esv" and self.commentary_registry.has("esv_passage_helps") and commentary_source != "esv_passage_helps":
+            notes.extend(self.commentary_registry.get("esv_passage_helps").get_commentary(session.reference))
+        return notes
 
     def _generate_questions(
         self,
