@@ -1,4 +1,4 @@
-﻿import importlib
+import importlib
 from collections import Counter
 import json
 
@@ -1629,4 +1629,5 @@ def test_theme_weighted_reference_selection_prefers_service_passages(tmp_path, m
 def test_curated_passage_bank_is_expanded_for_each_focus():
     assert set(CURATED_PASSAGE_BANK) == {"consistency", "application", "comprehension", "growth"}
     assert all(len(bank) >= 8 for bank in CURATED_PASSAGE_BANK.values())
+
 

@@ -1641,28 +1641,47 @@ function renderActionItems(actionItems) {
     return;
   }
 
-  elements.actionItemList.innerHTML = actionItems
-    .map((item) => {
-      const isSelected = item.action_item_id === state.selectedActionItemId;
-      const completed = item.status === "completed";
-      const footer = completed
-        ? `<p class="micro-copy">Completed ${escapeHtml(formatDateTime(item.completed_at))}${item.follow_up_outcome ? ` - ${escapeHtml(sentenceCase(item.follow_up_outcome.replaceAll("_", " ")) )}` : ""}</p>${item.follow_up_note ? `<p>${escapeHtml(item.follow_up_note)}</p>` : ""}`
-        : `<button class="action-button" type="button" data-action-item-select="${escapeHtml(item.action_item_id)}">${isSelected ? "Selected for follow-up" : "Complete follow-through"}</button>`;
-      return `
-        <article class="action-card ${completed ? "completed" : ""} ${isSelected ? "selected" : ""}">
-          <div class="action-card-header">
-            <div>
-              <p><strong>${escapeHtml(item.title)}</strong></p>
-              <p>${escapeHtml(item.detail)}</p>
-            </div>
-            <span class="status-pill">${escapeHtml(sentenceCase(item.status))}</span>
-          </div>
-          <p class="micro-copy">Created ${escapeHtml(formatDateTime(item.created_at))}</p>
-          ${footer}
-        </article>
-      `;
-    })
-    .join("");
+  const visibleItems = actionItems.slice(0, 2);
+  const olderItems = actionItems.slice(2);
+  const visibleMarkup = visibleItems.map((item) => buildActionItemCard(item)).join("");
+  const olderMarkup = olderItems.length
+    ? `
+      <details class="review-history-details">
+        <summary>Show ${olderItems.length} older next ${olderItems.length === 1 ? "step" : "steps"}</summary>
+        <div class="review-history-details-body">
+          ${olderItems.map((item) => buildActionItemCard(item)).join("")}
+        </div>
+      </details>
+    `
+    : "";
+
+  elements.actionItemList.innerHTML = `
+    <div class="list-stack">
+      ${visibleMarkup}
+      ${olderMarkup}
+    </div>
+  `;
+}
+
+function buildActionItemCard(item) {
+  const isSelected = item.action_item_id === state.selectedActionItemId;
+  const completed = item.status === "completed";
+  const footer = completed
+    ? `<p class="micro-copy">Completed ${escapeHtml(formatDateTime(item.completed_at))}${item.follow_up_outcome ? ` - ${escapeHtml(sentenceCase(item.follow_up_outcome.replaceAll("_", " ")) )}` : ""}</p>${item.follow_up_note ? `<p>${escapeHtml(item.follow_up_note)}</p>` : ""}`
+    : `<button class="action-button" type="button" data-action-item-select="${escapeHtml(item.action_item_id)}">${isSelected ? "Selected for reflection" : "Record what happened"}</button>`;
+  return `
+    <article class="action-card ${completed ? "completed" : ""} ${isSelected ? "selected" : ""}">
+      <div class="action-card-header">
+        <div>
+          <p><strong>${escapeHtml(item.title)}</strong></p>
+          <p>${escapeHtml(item.detail)}</p>
+        </div>
+        <span class="status-pill">${escapeHtml(sentenceCase(item.status))}</span>
+      </div>
+      <p class="micro-copy">Created ${escapeHtml(formatDateTime(item.created_at))}</p>
+      ${footer}
+    </article>
+  `;
 }
 
 function renderPrayerItems(prayerItems) {
@@ -1806,7 +1825,7 @@ function syncSelectedActionItem(actionItems) {
   state.selectedActionItemId = selected?.action_item_id || null;
 
   if (!selected) {
-    elements.followUpTargetCopy.textContent = "Choose an open next step above and note what happened.";
+    elements.followUpTargetCopy.textContent = "Choose an open next step above and record what happened.";
     elements.followUpSubmitButton.disabled = true;
     elements.followUpOutcomeSelect.value = "completed";
     elements.followUpNoteInput.value = "";
