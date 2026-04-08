@@ -190,6 +190,20 @@ class SpiritualMemorySummary(BaseModel):
     memory_count: int = 0
 
 
+class ReviewSessionEntry(BaseModel):
+    session: StudySession
+    responses: list[SessionResponse] = Field(default_factory=list)
+    action_item: ActionItem | None = None
+    prayers: list[PrayerItem] = Field(default_factory=list)
+    memory: SpiritualMemoryEntry | None = None
+
+
+class ReviewHistory(BaseModel):
+    user_id: str
+    sessions: list[ReviewSessionEntry] = Field(default_factory=list)
+    prayers: list[PrayerItem] = Field(default_factory=list)
+
+
 class SeenPassageRecord(BaseModel):
     user_id: str
     focus_area: Literal["comprehension", "application", "consistency", "growth"]

@@ -77,6 +77,16 @@ def list_prayer_items(user_id: str, status: str | None = None, container: Contai
     return {"items": container.study_service.list_prayer_items(user_id, status)}
 
 
+@router.get("/review/{user_id}")
+def get_review_history(
+    user_id: str,
+    limit_sessions: int = 6,
+    limit_prayers: int = 20,
+    container: Container = Depends(get_container),
+):
+    return container.study_service.build_review_history(user_id, limit_sessions=limit_sessions, limit_prayers=limit_prayers)
+
+
 @router.post("/prayer-items", status_code=201)
 def create_prayer_item(payload: CreatePrayerItemRequest, container: Container = Depends(get_container)):
     prayer_item = PrayerItem(

@@ -1,4 +1,5 @@
 ﻿import importlib
+from collections import Counter
 import json
 
 from fastapi.testclient import TestClient
@@ -145,6 +146,9 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert '<option value="America/New_York">Eastern Time (EST/EDT)</option>' in response.text
     assert "prayer-item-list" in response.text
     assert "prayer-form" in response.text
+    assert "review-history-card" in response.text
+    assert "review-summary-pill" in response.text
+    assert "Look back with clarity" in response.text
     assert "nudge-plan-card" in response.text
     assert response.text.count('id="identity-form"') == 1
     assert response.text.count('id="mood-form"') == 1
@@ -1364,6 +1368,73 @@ def test_nudge_preview_builds_on_completed_follow_through(tmp_path, monkeypatch)
 
 
 
+def test_review_history_groups_recent_sessions_prayers_and_actions(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    client.app.state.container.llm_registry.register(StrongResponseProvider())
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "requested_minutes": 20,
+        },
+    )
+    assert start.status_code == 200
+    session_id = start.json()["session"]["session_id"]
+
+    for answer in [
+        "I notice James warns me not to stop at hearing the word without obeying it.",
+        "This passage means Scripture is meant to reshape what I do, not just what I agree with.",
+        "Today I need one concrete act of obedience that matches what God is showing me.",
+    ]:
+        turn = client.post(
+            "/v1/agent/session/respond",
+            json={
+                "session_id": session_id,
+                "user_id": "demo-user",
+                "response_text": answer,
+                "engagement_score": 4,
+            },
+        )
+        assert turn.status_code == 200
+
+    complete = client.post(
+        "/v1/agent/session/complete",
+        json={
+            "session_id": session_id,
+            "user_id": "demo-user",
+            "summary_notes": "Christ is pressing me toward clearer obedience today.",
+        },
+    )
+    assert complete.status_code == 200
+    action_item = complete.json()["action_item"]
+
+    prayer = client.post(
+        "/v1/study/prayer-items",
+        json={
+            "user_id": "demo-user",
+            "title": "Pray for courage to obey",
+            "detail": "Ask Christ to help this next step become real today.",
+            "related_session_id": session_id,
+        },
+    )
+    assert prayer.status_code == 201
+
+    review = client.get("/v1/study/review/demo-user")
+    assert review.status_code == 200
+    payload = review.json()
+    assert payload["user_id"] == "demo-user"
+    assert len(payload["sessions"]) == 1
+    entry = payload["sessions"][0]
+    assert entry["session"]["session_id"] == session_id
+    assert len(entry["responses"]) == 3
+    assert entry["action_item"]["action_item_id"] == action_item["action_item_id"]
+    assert entry["prayers"][0]["title"] == "Pray for courage to obey"
+    assert entry["memory"] is not None
+    assert payload["prayers"][0]["related_session_id"] == session_id
+
+
 def test_requested_minutes_changes_question_count_and_plan(tmp_path, monkeypatch):
     client = build_client(tmp_path, monkeypatch)
 
@@ -1444,6 +1515,24 @@ def test_requested_minutes_changes_question_count_and_plan(tmp_path, monkeypatch
 
 
 
+
+def test_theme_weighted_reference_selection_prefers_service_passages(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    personalization = client.app.state.container.personalization_service
+
+    reference = personalization._select_reference_for_focus(
+        "demo-user",
+        "application",
+        cache={},
+        preferred_themes=Counter({"service": 4, "love": 3}),
+    )
+
+    assert reference.book == "Philippians"
+    assert reference.chapter == 2
+    assert reference.start_verse == 3
+
+
 def test_curated_passage_bank_is_expanded_for_each_focus():
     assert set(CURATED_PASSAGE_BANK) == {"consistency", "application", "comprehension", "growth"}
     assert all(len(bank) >= 8 for bank in CURATED_PASSAGE_BANK.values())
+

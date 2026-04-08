@@ -9,6 +9,8 @@ from emmaus.domain.models import (
     EngagementSummary,
     MoodCheckIn,
     PrayerItem,
+    ReviewHistory,
+    ReviewSessionEntry,
     SeenPassageRecord,
     SessionResponse,
     SpiritualMemoryEntry,
@@ -273,6 +275,37 @@ class StudyService:
             )
         )
         return prayer_item
+
+    def build_review_history(self, user_id: str, limit_sessions: int = 6, limit_prayers: int = 20) -> ReviewHistory:
+        sessions = self.list_sessions(user_id, status="completed")[:limit_sessions]
+        action_items_by_session = {
+            item.session_id: item
+            for item in self.list_action_items(user_id)
+            if item.session_id
+        }
+        prayers = self.list_prayer_items(user_id)[:limit_prayers]
+        prayers_by_session: dict[str, list[PrayerItem]] = {}
+        for prayer in prayers:
+            if prayer.related_session_id:
+                prayers_by_session.setdefault(prayer.related_session_id, []).append(prayer)
+
+        review_sessions: list[ReviewSessionEntry] = []
+        for session in sessions:
+            review_sessions.append(
+                ReviewSessionEntry(
+                    session=session,
+                    responses=self.list_session_responses(session.session_id),
+                    action_item=action_items_by_session.get(session.session_id),
+                    prayers=prayers_by_session.get(session.session_id, []),
+                    memory=self.get_latest_spiritual_memory_for_session(session.session_id),
+                )
+            )
+
+        return ReviewHistory(
+            user_id=user_id,
+            sessions=review_sessions,
+            prayers=prayers,
+        )
 
     def _refresh_spiritual_memory_from_action_follow_up(self, action_item: ActionItem) -> None:
         memory = self.get_latest_spiritual_memory_for_session(action_item.session_id)

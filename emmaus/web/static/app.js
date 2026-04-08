@@ -40,6 +40,7 @@ const state = {
   lastFollowThroughUpdate: null,
   actionItems: [],
   prayerItems: [],
+  reviewHistory: null,
   onboardingStep: 1,
   textSources: [],
   translationTemplates: [],
@@ -137,6 +138,8 @@ function cacheElements() {
     actionItemList: document.getElementById("action-item-list"),
     prayerSummaryPill: document.getElementById("prayer-summary-pill"),
     prayerItemList: document.getElementById("prayer-item-list"),
+    reviewSummaryPill: document.getElementById("review-summary-pill"),
+    reviewHistoryCard: document.getElementById("review-history-card"),
     prayerForm: document.getElementById("prayer-form"),
     prayerTitleInput: document.getElementById("prayer-title-input"),
     prayerDetailInput: document.getElementById("prayer-detail-input"),
@@ -273,21 +276,6 @@ async function refreshExperience({ restoreScreen = false } = {}) {
   await loadLiveDashboard({ restoreScreen });
 }
 
-async function loadTextSources() {
-  if (isDemoMode()) {
-    state.textSources = DEFAULT_TEXT_SOURCES;
-    renderTextSourceOptions();
-    return;
-  }
-  try {
-    const response = await fetchJson("/v1/sources/text");
-    state.textSources = response.sources || response;
-  } catch {
-    state.textSources = DEFAULT_TEXT_SOURCES;
-  }
-  renderTextSourceOptions();
-}
-
 function getSourceById(sourceId) {
   const sources = state.textSources.length ? state.textSources : DEFAULT_TEXT_SOURCES;
   return sources.find((source) => source.source_id === sourceId) || null;
@@ -341,88 +329,6 @@ function renderTextSourceOptions() {
   }
 
   renderBibleSourceManager();
-}
-
-async function loadLiveDashboard({ restoreScreen = false } = {}) {
-  const userId = getUserId();
-  localStorage.setItem("emmaus.userId", userId);
-  const [profile, recommendation, streaks, actionItems, latestMood, activeSession] = await Promise.all([
-    fetchJson(`/v1/users/${encodeURIComponent(userId)}/profile`),
-    fetchJson(`/v1/agent/recommendations/${encodeURIComponent(userId)}`),
-    fetchJson(`/v1/engagement/streaks/${encodeURIComponent(userId)}`),
-    fetchJson(`/v1/study/action-items/${encodeURIComponent(userId)}`),
-    fetchJson(`/v1/study/mood/${encodeURIComponent(userId)}`, { allowNull: true }),
-    fetchJson(`/v1/agent/session/active/${encodeURIComponent(userId)}`, { allowNull: true }),
-    fetchJson(`/v1/users/${encodeURIComponent(userId)}/memory`),
-  ]);
-
-  state.profile = profile;
-  state.recommendation = recommendation;
-  state.activeSessionPayload = activeSession;
-  state.nudgePlan = null;
-
-  renderDashboardShell({
-    profile,
-    recommendation,
-    streaks,
-    actionItems: actionItems.items || [],
-    latestMood,
-    activeSession,
-    memorySummary,
-  });
-
-  await loadNudgeArtifacts();
-  renderTodayPlan(recommendation, activeSession, actionItems.items || []);
-  if (restoreScreen) {
-    restorePreferredScreen();
-  }
-}
-
-function renderDemoDashboard({ restoreScreen = false } = {}) {
-  const demo = buildDemoScenarioData(state.demoScenario);
-  state.profile = demo.profile;
-  state.recommendation = demo.recommendation;
-  state.activeSessionPayload = demo.activeSession;
-  state.nudge = demo.nudge;
-  state.nudgePlan = demo.nudgePlan;
-  state.memorySummary = demo.memorySummary;
-  renderDashboardShell({
-    profile: demo.profile,
-    recommendation: demo.recommendation,
-    streaks: demo.streaks,
-    actionItems: demo.actionItems,
-      prayerItems: demo.prayerItems || [],
-    latestMood: demo.latestMood,
-    activeSession: demo.activeSession,
-    memorySummary: demo.memorySummary,
-  });
-  renderNudge(demo.nudge, demo.nudgePlan);
-  renderTodayPlan(demo.recommendation, demo.activeSession, demo.actionItems, demo.memorySummary);
-  if (restoreScreen) {
-    restorePreferredScreen();
-  }
-}
-
-function renderDashboardShell({ profile, recommendation, streaks, actionItems, prayerItems, latestMood, activeSession, memorySummary }) {
-  renderProfile(profile);
-  renderRecommendation(recommendation, memorySummary);
-  renderMemorySummary(memorySummary);
-  renderStreaks(streaks);
-  renderActionItems(actionItems);
-  renderPrayerItems(prayerItems || []);
-  renderCompletionSummary(memorySummary, actionItems);
-  renderLatestMood(latestMood);
-  renderOnboarding(profile, streaks, activeSession);
-  updateSessionEntryState(activeSession);
-  renderDemoControls();
-
-  if (activeSession) {
-    renderSessionStart(activeSession, { navigate: false });
-    localStorage.setItem("emmaus.activeSessionId", activeSession.session.session_id);
-  } else {
-    clearSessionView();
-    localStorage.removeItem("emmaus.activeSessionId");
-  }
 }
 
 function getInitialDemoScenario() {
@@ -948,12 +854,13 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
   state.userId = userId;
   localStorage.setItem("emmaus.userId", userId);
 
-  const [profile, recommendation, streaks, actionItemsResponse, prayerItemsResponse, latestMood, activeSession, memorySummary] = await Promise.all([
+  const [profile, recommendation, streaks, actionItemsResponse, prayerItemsResponse, reviewHistory, latestMood, activeSession, memorySummary] = await Promise.all([
     fetchJson(`/v1/users/${encodeURIComponent(userId)}/profile`),
     fetchJson(`/v1/agent/recommendations/${encodeURIComponent(userId)}`),
     fetchJson(`/v1/engagement/streaks/${encodeURIComponent(userId)}`),
     fetchJson(`/v1/study/action-items/${encodeURIComponent(userId)}`),
     fetchJson(`/v1/study/prayer-items/${encodeURIComponent(userId)}`),
+    fetchJson(`/v1/study/review/${encodeURIComponent(userId)}`),
     fetchJson(`/v1/study/mood/${encodeURIComponent(userId)}`, { allowNull: true }),
     fetchJson(`/v1/agent/session/active/${encodeURIComponent(userId)}`, { allowNull: true }),
     fetchJson(`/v1/users/${encodeURIComponent(userId)}/memory`, { allowNull: true }),
@@ -964,6 +871,7 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
   state.streaks = streaks;
   state.actionItems = actionItemsResponse.items || [];
   state.prayerItems = prayerItemsResponse.items || [];
+  state.reviewHistory = reviewHistory;
   state.latestMood = latestMood;
   state.activeSessionPayload = activeSession;
   state.currentQuestion = activeSession?.current_question || null;
@@ -982,7 +890,7 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
   });
 
   await loadNudgeArtifacts();
-  renderTodayPlan(recommendation, activeSession, state.actionItems, memorySummary);
+  renderTodayPlan(recommendation, activeSession, state.actionItems, state.memorySummary);
   if (restoreScreen) {
     restorePreferredScreen();
   }
@@ -996,23 +904,25 @@ function renderDemoDashboard({ restoreScreen = false } = {}) {
   state.streaks = demo.streaks;
   state.actionItems = demo.actionItems;
   state.prayerItems = demo.prayerItems || [];
+  state.reviewHistory = demo.reviewHistory || null;
   state.latestMood = demo.latestMood;
   state.activeSessionPayload = demo.activeSession;
   state.currentQuestion = demo.activeSession?.current_question || null;
   state.nudge = demo.nudge;
   state.nudgePlan = demo.nudgePlan;
+  state.memorySummary = demo.memorySummary;
 
   renderDashboardShell({
     profile: demo.profile,
     recommendation: demo.recommendation,
     streaks: demo.streaks,
     actionItems: demo.actionItems,
-      prayerItems: demo.prayerItems || [],
+    prayerItems: demo.prayerItems || [],
     latestMood: demo.latestMood,
     activeSession: demo.activeSession,
   });
   renderNudge(demo.nudge, demo.nudgePlan);
-  renderTodayPlan(demo.recommendation, demo.activeSession, demo.actionItems);
+  renderTodayPlan(demo.recommendation, demo.activeSession, demo.actionItems, demo.memorySummary);
   if (restoreScreen) {
     restorePreferredScreen();
   }
@@ -1022,9 +932,12 @@ function renderDashboardShell({ profile, recommendation, streaks, actionItems, p
   renderHero(profile, recommendation, activeSession, actionItems);
   renderProfile(profile);
   renderRecommendation(recommendation, state.memorySummary);
+  renderMemorySummary(state.memorySummary);
   renderStreaks(streaks);
   renderActionItems(actionItems);
   renderPrayerItems(prayerItems || []);
+  renderReviewHistory(state.reviewHistory);
+  renderCompletionSummary(state.memorySummary, actionItems);
   renderLatestMood(latestMood);
   renderOnboarding(profile, streaks, activeSession, actionItems);
   updateSessionEntryState(activeSession);
@@ -1778,6 +1691,92 @@ function renderPrayerItems(prayerItems) {
       `;
     })
     .join("");
+}
+
+function renderReviewHistory(reviewHistory) {
+  if (!elements.reviewHistoryCard || !elements.reviewSummaryPill) {
+    return;
+  }
+
+  const sessions = safeArray(reviewHistory?.sessions);
+  const prayers = safeArray(reviewHistory?.prayers);
+  elements.reviewSummaryPill.textContent = sessions.length ? `${sessions.length} recent` : "Ready";
+
+  if (!sessions.length && !prayers.length) {
+    elements.reviewHistoryCard.innerHTML = '<p class="empty-state">Complete a few sessions and Emmaus will help you review your recent answers, next steps, and prayers here.</p>';
+    return;
+  }
+
+  const sessionMarkup = sessions.length
+    ? sessions.map((entry) => buildReviewSessionCard(entry)).join("")
+    : '<p class="empty-state">No completed sessions yet. Your recent responses will show up here after you finish one.</p>';
+
+  const prayerHistory = prayers.length
+    ? `<div class="inline-card review-prayer-history"><p><strong>Prayer history</strong></p><p class="micro-copy">${escapeHtml(buildPrayerHistorySummary(prayers))}</p></div>`
+    : '';
+
+  elements.reviewHistoryCard.innerHTML = `
+    <div class="list-stack review-history-stack">
+      ${sessionMarkup}
+      ${prayerHistory}
+    </div>
+  `;
+}
+
+function buildReviewSessionCard(entry) {
+  const session = entry?.session || null;
+  if (!session) {
+    return "";
+  }
+
+  const responses = safeArray(entry.responses).slice(0, 2);
+  const responseMarkup = responses.length
+    ? `<div class="review-response-list">${responses.map((response) => `
+        <div class="inline-card review-response-card">
+          <p><strong>${escapeHtml(humanizeQuestionType(response.question_type))}</strong></p>
+          <p class="micro-copy">${escapeHtml(truncateGuideCopy(response.question, 100))}</p>
+          <p>${escapeHtml(truncateGuideCopy(response.response_text, 150))}</p>
+        </div>
+      `).join("")}</div>`
+    : '<p class="micro-copy">No saved responses for this session.</p>';
+
+  const actionItem = entry.action_item;
+  const actionMarkup = actionItem
+    ? `<div class="inline-card review-action-card"><p><strong>Next step</strong></p><p>${escapeHtml(actionItem.title)}</p><p class="micro-copy">${escapeHtml(truncateGuideCopy(actionItem.detail, 140))}</p></div>`
+    : '';
+
+  const linkedPrayers = safeArray(entry.prayers);
+  const prayerMarkup = linkedPrayers.length
+    ? `<div class="inline-card review-prayer-card"><p><strong>Prayer carried with this session</strong></p><p>${escapeHtml(linkedPrayers[0].title)}</p><p class="micro-copy">${escapeHtml(truncateGuideCopy(linkedPrayers[0].detail, 140))}</p></div>`
+    : '';
+
+  const memoryMarkup = entry.memory?.summary
+    ? `<p class="micro-copy">${escapeHtml(truncateGuideCopy(entry.memory.summary, 150))}</p>`
+    : '';
+
+  return `
+    <article class="action-card review-session-card">
+      <div class="action-card-header">
+        <div>
+          <p><strong>${escapeHtml(formatReference(session.reference))}</strong></p>
+          <p class="micro-copy">Completed ${escapeHtml(formatDateTime(session.completed_at || session.started_at))}</p>
+        </div>
+        <span class="status-pill">${escapeHtml(humanizeGuideMode(session.guide_mode))}</span>
+      </div>
+      ${memoryMarkup}
+      ${responseMarkup}
+      ${actionMarkup}
+      ${prayerMarkup}
+    </article>
+  `;
+}
+
+function buildPrayerHistorySummary(prayers) {
+  const answeredCount = prayers.filter((item) => item.status === "answered").length;
+  const activeCount = prayers.filter((item) => item.status === "active").length;
+  const latest = prayers[0];
+  const latestCopy = latest ? `Most recent: ${latest.title}.` : "";
+  return `${activeCount} active, ${answeredCount} answered. ${latestCopy}`.trim();
 }
 
 function syncSelectedActionItem(actionItems) {

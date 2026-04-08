@@ -25,47 +25,99 @@ def _reference(book: str, chapter: int, start_verse: int, end_verse: int | None 
     return PassageReference(book=book, chapter=chapter, start_verse=start_verse, end_verse=end_verse)
 
 
-CURATED_PASSAGE_BANK: dict[str, list[PassageReference]] = {
+def _themed_reference(
+    book: str,
+    chapter: int,
+    start_verse: int,
+    *rest: object,
+) -> dict[str, object]:
+    end_verse: int | None = None
+    themes: tuple[str, ...]
+    if rest and isinstance(rest[0], int):
+        end_verse = rest[0]
+        themes = tuple(str(theme) for theme in rest[1:])
+    else:
+        themes = tuple(str(theme) for theme in rest)
+    return {"reference": _reference(book, chapter, start_verse, end_verse), "themes": themes}
+
+
+CURATED_PASSAGE_LIBRARY: dict[str, list[dict[str, object]]] = {
     "consistency": [
-        _reference("Psalm", 23, 1, 3),
-        _reference("Matthew", 11, 28, 30),
-        _reference("Hebrews", 4, 14, 16),
-        _reference("Psalm", 27, 13, 14),
-        _reference("Isaiah", 40, 29, 31),
-        _reference("Lamentations", 3, 22, 24),
-        _reference("Psalm", 1, 1, 3),
-        _reference("Galatians", 6, 9, 10),
+        _themed_reference("Psalm", 23, 1, 3, "encouragement", "rest", "trust", "prayer"),
+        _themed_reference("Matthew", 11, 28, 30, "encouragement", "rest", "burden", "prayer"),
+        _themed_reference("Hebrews", 4, 14, 16, "prayer", "help", "assurance", "trust"),
+        _themed_reference("Psalm", 27, 13, 14, "encouragement", "trust", "courage", "waiting"),
+        _themed_reference("Isaiah", 40, 29, 31, "encouragement", "strength", "waiting"),
+        _themed_reference("Lamentations", 3, 22, 24, "hope", "mercy", "encouragement", "restart"),
+        _themed_reference("Psalm", 1, 1, 3, "steadiness", "scripture", "rhythm"),
+        _themed_reference("Galatians", 6, 9, 10, "perseverance", "service", "obedience"),
     ],
     "application": [
-        _reference("James", 1, 22, 25),
-        _reference("Micah", 6, 8),
-        _reference("Colossians", 3, 12, 17),
-        _reference("Luke", 6, 46, 49),
-        _reference("Romans", 12, 9, 13),
-        _reference("Ephesians", 4, 29, 32),
-        _reference("Philippians", 2, 3, 5),
-        _reference("1 John", 3, 16, 18),
+        _themed_reference("James", 1, 22, 25, "obedience", "follow_through", "scripture"),
+        _themed_reference("Micah", 6, 8, "obedience", "justice", "mercy", "humility"),
+        _themed_reference("Colossians", 3, 12, 17, "compassion", "community", "speech", "obedience"),
+        _themed_reference("Luke", 6, 46, 49, "obedience", "foundation", "follow_through"),
+        _themed_reference("Romans", 12, 9, 13, "love", "service", "prayer"),
+        _themed_reference("Ephesians", 4, 29, 32, "speech", "forgiveness", "community"),
+        _themed_reference("Philippians", 2, 3, 5, "humility", "service", "love"),
+        _themed_reference("1 John", 3, 16, 18, "love", "service", "generosity"),
     ],
     "comprehension": [
-        _reference("Luke", 24, 13, 17),
-        _reference("Luke", 24, 25, 27),
-        _reference("John", 3, 16, 17),
-        _reference("Nehemiah", 8, 8, 10),
-        _reference("Mark", 4, 35, 41),
-        _reference("Psalm", 119, 33, 37),
-        _reference("Acts", 8, 30, 35),
-        _reference("2 Timothy", 3, 14, 17),
+        _themed_reference("Luke", 24, 13, 17, "understanding", "discouragement", "christ_centered"),
+        _themed_reference("Luke", 24, 25, 27, "understanding", "scripture", "christ_centered"),
+        _themed_reference("John", 3, 16, 17, "gospel", "love", "identity", "christ_centered"),
+        _themed_reference("Nehemiah", 8, 8, 10, "scripture", "understanding", "joy"),
+        _themed_reference("Mark", 4, 35, 41, "trust", "fear", "christ_centered"),
+        _themed_reference("Psalm", 119, 33, 37, "scripture", "understanding", "obedience"),
+        _themed_reference("Acts", 8, 30, 35, "scripture", "understanding", "christ_centered"),
+        _themed_reference("2 Timothy", 3, 14, 17, "scripture", "understanding", "equipping"),
     ],
     "growth": [
-        _reference("John", 15, 1, 5),
-        _reference("Philippians", 3, 7, 14),
-        _reference("Hebrews", 12, 1, 3),
-        _reference("Romans", 8, 31, 39),
-        _reference("2 Peter", 1, 3, 8),
-        _reference("Colossians", 2, 6, 7),
-        _reference("Ephesians", 3, 16, 19),
-        _reference("Galatians", 5, 22, 25),
+        _themed_reference("John", 15, 1, 5, "abiding", "fruitfulness", "identity"),
+        _themed_reference("Philippians", 3, 7, 14, "growth", "pursuit", "endurance"),
+        _themed_reference("Hebrews", 12, 1, 3, "endurance", "suffering", "christ_centered"),
+        _themed_reference("Romans", 8, 31, 39, "assurance", "identity", "suffering"),
+        _themed_reference("2 Peter", 1, 3, 8, "growth", "diligence", "holiness"),
+        _themed_reference("Colossians", 2, 6, 7, "rootedness", "identity", "thankfulness"),
+        _themed_reference("Ephesians", 3, 16, 19, "identity", "love", "strength"),
+        _themed_reference("Galatians", 5, 22, 25, "spirit", "fruit", "holiness"),
     ],
+}
+
+CURATED_PASSAGE_BANK: dict[str, list[PassageReference]] = {
+    focus: [entry["reference"] for entry in entries]
+    for focus, entries in CURATED_PASSAGE_LIBRARY.items()
+}
+
+BASE_THEME_WEIGHTS: dict[str, Counter[str]] = {
+    "consistency": Counter({"encouragement": 2, "rest": 2, "steadiness": 2, "trust": 1, "prayer": 1, "waiting": 1}),
+    "application": Counter({"obedience": 3, "follow_through": 2, "service": 1, "love": 1, "humility": 1, "speech": 1}),
+    "comprehension": Counter({"understanding": 3, "scripture": 2, "christ_centered": 2, "trust": 1}),
+    "growth": Counter({"growth": 2, "identity": 2, "abiding": 1, "endurance": 1, "holiness": 1, "love": 1}),
+}
+
+THEME_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "prayer": ("pray", "prayer", "intercede"),
+    "encouragement": ("encouragement", "comfort", "hope", "weary", "burden", "overwhelmed", "peace"),
+    "obedience": ("obey", "obedience", "doer", "action", "follow-through", "follow through", "next step"),
+    "follow_through": ("follow-through", "follow through", "finish", "complete", "carry forward"),
+    "service": ("serve", "service", "care", "kindness", "hospitality", "generosity", "someone else"),
+    "love": ("love", "compassion", "mercy", "forgive", "forgiveness"),
+    "humility": ("humble", "humility", "lowly"),
+    "speech": ("speech", "words", "tongue", "talk", "speak"),
+    "understanding": ("understand", "understanding", "clarity", "meaning", "interpret", "interpretation"),
+    "scripture": ("scripture", "word", "passage", "text", "reading", "read"),
+    "christ_centered": ("christ", "jesus", "gospel", "cross", "resurrection"),
+    "identity": ("identity", "assurance", "beloved", "adopted", "in christ", "love of god"),
+    "trust": ("trust", "rest", "wait", "waiting", "fear", "peace"),
+    "endurance": ("endure", "endurance", "persevere", "perseverance", "patience", "steady", "rhythm"),
+    "suffering": ("suffer", "suffering", "pain", "grief", "storm", "discouraged", "anxious", "stressed"),
+    "strength": ("strength", "strong", "faint", "weak"),
+    "growth": ("grow", "growth", "maturity", "deeper", "challenge"),
+    "holiness": ("holy", "godliness", "purity", "fruit"),
+    "abiding": ("abide", "abiding", "remain", "rooted"),
+    "hope": ("hope", "mercies", "faithfulness"),
+    "joy": ("joy", "glad", "rejoice"),
 }
 
 
@@ -258,7 +310,7 @@ class PersonalizationService:
 
         focus = gap_report.focus_area
         lead_pattern = gap_report.observed_patterns[0] if gap_report.observed_patterns else None
-        reference = self._select_reference_for_focus(user_id, focus)
+        reference = self._select_reference_for_focus(user_id, focus, cache=cache)
         if focus == "consistency":
             guide_mode = "coach"
             entry_point = "help me restart after missing a few days"
@@ -300,7 +352,12 @@ class PersonalizationService:
 
         if latest_mood is not None:
             if latest_mood.mood in {"anxious", "stressed", "discouraged"}:
-                reference = PassageReference(book="Psalm", chapter=23, start_verse=1, end_verse=3)
+                reference = self._select_reference_for_focus(
+                    user_id,
+                    "consistency",
+                    cache=cache,
+                    preferred_themes=Counter({"encouragement": 4, "rest": 3, "prayer": 3, "trust": 2, "hope": 2}),
+                )
                 guide_mode = "peer" if profile.preferences.preferred_guide_mode == "peer" else "guide"
                 entry_point = "I need encouragement"
                 reason = "Recent mood signals suggest the next session should steady and encourage the user before pressing harder."
@@ -586,23 +643,125 @@ class PersonalizationService:
         ending = f"-{reference.end_verse}" if reference.end_verse else ""
         return f"{reference.book} {reference.chapter}:{reference.start_verse}{ending}"
 
-    def _select_reference_for_focus(self, user_id: str, focus: str) -> PassageReference:
-        bank = CURATED_PASSAGE_BANK.get(focus) or CURATED_PASSAGE_BANK["growth"]
+    def _select_reference_for_focus(
+        self,
+        user_id: str,
+        focus: str,
+        cache: dict[str, object] | None = None,
+        preferred_themes: Counter[str] | None = None,
+    ) -> PassageReference:
+        cache = self._resolve_cache(cache)
+        library = CURATED_PASSAGE_LIBRARY.get(focus) or CURATED_PASSAGE_LIBRARY["growth"]
         seen_records = {
             self._format_reference(record.reference): record
             for record in self.study_service.list_seen_passages(user_id, focus)
         }
-        unseen = [reference for reference in bank if self._format_reference(reference) not in seen_records]
-        if unseen:
-            return unseen[0]
+        theme_weights = self._build_theme_weights(user_id, focus, cache=cache, preferred_themes=preferred_themes)
+        unseen_entries = [entry for entry in library if self._format_reference(entry["reference"]) not in seen_records]
+        if unseen_entries:
+            return self._choose_best_entry(unseen_entries, theme_weights, library)["reference"]
+
+        top_score = max(self._score_entry_themes(entry, theme_weights) for entry in library)
+        top_entries = [entry for entry in library if self._score_entry_themes(entry, theme_weights) == top_score]
         return min(
-            bank,
-            key=lambda reference: (
-                seen_records[self._format_reference(reference)].session_count,
-                seen_records[self._format_reference(reference)].last_seen_at,
-                bank.index(reference),
+            top_entries,
+            key=lambda entry: (
+                seen_records[self._format_reference(entry["reference"])].session_count,
+                seen_records[self._format_reference(entry["reference"])].last_seen_at,
+                library.index(entry),
+            ),
+        )["reference"]
+
+    def _build_theme_weights(
+        self,
+        user_id: str,
+        focus: str,
+        cache: dict[str, object] | None = None,
+        preferred_themes: Counter[str] | None = None,
+    ) -> Counter[str]:
+        cache = self._resolve_cache(cache)
+        weights = Counter(BASE_THEME_WEIGHTS.get(focus, {}))
+        if preferred_themes:
+            weights.update(preferred_themes)
+
+        latest_mood = self._get_cached(
+            cache,
+            f"latest_mood:{user_id}",
+            lambda: self.study_service.get_latest_mood_checkin(user_id),
+        )
+        open_action_items = self._get_cached(
+            cache,
+            f"open_action_items:{user_id}",
+            lambda: self.study_service.list_action_items(user_id, status="open"),
+        )
+        active_prayer_items = self._get_cached(
+            cache,
+            f"active_prayer_items:{user_id}",
+            lambda: self.study_service.list_prayer_items(user_id, status="active"),
+        )
+        memory_summary = self._get_cached(
+            cache,
+            f"memory_summary:{user_id}",
+            lambda: self.study_service.summarize_spiritual_memory(user_id),
+        )
+
+        if latest_mood is not None:
+            if latest_mood.mood in {"anxious", "stressed", "discouraged"}:
+                weights.update(Counter({"encouragement": 3, "trust": 2, "rest": 2, "prayer": 2, "hope": 1, "suffering": 1}))
+            elif latest_mood.mood in {"peaceful", "encouraged"}:
+                weights.update(Counter({"growth": 1, "endurance": 1, "love": 1}))
+
+            if latest_mood.energy == "low":
+                weights.update(Counter({"rest": 2, "encouragement": 1, "steadiness": 1}))
+            elif latest_mood.energy == "high":
+                weights.update(Counter({"growth": 1, "endurance": 1}))
+
+            self._apply_theme_keywords(weights, latest_mood.notes)
+
+        if open_action_items:
+            weights.update(Counter({"obedience": 3, "follow_through": 3, "service": 1, "prayer": 1}))
+            for item in open_action_items[:3]:
+                self._apply_theme_keywords(weights, f"{item.title} {item.detail}")
+
+        if active_prayer_items:
+            weights.update(Counter({"prayer": 3, "trust": 1, "encouragement": 1}))
+            for item in active_prayer_items[:3]:
+                self._apply_theme_keywords(weights, f"{item.title} {item.detail}")
+
+        if memory_summary.memory_count > 0:
+            self._apply_theme_keywords(weights, memory_summary.latest_summary)
+            self._apply_theme_keywords(weights, memory_summary.carry_forward_prompt)
+            for theme in memory_summary.recurring_themes[:4]:
+                self._apply_theme_keywords(weights, theme)
+            for area in memory_summary.growth_areas[:4]:
+                self._apply_theme_keywords(weights, area)
+
+        return weights
+
+    def _apply_theme_keywords(self, weights: Counter[str], text: str | None) -> None:
+        if not text:
+            return
+        lowered = text.lower()
+        for theme, keywords in THEME_KEYWORDS.items():
+            if any(keyword in lowered for keyword in keywords):
+                weights[theme] += 1
+
+    def _choose_best_entry(
+        self,
+        entries: list[dict[str, object]],
+        theme_weights: Counter[str],
+        library: list[dict[str, object]],
+    ) -> dict[str, object]:
+        return max(
+            entries,
+            key=lambda entry: (
+                self._score_entry_themes(entry, theme_weights),
+                -library.index(entry),
             ),
         )
+
+    def _score_entry_themes(self, entry: dict[str, object], theme_weights: Counter[str]) -> int:
+        return sum(theme_weights.get(theme, 0) for theme in entry.get("themes", ()))
 
     def _decide_nudge_timing(
         self,
