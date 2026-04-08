@@ -20,6 +20,8 @@ from emmaus.providers.llm import LLMProviderRegistry
 from emmaus.services.study import StudyService
 from emmaus.services.text import TextSourceService
 
+PASSAGE_REVISIT_COOLDOWN = timedelta(days=2)
+
 
 def _reference(book: str, chapter: int, start_verse: int, end_verse: int | None = None) -> PassageReference:
     return PassageReference(book=book, chapter=chapter, start_verse=start_verse, end_verse=end_verse)
@@ -310,7 +312,7 @@ class PersonalizationService:
 
         focus = gap_report.focus_area
         lead_pattern = gap_report.observed_patterns[0] if gap_report.observed_patterns else None
-        reference = self._select_reference_for_focus(user_id, focus, cache=cache)
+        reference, revisit_reason = self._select_reference_choice(user_id, focus, cache=cache)
         if focus == "consistency":
             guide_mode = "coach"
             entry_point = "help me restart after missing a few days"
@@ -336,6 +338,9 @@ class PersonalizationService:
             reason = "Current patterns are healthy enough to push into deeper reflection and challenge."
             suggested_action = "Use the next session to confront assumptions and pursue a more demanding application."
 
+        if revisit_reason:
+            reason = f"{revisit_reason} {reason}"
+
         if lead_pattern is not None:
             reason = f"{reason} {lead_pattern}"
 
@@ -352,7 +357,7 @@ class PersonalizationService:
 
         if latest_mood is not None:
             if latest_mood.mood in {"anxious", "stressed", "discouraged"}:
-                reference = self._select_reference_for_focus(
+                reference, revisit_reason = self._select_reference_choice(
                     user_id,
                     "consistency",
                     cache=cache,
@@ -650,27 +655,78 @@ class PersonalizationService:
         cache: dict[str, object] | None = None,
         preferred_themes: Counter[str] | None = None,
     ) -> PassageReference:
+        reference, _ = self._select_reference_choice(
+            user_id,
+            focus,
+            cache=cache,
+            preferred_themes=preferred_themes,
+        )
+        return reference
+
+    def _select_reference_choice(
+        self,
+        user_id: str,
+        focus: str,
+        cache: dict[str, object] | None = None,
+        preferred_themes: Counter[str] | None = None,
+    ) -> tuple[PassageReference, str | None]:
         cache = self._resolve_cache(cache)
         library = CURATED_PASSAGE_LIBRARY.get(focus) or CURATED_PASSAGE_LIBRARY["growth"]
         seen_records = {
             self._format_reference(record.reference): record
             for record in self.study_service.list_seen_passages(user_id, focus)
         }
+        all_seen_records = self._get_cached(
+            cache,
+            f"seen_passages:{user_id}:all",
+            lambda: self.study_service.list_seen_passages(user_id),
+        )
+        recent_cutoff = datetime.now(UTC) - PASSAGE_REVISIT_COOLDOWN
+        recent_reference_keys = {
+            self._format_reference(record.reference)
+            for record in all_seen_records
+            if record.last_seen_at >= recent_cutoff
+        }
+        most_recent_record = max(all_seen_records, key=lambda record: record.last_seen_at, default=None)
         theme_weights = self._build_theme_weights(user_id, focus, cache=cache, preferred_themes=preferred_themes)
         unseen_entries = [entry for entry in library if self._format_reference(entry["reference"]) not in seen_records]
+        unseen_without_recent = [
+            entry for entry in unseen_entries if self._format_reference(entry["reference"]) not in recent_reference_keys
+        ]
+        if unseen_without_recent:
+            return self._choose_best_entry(unseen_without_recent, theme_weights, library)["reference"], None
         if unseen_entries:
-            return self._choose_best_entry(unseen_entries, theme_weights, library)["reference"]
+            chosen_entry = self._choose_best_entry(unseen_entries, theme_weights, library)
+            chosen_reference = chosen_entry["reference"]
+            return chosen_reference, self._build_revisit_reason(chosen_reference, most_recent_record)
 
         top_score = max(self._score_entry_themes(entry, theme_weights) for entry in library)
         top_entries = [entry for entry in library if self._score_entry_themes(entry, theme_weights) == top_score]
-        return min(
-            top_entries,
+        candidate_entries = [
+            entry for entry in top_entries if self._format_reference(entry["reference"]) not in recent_reference_keys
+        ] or top_entries
+        chosen_entry = min(
+            candidate_entries,
             key=lambda entry: (
                 seen_records[self._format_reference(entry["reference"])].session_count,
                 seen_records[self._format_reference(entry["reference"])].last_seen_at,
                 library.index(entry),
             ),
-        )["reference"]
+        )
+        chosen_reference = chosen_entry["reference"]
+        revisit_reason = None
+        if self._format_reference(chosen_reference) in recent_reference_keys:
+            revisit_reason = self._build_revisit_reason(chosen_reference, most_recent_record)
+        return chosen_reference, revisit_reason
+
+    def _build_revisit_reason(self, reference: PassageReference, most_recent_record: object | None) -> str:
+        reference_label = self._format_reference(reference)
+        if most_recent_record is not None and self._format_reference(most_recent_record.reference) == reference_label:
+            return (
+                f"Emmaus is bringing you back to {reference_label} because your most recent session and next step "
+                "are still pointing to the same growth edge."
+            )
+        return f"Emmaus is revisiting {reference_label} because it still speaks directly to the thread it is carrying forward."
 
     def _build_theme_weights(
         self,

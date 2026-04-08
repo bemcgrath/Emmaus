@@ -1287,6 +1287,68 @@ def test_recommendations_rotate_curated_passages_after_one_is_seen(tmp_path, mon
     assert second_payload["recommended_reference"]["book"] in {"Micah", "Colossians", "Luke", "Romans", "Ephesians", "Philippians", "1 John"}
 
 
+def test_recommendations_avoid_recent_same_passage_across_focuses(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    personalization = client.app.state.container.personalization_service
+    study = client.app.state.container.study_service
+    monkeypatch.setattr(
+        personalization,
+        "build_gap_report",
+        lambda user_id, cache=None: StudyGapReport(
+            user_id=user_id,
+            comprehension_gap=0.18,
+            application_gap=0.81,
+            consistency_gap=0.2,
+            focus_area="application",
+            observed_patterns=["A recent session still points toward clearer follow-through."],
+        ),
+    )
+
+    study.record_passage_seen(
+        "demo-user",
+        "comprehension",
+        {"book": "James", "chapter": 1, "start_verse": 22, "end_verse": 25},
+    )
+
+    recommendation = client.get("/v1/agent/recommendations/demo-user")
+    assert recommendation.status_code == 200
+    payload = recommendation.json()
+    assert payload["recommended_reference"] != {
+        "book": "James",
+        "chapter": 1,
+        "start_verse": 22,
+        "end_verse": 25,
+    }
+    assert "bringing you back" not in payload["reason"].lower()
+
+
+def test_recommendations_explain_intentional_revisits(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    personalization = client.app.state.container.personalization_service
+    study = client.app.state.container.study_service
+    monkeypatch.setattr(
+        personalization,
+        "build_gap_report",
+        lambda user_id, cache=None: StudyGapReport(
+            user_id=user_id,
+            comprehension_gap=0.18,
+            application_gap=0.81,
+            consistency_gap=0.2,
+            focus_area="application",
+            observed_patterns=["A recent session still points toward clearer follow-through."],
+        ),
+    )
+
+    for reference in CURATED_PASSAGE_BANK["application"]:
+        study.record_passage_seen("demo-user", "application", reference.model_dump())
+
+    recommendation = client.get("/v1/agent/recommendations/demo-user")
+    assert recommendation.status_code == 200
+    payload = recommendation.json()
+    assert payload["recommended_reference"]["book"]
+    assert "emmaus is revisiting" in payload["reason"].lower() or "emmaus is bringing you back" in payload["reason"].lower()
+
+
 def test_mood_shapes_recommendation_and_nudge_preview(tmp_path, monkeypatch):
     client = build_client(tmp_path, monkeypatch)
 

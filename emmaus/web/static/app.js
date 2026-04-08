@@ -1460,7 +1460,11 @@ function buildTodayReasonSummary(recommendation) {
   const focusLabel = humanizeFocusArea(recommendation.focus_area).toLowerCase();
   const baseReason = truncateGuideCopy(polishGuideCopy(recommendation.reason), 150);
   const pattern = truncateGuideCopy(polishGuideCopy(safeArray(recommendation.gap_report?.observed_patterns)[0] || ""), 110);
+  const isExplicitRevisit = /^Emmaus is (bringing you back|revisiting) /i.test(baseReason);
 
+  if (isExplicitRevisit) {
+    return baseReason;
+  }
   if (focusLabel === "living it out") {
     return `Today Emmaus is helping you turn what you've studied into a clear next step.`;
   }
