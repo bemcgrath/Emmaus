@@ -825,10 +825,13 @@ class PersonalizationService:
 
     def _next_delivery_candidate(self, profile: UserProfile, preview_at: datetime | None) -> datetime | None:
         timezone_name = profile.preferences.timezone or "UTC"
-        try:
-            zone = ZoneInfo(timezone_name)
-        except ZoneInfoNotFoundError:
-            zone = ZoneInfo("UTC")
+        if timezone_name in {"UTC", "Etc/UTC"}:
+            zone = UTC
+        else:
+            try:
+                zone = ZoneInfo(timezone_name)
+            except ZoneInfoNotFoundError:
+                zone = UTC
         base_time = preview_at or datetime.now(UTC)
         if base_time.tzinfo is None:
             base_time = base_time.replace(tzinfo=UTC)

@@ -1438,12 +1438,8 @@ def test_review_history_groups_recent_sessions_prayers_and_actions(tmp_path, mon
     assert payload["prayers"][0]["related_session_id"] == session_id
 
 
-def test_nudge_preview_falls_back_to_builtin_utc_without_tzdata(tmp_path, monkeypatch):
+def test_nudge_preview_and_plan_fall_back_to_builtin_utc_without_tzdata(tmp_path, monkeypatch):
     client = build_client(tmp_path, monkeypatch)
-    personalization = client.app.state.container.personalization_service
-
-    real_zoneinfo = personalization.__class__.__mro__[0].__dict__.get('_decide_nudge_timing')
-    assert real_zoneinfo is not None
 
     from zoneinfo import ZoneInfoNotFoundError
     import emmaus.services.personalization as personalization_module
@@ -1453,10 +1449,15 @@ def test_nudge_preview_falls_back_to_builtin_utc_without_tzdata(tmp_path, monkey
 
     monkeypatch.setattr(personalization_module, 'ZoneInfo', fake_zoneinfo)
 
-    response = client.post('/v1/agent/nudges/preview', json={'user_id': 'demo-user'})
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload['local_timezone'] == 'UTC'
+    preview_response = client.post('/v1/agent/nudges/preview', json={'user_id': 'demo-user'})
+    assert preview_response.status_code == 200
+    preview_payload = preview_response.json()
+    assert preview_payload['local_timezone'] == 'UTC'
+
+    plan_response = client.post('/v1/agent/nudges/plan', json={'user_id': 'demo-user'})
+    assert plan_response.status_code == 200
+    plan_payload = plan_response.json()
+    assert plan_payload['delivery_status'] in {'send_now', 'scheduled', 'suppressed'}
 
 
 def test_requested_minutes_changes_question_count_and_plan(tmp_path, monkeypatch):
