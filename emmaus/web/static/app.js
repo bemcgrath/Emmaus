@@ -1922,14 +1922,14 @@ function buildPastoralSessionReason(recommendation, memorySummary) {
 }
 
 function buildQuestionTransitionCopy(session, currentQuestion) {
-  const latestMessage = truncateGuideCopy(polishGuideCopy(session?.latest_message || ""), 150);
+  const latestMessage = truncateGuideCopy(polishGuideCopy(session?.latest_message || ""), 120);
   if (latestMessage) {
     return latestMessage.replace(/^Next question:\s*/i, "");
   }
   if (!currentQuestion) {
     return "You've worked through the questions. Finish the session and let Emmaus help you carry one response into today.";
   }
-  return `Take this next question slowly and keep your answer close to the passage.`;
+  return "Take this next question slowly and stay close to the passage.";
 }
 
 function renderSessionStart(payload, { navigate = true } = {}) {
@@ -1962,8 +1962,8 @@ function renderSessionStart(payload, { navigate = true } = {}) {
       <div class="session-meta">
         <span class="meta-pill">${escapeHtml(String(session.requested_minutes))} min</span>
         <span class="meta-pill">${escapeHtml(sessionLengthLabel(session.requested_minutes))}</span>
-        <span class="meta-pill">${escapeHtml(humanizeEntryPoint(session.entry_point))}</span>
       </div>
+      <p class="micro-copy session-setup-note"><strong>Starting from:</strong> ${escapeHtml(humanizeEntryPoint(session.entry_point))}</p>
     </div>
   `;
   elements.passageText.innerHTML = buildPassageMarkup(payload.passage);

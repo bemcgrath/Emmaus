@@ -174,6 +174,7 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "openBibleSettingsInProfile" in asset.text
     assert "resetViewportScroll" in asset.text
     assert "review-history-details" in asset.text
+    assert "session-setup-note" in asset.text
     assert "previewBibleSource" in asset.text
     assert "onTranslationTemplateClick" in asset.text
     assert "buildPassageMarkup" in asset.text

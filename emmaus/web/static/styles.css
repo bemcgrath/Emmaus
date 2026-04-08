@@ -131,6 +131,12 @@ button:disabled { cursor: not-allowed; opacity: 0.6; transform: none; }
 .commentary-handoff { margin: 0.15rem 0 0.35rem; color: var(--text-muted); }
 .session-context-card { background: linear-gradient(145deg, rgba(255, 248, 232, 0.96), rgba(244, 232, 204, 0.92)); }
 .session-context-copy { color: var(--text-muted); line-height: 1.5; }
+.session-setup-note { margin-top: -0.1rem; }
+#response-text { min-height: 8rem; }
+#entry-point-input {
+  min-height: 5.5rem;
+  line-height: 1.45;
+}
 .session-passage { line-height: 1.7; white-space: pre-wrap; }
 .passage-notice { margin-top: 0.9rem; font-size: 0.82rem; line-height: 1.45; color: var(--text-muted); }
 .commentary-note { border-left: 4px solid var(--accent); padding-left: 0.9rem; background: rgba(255, 250, 241, 0.96); border-radius: 0 18px 18px 0; padding-top: 0.9rem; padding-bottom: 0.9rem; display: grid; gap: 0.7rem; }
@@ -250,6 +256,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .hero-copy, .today-plan-copy, .micro-copy, .recommendation-support, .memory-prompt, .empty-state { overflow-wrap: anywhere; }
   .commentary-details summary { flex-direction: column; align-items: flex-start; }
   .meta-pill { justify-content: center; }
+  .prompt-card, .session-passage, .inline-card, .commentary-note, .commentary-details, .session-context-card { padding: 0.9rem; }
+  .session-passage { line-height: 1.62; }
+  .session-meta, .recommendation-meta, .today-plan-actions { gap: 0.5rem; }
+  #question-progress-pill, #session-status-pill { min-width: 0; padding: 0.4rem 0.65rem; font-size: 0.78rem; }
+  #response-text { min-height: 7.25rem; padding: 0.85rem 0.9rem; }
+  #entry-point-input { min-height: 5rem; padding: 0.8rem 0.9rem; }
+  .session-setup-note { margin-top: 0; }
   .inline-inputs > label,
   .inline-inputs input[type="time"] { width: 100%; max-width: 100%; }
   .inline-inputs input[type="time"] {
