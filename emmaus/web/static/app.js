@@ -81,6 +81,9 @@ function cacheElements() {
     sourceManageToggle: document.getElementById("source-manage-toggle"),
     sourceManagerDetails: document.getElementById("source-manager-details"),
     sourcePreviewCard: document.getElementById("source-preview-card"),
+    homeBibleCurrentName: document.getElementById("home-bible-current-name"),
+    openBibleSettingsButton: document.getElementById("open-bible-settings-button"),
+    profileBiblePanel: document.getElementById("profile-bible-panel"),
     identityForm: document.getElementById("identity-form"),
     userIdInput: document.getElementById("user-id-input"),
     displayNameInput: document.getElementById("display-name-input"),
@@ -160,6 +163,7 @@ function cacheElements() {
 
 function bindEvents() {
   elements.sourceManageToggle?.addEventListener("click", onToggleBibleManager);
+  elements.openBibleSettingsButton?.addEventListener("click", openBibleSettingsInProfile);
   elements.navButtons.forEach((button) => {
     button.addEventListener("click", () => showScreen(button.dataset.navTarget));
   });
@@ -2696,6 +2700,13 @@ function focusIdentityForm() {
   elements.identityForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function openBibleSettingsInProfile() {
+  showScreen("profile");
+  setBibleManagerExpanded(true);
+  elements.profileBiblePanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  elements.sourceManageToggle?.focus();
+}
+
 function syncDemoQueryParam(scenario) {
   const url = new URL(window.location.href);
   if (scenario === "live") {
@@ -3023,6 +3034,9 @@ function renderBibleSourceManager() {
   if (sourceUi.currentName) {
     sourceUi.currentName.textContent = preferredSource?.name || "Choose your Bible";
   }
+    if (elements.homeBibleCurrentName) {
+      elements.homeBibleCurrentName.textContent = preferredSource?.name || "Choose your Bible";
+    }
   if (sourceUi.currentDetail) {
     sourceUi.currentDetail.textContent = preferredSource
       ? `${preferredSource.name} is your current Bible for new sessions. Active sessions keep the Bible they started with.`

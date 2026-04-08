@@ -149,8 +149,11 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "review-history-card" in response.text
     assert "review-summary-pill" in response.text
     assert "Look back with clarity" in response.text
-    assert "Open Bible settings" in response.text
-    assert "Bible settings live in Profile" in response.text
+    assert "Change Bible" in response.text
+    assert "Your current Bible" in response.text
+    assert "Default for new sessions" in response.text
+    assert 'id="home-bible-current-name"' in response.text
+    assert 'id="profile-bible-panel"' in response.text
     assert "nudge-plan-card" in response.text
     assert response.text.count('id="identity-form"') == 1
     assert response.text.count('id="mood-form"') == 1
@@ -168,6 +171,7 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "onConnectEsvSource" in asset.text
     assert "renderTranslationTemplates" in asset.text
     assert "renderSourcePreview" in asset.text
+    assert "openBibleSettingsInProfile" in asset.text
     assert "previewBibleSource" in asset.text
     assert "onTranslationTemplateClick" in asset.text
     assert "buildPassageMarkup" in asset.text

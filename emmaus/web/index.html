@@ -148,11 +148,13 @@
             <div class="panel-heading">
               <div>
                 <p class="panel-label">Bible</p>
-                <h2>Bible settings live in Profile</h2>
+                <h2>Your current Bible</h2>
               </div>
             </div>
-            <p class="micro-copy">Emmaus will keep using your current Bible for new sessions. You can change it any time under Profile.</p>
-            <button class="secondary-button" type="button" data-nav-target="profile">Open Bible settings</button>
+            <p class="panel-label">Default for new sessions</p>
+            <p><strong id="home-bible-current-name">Your selected Bible</strong></p>
+            <p class="micro-copy">You can change it any time under Profile.</p>
+            <button class="secondary-button" type="button" id="open-bible-settings-button">Change Bible</button>
           </section>
         </section>
 
@@ -342,7 +344,7 @@
           </section>
   
           <section class="screen" data-screen="profile">
-          <section class="panel stack-panel">
+          <section class="panel stack-panel" id="profile-bible-panel">
             <div class="panel-heading">
               <div>
                 <p class="panel-label">Bible</p>
