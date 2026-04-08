@@ -26,6 +26,7 @@ body {
   font-family: var(--font-body);
   color: var(--text);
   background: radial-gradient(circle at top, rgba(255, 241, 217, 0.95), transparent 38%), linear-gradient(180deg, #f9f2e4 0%, #f1e3cd 48%, #ecd7b6 100%);
+  overflow-x: hidden;
 }
 button, input, select, textarea { font: inherit; }
 button { border: 0; cursor: pointer; }
@@ -58,6 +59,16 @@ h2 { font-size: 1.35rem; }
 .screens, .screen, .hero-card, .stack-panel, .stack-form, .content-stack, .list-stack, .commentary-block { display: grid; gap: 0.85rem; }
 .screen { display: none; }
 .screen-active { display: grid; }
+.screen,
+.panel,
+.hero-card,
+.inline-card,
+.action-card,
+.current-bible-card,
+.panel-heading > div,
+.action-card-header > div {
+  min-width: 0;
+}
 .panel, .hero-card {
   background: var(--surface);
   backdrop-filter: blur(18px);
@@ -71,6 +82,13 @@ h2 { font-size: 1.35rem; }
 .hero-copy, .today-plan-copy { font-size: 0.98rem; line-height: 1.5; color: var(--text-muted); }
 .hero-actions, .panel-heading, .button-row, .chip-row, .bottom-nav, .recommendation-meta, .nudge-meta, .session-meta, .today-plan-actions, .dual-grid, .inline-inputs {
   display: flex; gap: 0.75rem;
+}
+.hero-actions, .panel-heading, .button-row, .chip-row, .today-plan-actions, .inline-inputs, .action-card-header {
+  flex-wrap: wrap;
+}
+.recommendation-meta, .nudge-meta, .session-meta, .today-plan-actions {
+  flex-wrap: wrap;
+  align-items: flex-start;
 }
 .hero-actions, .panel-heading, .button-row { justify-content: space-between; align-items: center; }
 .dual-grid { display: grid; grid-template-columns: 1fr 1fr; }
@@ -138,6 +156,26 @@ button:disabled { cursor: not-allowed; opacity: 0.6; transform: none; }
 .commentary-details summary::-webkit-details-marker { display: none; }
 .commentary-details-body { display: grid; gap: 0.6rem; color: var(--text-muted); line-height: 1.55; }
 .commentary-list { margin: 0; padding-left: 1.15rem; display: grid; gap: 0.45rem; }
+.review-history-details {
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(255, 251, 245, 0.9);
+  padding: 0.9rem 1rem;
+}
+.review-history-details summary {
+  cursor: pointer;
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+.review-history-details[open] {
+  display: grid;
+  gap: 0.9rem;
+}
+.review-history-details-body {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+}
 .meta-pill {
   display: inline-flex;
   border-radius: 999px;
@@ -145,6 +183,15 @@ button:disabled { cursor: not-allowed; opacity: 0.6; transform: none; }
   color: var(--text-muted);
   padding: 0.35rem 0.7rem;
   font-size: 0.82rem;
+  white-space: normal;
+  text-align: center;
+}
+input[type="time"] {
+  min-width: 0;
+  max-width: 100%;
+}
+.inline-inputs > label {
+  min-width: 0;
 }
 .progress-track { height: 0.6rem; border-radius: 999px; background: rgba(159, 94, 45, 0.12); overflow: hidden; }
 .progress-fill { height: 100%; border-radius: inherit; background: linear-gradient(135deg, var(--olive) 0%, var(--accent) 100%); }
@@ -184,13 +231,33 @@ button:disabled { cursor: not-allowed; opacity: 0.6; transform: none; }
 .hidden { display: none; }
 button:hover, button:focus-visible { transform: translateY(-1px); }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid rgba(159, 94, 45, 0.28); outline-offset: 2px; }
-@media (max-width: 420px) {
+@media (max-width: 640px) {
   .app-shell { padding-top: max(0.7rem, env(safe-area-inset-top)); padding-left: 0.85rem; padding-right: 0.85rem; }
   h1 { font-size: clamp(1.35rem, 7.2vw, 1.8rem); max-width: 16ch; }
   .topbar { margin-bottom: 0.55rem; }
   .dual-grid { grid-template-columns: 1fr; }
-  .hero-actions, .panel-heading, .button-row, .today-plan-actions, .inline-inputs { flex-direction: column; align-items: stretch; }
+  .hero-actions, .panel-heading, .button-row, .today-plan-actions, .inline-inputs, .action-card-header, .source-card-actions, .current-bible-actions { flex-direction: column; align-items: stretch; }
+  .hero-actions > *, .button-row > *, .today-plan-actions > *, .inline-inputs > *, .source-card-actions > *, .current-bible-actions > * { width: 100%; min-width: 0; }
+  .current-bible-actions .action-button,
+  .current-bible-actions .secondary-button { flex: 0 0 auto; }
+  #source-manage-toggle {
+    align-self: stretch;
+    width: 100%;
+    padding: 0.85rem 1rem;
+    min-height: auto;
+  }
+  .panel-heading > * { width: 100%; min-width: 0; }
+  .hero-copy, .today-plan-copy, .micro-copy, .recommendation-support, .memory-prompt, .empty-state { overflow-wrap: anywhere; }
   .commentary-details summary { flex-direction: column; align-items: flex-start; }
+  .meta-pill { justify-content: center; }
+  .inline-inputs > label,
+  .inline-inputs input[type="time"] { width: 100%; max-width: 100%; }
+  .inline-inputs input[type="time"] {
+    width: calc(100% - 1rem);
+    max-width: calc(100% - 1rem);
+    padding: 0.75rem 0.75rem;
+    margin-right: 1rem;
+  }
   .bottom-nav { gap: 0.45rem; }
   .demo-chip-row .choice-chip, .choice-chip { flex-basis: 46%; }
 }
@@ -235,10 +302,29 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .current-bible-actions {
   align-items: center;
+  margin-top: 0.4rem;
 }
 .current-bible-actions .action-button,
 .current-bible-actions .secondary-button {
   flex: 1 1 180px;
+}
+#source-manage-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8rem 1.15rem;
+  line-height: 1.15;
+}
+@media (max-width: 640px) {
+  .current-bible-actions .action-button,
+  .current-bible-actions .secondary-button {
+    flex: 0 0 auto;
+  }
+  #source-manage-toggle {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    min-height: auto;
+  }
 }
 .source-current-meta {
   display: flex;

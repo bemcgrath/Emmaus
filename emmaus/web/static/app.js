@@ -1715,9 +1715,21 @@ function renderReviewHistory(reviewHistory) {
     return;
   }
 
-  const sessionMarkup = sessions.length
-    ? sessions.map((entry) => buildReviewSessionCard(entry)).join("")
+  const visibleSessions = sessions.slice(0, 2);
+  const olderSessions = sessions.slice(2);
+  const sessionMarkup = visibleSessions.length
+    ? visibleSessions.map((entry) => buildReviewSessionCard(entry)).join("")
     : '<p class="empty-state">No completed sessions yet. Your recent responses will show up here after you finish one.</p>';
+  const olderSessionsMarkup = olderSessions.length
+    ? `
+      <details class="review-history-details">
+        <summary>Show ${olderSessions.length} older review ${olderSessions.length === 1 ? "item" : "items"}</summary>
+        <div class="review-history-details-body">
+          ${olderSessions.map((entry) => buildReviewSessionCard(entry)).join("")}
+        </div>
+      </details>
+    `
+    : '';
 
   const prayerHistory = prayers.length
     ? `<div class="inline-card review-prayer-history"><p><strong>Prayer history</strong></p><p class="micro-copy">${escapeHtml(buildPrayerHistorySummary(prayers))}</p></div>`
@@ -1726,6 +1738,7 @@ function renderReviewHistory(reviewHistory) {
   elements.reviewHistoryCard.innerHTML = `
     <div class="list-stack review-history-stack">
       ${sessionMarkup}
+      ${olderSessionsMarkup}
       ${prayerHistory}
     </div>
   `;
@@ -2693,6 +2706,13 @@ function showScreen(screenName) {
   elements.navButtons.forEach((button) => {
     button.classList.toggle("nav-pill-active", button.dataset.navTarget === screenName);
   });
+  resetViewportScroll();
+}
+
+function resetViewportScroll() {
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
 }
 
 function focusIdentityForm() {
