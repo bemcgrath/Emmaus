@@ -86,75 +86,15 @@
             <div id="memory-thread-card" class="content-stack"></div>
           </section>
 
-          <section class="panel stack-panel">
+          <section class="panel stack-panel bible-note-panel">
             <div class="panel-heading">
               <div>
                 <p class="panel-label">Bible</p>
-                <h2>Your Bible</h2>
+                <h2>Bible settings live in Profile</h2>
               </div>
             </div>
-            <p class="micro-copy" id="source-manager-copy">Emmaus will use your current Bible for new sessions.</p>
-            <div class="inline-card current-bible-card">
-              <div class="content-stack compact-gap">
-                <p><strong id="source-current-name">Current Bible</strong></p>
-                <p class="micro-copy" id="source-current-detail">Choose the Bible Emmaus should use for new sessions.</p>
-              </div>
-              <div class="source-card-actions current-bible-actions">
-                <button id="source-manage-toggle" class="secondary-button" type="button" aria-expanded="false">Manage Bible</button>
-              </div>
-            </div>
-            <section id="source-manager-details" class="content-stack hidden">
-              <div class="source-quick-actions">
-                <button id="source-use-starter" class="primary-button full-width" type="button">Use included starter Bible</button>
-                <button id="source-focus-esv" class="secondary-button full-width" type="button">Connect ESV</button>
-                <button id="source-advanced-toggle" class="secondary-button full-width" type="button" aria-expanded="false">More setup options</button>
-              </div>
-              <section id="source-setup-options" class="content-stack hidden">
-                <div id="translation-template-list" class="list-stack"></div>
-                <div id="source-preview-card" class="content-stack"></div>
-                <div id="source-library" class="list-stack"></div>
-                <form id="source-esv-form" class="stack-form compact-form">
-                  <p class="panel-label">Connect ESV</p>
-                  <p class="micro-copy">Use your Crossway ESV API key. Emmaus will connect through the official API without bundling the text in this open-source app.</p>
-                  <label>
-                    <span>ESV API key</span>
-                    <input id="source-esv-key" type="password" placeholder="Paste your ESV API key" />
-                  </label>
-                  <button class="secondary-button full-width" type="submit">Connect ESV</button>
-                </form>
-                <form id="source-upload-form" class="stack-form compact-form">
-                  <p class="panel-label">Upload from device</p>
-                  <label>
-                    <span>Bible name</span>
-                    <input id="source-upload-name" type="text" placeholder="My Bible" />
-                  </label>
-                  <label>
-                    <span>Bible JSON file</span>
-                    <input id="source-upload-file" type="file" accept=".json,application/json" />
-                  </label>
-                  <button class="secondary-button full-width" type="submit">Upload Bible file</button>
-                </form>
-                <section id="source-advanced-panel" class="stack-form compact-form">
-                  <p class="panel-label">Advanced setup</p>
-                  <p class="micro-copy">Use this only if your Bible provider gave you an API URL and key.</p>
-                  <form id="source-api-form" class="stack-form compact-form no-top-gap">
-                    <label>
-                      <span>Provider name</span>
-                      <input id="source-api-name" type="text" placeholder="Licensed Bible provider" />
-                    </label>
-                    <label>
-                      <span>Base URL</span>
-                      <input id="source-api-url" type="url" placeholder="https://example.com/bible" />
-                    </label>
-                    <label>
-                      <span>API key</span>
-                      <input id="source-api-key" type="password" placeholder="Optional" />
-                    </label>
-                    <button class="secondary-button full-width" type="submit">Connect provider</button>
-                  </form>
-                </section>
-              </section>
-            </section>
+            <p class="micro-copy">Emmaus will keep using your current Bible for new sessions. You can change it any time under Profile.</p>
+            <button class="secondary-button" type="button" data-nav-target="profile">Open Bible settings</button>
           </section>
 
           <section class="dual-grid">
@@ -405,11 +345,82 @@
           <section class="panel stack-panel">
             <div class="panel-heading">
               <div>
+                <p class="panel-label">Bible</p>
+                <h2>Your Bible</h2>
+              </div>
+            </div>
+            <p class="micro-copy" id="source-manager-copy">Emmaus will use your current Bible for new sessions. You can change it any time here.</p>
+            <div class="inline-card current-bible-card">
+              <div class="content-stack compact-gap">
+                <p><strong id="source-current-name">Current Bible</strong></p>
+                <p class="micro-copy" id="source-current-detail">Choose the Bible Emmaus should use for new sessions.</p>
+              </div>
+              <div class="source-card-actions current-bible-actions">
+                <button id="source-manage-toggle" class="secondary-button" type="button" aria-expanded="false">Manage Bible</button>
+              </div>
+            </div>
+            <section id="source-manager-details" class="content-stack hidden">
+              <div class="source-quick-actions">
+                <button id="source-use-starter" class="primary-button full-width" type="button">Use included starter Bible</button>
+                <button id="source-focus-esv" class="secondary-button full-width" type="button">Connect ESV</button>
+                <button id="source-advanced-toggle" class="secondary-button full-width" type="button" aria-expanded="false">More setup options</button>
+              </div>
+              <section id="source-setup-options" class="content-stack hidden">
+                <div id="translation-template-list" class="list-stack"></div>
+                <div id="source-preview-card" class="content-stack"></div>
+                <div id="source-library" class="list-stack"></div>
+                <form id="source-esv-form" class="stack-form compact-form">
+                  <p class="panel-label">Connect ESV</p>
+                  <p class="micro-copy">Use your Crossway ESV API key. Emmaus will connect through the official API without bundling the text in this open-source app.</p>
+                  <label>
+                    <span>ESV API key</span>
+                    <input id="source-esv-key" type="password" placeholder="Paste your ESV API key" />
+                  </label>
+                  <button class="secondary-button full-width" type="submit">Connect ESV</button>
+                </form>
+                <form id="source-upload-form" class="stack-form compact-form">
+                  <p class="panel-label">Upload from device</p>
+                  <label>
+                    <span>Bible name</span>
+                    <input id="source-upload-name" type="text" placeholder="My Bible" />
+                  </label>
+                  <label>
+                    <span>Bible JSON file</span>
+                    <input id="source-upload-file" type="file" accept=".json,application/json" />
+                  </label>
+                  <button class="secondary-button full-width" type="submit">Upload Bible file</button>
+                </form>
+                <section id="source-advanced-panel" class="stack-form compact-form">
+                  <p class="panel-label">Advanced setup</p>
+                  <p class="micro-copy">Use this only if your Bible provider gave you an API URL and key.</p>
+                  <form id="source-api-form" class="stack-form compact-form no-top-gap">
+                    <label>
+                      <span>Provider name</span>
+                      <input id="source-api-name" type="text" placeholder="Licensed Bible provider" />
+                    </label>
+                    <label>
+                      <span>Base URL</span>
+                      <input id="source-api-url" type="url" placeholder="https://example.com/bible" />
+                    </label>
+                    <label>
+                      <span>API key</span>
+                      <input id="source-api-key" type="password" placeholder="Optional" />
+                    </label>
+                    <button class="secondary-button full-width" type="submit">Connect provider</button>
+                  </form>
+                </section>
+              </section>
+            </section>
+          </section>
+
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
                 <p class="panel-label">Profile</p>
                 <h2>Guide profile and rhythm</h2>
               </div>
             </div>
-            <p class="micro-copy">Adjust your study rhythm, Bible preference, reminder tone, and time windows here. Your daily check-in now lives on Home.</p>
+            <p class="micro-copy">Adjust your study rhythm, reminder tone, and time windows here. Your daily check-in now lives on Home.</p>
             <form id="identity-form" class="stack-form">
               <label>
                 <span>User ID</span>

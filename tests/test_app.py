@@ -149,9 +149,12 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "review-history-card" in response.text
     assert "review-summary-pill" in response.text
     assert "Look back with clarity" in response.text
+    assert "Open Bible settings" in response.text
+    assert "Bible settings live in Profile" in response.text
     assert "nudge-plan-card" in response.text
     assert response.text.count('id="identity-form"') == 1
     assert response.text.count('id="mood-form"') == 1
+    assert response.text.count('id="source-manager-copy"') == 1
     assert 'data-nav-target="profile"' in response.text
     assert 'data-nav-target="nudges"' not in response.text
 
