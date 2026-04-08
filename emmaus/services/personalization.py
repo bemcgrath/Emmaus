@@ -769,11 +769,15 @@ class PersonalizationService:
         preview_at: datetime | None,
     ) -> tuple[str, datetime | None, str, str]:
         timezone_name = profile.preferences.timezone or "UTC"
-        try:
-            zone = ZoneInfo(timezone_name)
-        except ZoneInfoNotFoundError:
-            zone = ZoneInfo("UTC")
+        if timezone_name in {"UTC", "Etc/UTC"}:
+            zone = UTC
             timezone_name = "UTC"
+        else:
+            try:
+                zone = ZoneInfo(timezone_name)
+            except ZoneInfoNotFoundError:
+                zone = UTC
+                timezone_name = "UTC"
 
         base_time = preview_at or datetime.now(UTC)
         if base_time.tzinfo is None:
