@@ -4,29 +4,10 @@ Emmaus is a mobile-first, agentic Bible study app built to help users deepen the
 
 The app is designed around a personalized guide that helps users read, understand, apply, and return to Scripture in a way that fits their real habits, schedule, and spiritual needs. Bible text, commentary, and AI logic remain modular so the project can stay open-source and avoid bundling proprietary content.
 
-## Current Status
-
-Emmaus is currently in late `Phase 1` and early `Phase 2`.
-
-That means:
-
-- the MVP guide loop is real and usable end to end
-- mobile-first study, action steps, reminders, and ESV-first setup are working
-- personalization is already underway through mood, timing, memory, response evaluation, and adaptive session recommendations
-- content depth is only lightly started through modular text-source work and ESV support
-
-A practical way to think about the project right now:
-
-- `Phase 1`: substantially complete
-- `Phase 2`: actively in progress
-- `Phase 3`: lightly started
-
-The next priority is not foundational scaffolding anymore. It is making the guide feel more consistently pastoral, intelligent, and polished across real user flows.
 ## Core Docs
 
 - [Objective](docs/OBJECTIVE.md)
 - [Product Blueprint](docs/PRODUCT_BLUEPRINT.md)
-- [Roadmap](docs/ROADMAP.md)
 - [Bible Source Connection](docs/BIBLE_SOURCE_CONNECTION.md)
 - [ESV Setup](docs/ESV_SETUP.md)
 - [Licensed Translation Guide](docs/LICENSED_TRANSLATIONS.md)
@@ -71,18 +52,16 @@ docs/             Product and objective references
 tests/            API and frontend smoke tests
 ```
 
-## MVP Translation Focus
+## Translation Experience
 
-Emmaus should be fully usable for `ESV` in the MVP.
+Emmaus is currently optimized around an `ESV`-first experience, while still supporting the included starter Bible and other modular source connections.
 
-That means the MVP translation experience should prioritize:
+The translation experience prioritizes:
 
 - a smooth `Connect ESV` flow
 - clear attribution and source visibility
-- strong mobile-first ESV setup and selection UX
-- the included starter Bible as the fallback when ESV is not connected
-
-For now, `NIV` and `NASB` should remain documented licensing targets rather than active MVP commitments.
+- strong mobile-first Bible setup and selection UX
+- the included starter Bible as a fallback when ESV is not connected
 
 ## Current API Surface
 
@@ -177,11 +156,11 @@ uvicorn emmaus.main:app --reload
 
 Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) to use the mobile-first Emmaus web client.
 
-## Mobile-first frontend surface
+## Mobile Experience
 
-Emmaus now includes a lightweight mobile web client served directly from the FastAPI app at `/`.
+Emmaus includes a lightweight mobile web client served directly from the FastAPI app at `/`.
 
-The current frontend emphasizes:
+The frontend emphasizes:
 
 - onboarding that captures guide mode, study rhythm, preferred days, timing windows, and nudge tone
 - a return-to-today�s-plan home screen that highlights the next best step
@@ -226,7 +205,7 @@ Emmaus now includes a built-in demo mode for the mobile web client.
 - You can also open a seeded state directly with `?demo=first_visit`, `?demo=comprehension_gap`, `?demo=in_progress`, `?demo=overdue_action`, or `?demo=scheduled_nudge`.
 - Switch back to `Live` anytime to use the real API-backed experience.
 
-## Open-source licensing posture
+## Licensing Posture
 
 - The codebase is MIT licensed.
 - No proprietary Bible texts or commentary are bundled.
