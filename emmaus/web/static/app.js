@@ -116,6 +116,10 @@ function cacheElements() {
     openActionCopy: document.getElementById("open-action-copy"),
     recommendationCard: document.getElementById("recommendation-card"),
     focusPill: document.getElementById("focus-pill"),
+    lookBackPill: document.getElementById("look-back-pill"),
+    lookBackCard: document.getElementById("look-back-card"),
+    lookBackForm: document.getElementById("look-back-form"),
+    lookBackResponseText: document.getElementById("look-back-response-text"),
     moodForm: document.getElementById("mood-form"),
     moodChipRow: document.getElementById("mood-chip-row"),
     energySelect: document.getElementById("energy-select"),
@@ -124,6 +128,7 @@ function cacheElements() {
     sessionForm: document.getElementById("session-form"),
     sessionFormCopy: document.getElementById("session-form-copy"),
     sessionFormButton: document.getElementById("session-form-button"),
+    sessionPanelHeading: document.getElementById("session-panel-heading"),
     entryPointInput: document.getElementById("entry-point-input"),
     requestedMinutesInput: document.getElementById("requested-minutes-input"),
     sessionGuideMode: document.getElementById("session-guide-mode"),
@@ -187,6 +192,7 @@ function bindEvents() {
   });
   elements.identityForm.addEventListener("submit", onSaveIdentity);
   elements.moodForm.addEventListener("submit", onSaveMood);
+  elements.lookBackForm?.addEventListener("submit", onSubmitLookBack);
   elements.sessionForm.addEventListener("submit", onStartSession);
   elements.responseForm.addEventListener("submit", onSubmitResponse);
   elements.completeForm.addEventListener("submit", onCompleteSession);
@@ -950,6 +956,7 @@ function renderDashboardShell({ profile, recommendation, streaks, actionItems, p
   renderHero(profile, recommendation, activeSession, actionItems);
   renderProfile(profile);
   renderRecommendation(recommendation, state.memorySummary);
+  renderLookBack(state.lookBack);
   renderMemorySummary(state.memorySummary);
   renderStreaks(streaks);
   renderActionItems(actionItems);
@@ -968,6 +975,49 @@ function renderDashboardShell({ profile, recommendation, streaks, actionItems, p
     clearSessionView();
     localStorage.removeItem("emmaus.activeSessionId");
   }
+}
+
+function renderLookBack(lookBack) {
+  if (!elements.lookBackCard || !elements.lookBackPill || !elements.lookBackForm || !elements.lookBackResponseText) {
+    return;
+  }
+
+  const prompt = lookBack?.prompt || null;
+  const latestReview = lookBack?.latest_review || null;
+
+  if (prompt) {
+    elements.lookBackPill.textContent = "Ready";
+    elements.lookBackCard.innerHTML = `
+      <div class="memory-card">
+        <p><strong>${escapeHtml(formatReference(prompt.reference))}</strong></p>
+        <p>${escapeHtml(prompt.prompt)}</p>
+        <p class="micro-copy">${escapeHtml(prompt.support_text)}</p>
+      </div>
+    `;
+    elements.lookBackForm.classList.remove("hidden");
+    return;
+  }
+
+  elements.lookBackResponseText.value = "";
+  elements.lookBackForm.classList.add("hidden");
+
+  if (latestReview) {
+    elements.lookBackPill.textContent = "Saved";
+    elements.lookBackCard.innerHTML = `
+      <div class="memory-card">
+        <p><strong>${escapeHtml(formatReference(latestReview.reference))}</strong></p>
+        <p class="today-plan-copy">${escapeHtml(latestReview.encouragement)}</p>
+        <div class="inline-card">
+          <p><strong>You remembered</strong></p>
+          <p>${escapeHtml(latestReview.response_text)}</p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  elements.lookBackPill.textContent = "Ready";
+  elements.lookBackCard.innerHTML = '<p class="empty-state">Finish a session and Emmaus will bring one recent truth back into view here.</p>';
 }
 
 function renderHero(profile, recommendation, activeSession, actionItems) {
@@ -1452,8 +1502,9 @@ function updateSessionEntryState(activeSession) {
   if (activeSession) {
     const session = activeSession.session;
     const sessionSourceName = getSourceById(session.text_source_id)?.name || "the Bible chosen for this session";
+    elements.sessionPanelHeading.textContent = "Resume today's session";
     elements.sessionStatusPill.textContent = "Active";
-    elements.sessionFormCopy.textContent = `You already have an active session in ${formatReference(session.reference)}. This session will keep using ${sessionSourceName}. Adjust the time you have left, then resume where you left off.`;
+    elements.sessionFormCopy.textContent = `You already have an active session in ${formatReference(session.reference)} using ${sessionSourceName}. Adjust the time you have left, then resume.`;
     elements.sessionFormButton.textContent = "Adjust time and resume";
     elements.entryPointInput.value = "continue where I left off";
     elements.requestedMinutesInput.value = session.requested_minutes || state.recommendation?.recommended_minutes || "";
@@ -1468,6 +1519,7 @@ function updateSessionEntryState(activeSession) {
 
   setSessionResumeMode(false);
   setSessionEntryFormLocked(false);
+  elements.sessionPanelHeading.textContent = "Start or continue";
   elements.sessionStatusPill.textContent = "Ready";
   elements.sessionFormCopy.textContent = state.recommendation
     ? `Emmaus suggests ${state.recommendation.recommended_minutes} minutes centered on ${humanizeFocusArea(state.recommendation.focus_area).toLowerCase()}.`

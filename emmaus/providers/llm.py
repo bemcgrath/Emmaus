@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http.client
 import json
 import socket
 from abc import ABC, abstractmethod
@@ -80,7 +81,7 @@ class OllamaProvider(LLMProvider):
         try:
             with request.urlopen(tags_url, timeout=timeout_seconds) as response:
                 return getattr(response, "status", 200) == 200
-        except (error.URLError, TimeoutError, socket.timeout):
+        except (error.URLError, TimeoutError, socket.timeout, http.client.HTTPException, ValueError):
             return False
 
     def generate_guidance(self, prompt: str) -> str:

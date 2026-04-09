@@ -148,6 +148,29 @@
             <div id="recommendation-card" class="content-stack"></div>
           </section>
 
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Look back</p>
+                <h2>Return and remember</h2>
+              </div>
+              <span class="status-pill" id="look-back-pill">Ready</span>
+            </div>
+            <div id="look-back-card" class="content-stack"></div>
+            <form id="look-back-form" class="stack-form compact-form">
+              <label>
+                <span>Your reflection</span>
+                <textarea
+                  id="look-back-response-text"
+                  name="lookBackResponse"
+                  rows="3"
+                  placeholder="Name what you still remember before you look back."
+                ></textarea>
+              </label>
+              <button class="secondary-button full-width" type="submit">Save look back</button>
+            </form>
+          </section>
+
           <section class="panel stack-panel bible-note-panel">
             <div class="panel-heading">
               <div>
@@ -166,7 +189,7 @@
             <div class="panel-heading">
               <div>
                 <p class="panel-label">Session</p>
-                <h2>Start or continue</h2>
+                <h2 id="session-panel-heading">Start or continue</h2>
               </div>
               <span class="status-pill" id="session-status-pill">Ready</span>
             </div>
