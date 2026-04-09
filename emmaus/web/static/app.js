@@ -1,4 +1,4 @@
-﻿const STARTER_SOURCE_ID = "sample_local";
+const STARTER_SOURCE_ID = "sample_local";
 const ESV_SOURCE_ID = "esv";
 const DEFAULT_TEXT_SOURCES = [
   { source_id: STARTER_SOURCE_ID, name: "Included Starter Bible" },
@@ -16,9 +16,19 @@ const DEFAULT_TRANSLATION_TEMPLATES = [
 const DEMO_SCENARIO_LABELS = {
   live: "Live data",
   first_visit: "First visit",
+  comprehension_gap: "Comprehension gap",
   in_progress: "In progress session",
   overdue_action: "Overdue next step",
   scheduled_nudge: "Scheduled nudge",
+};
+
+const DEMO_SCENARIO_DETAILS = {
+  live: "You are viewing your real Emmaus profile, current session, and next steps.",
+  first_visit: "Shows how Emmaus feels for a brand-new user starting gently for the first time.",
+  comprehension_gap: "Shows a slower session where Emmaus helps the user stay closer to the passage before applying it.",
+  in_progress: "Shows an active session already underway so you can preview the resume experience.",
+  overdue_action: "Shows a user with an unfinished next step so the Home and Actions flow can focus on follow-through.",
+  scheduled_nudge: "Shows how Emmaus previews a comeback reminder when it is time to re-engage the user.",
 };
 
 const state = {
@@ -68,6 +78,7 @@ function cacheElements() {
     previewNudgeButton: document.getElementById("preview-nudge-button"),
     demoSceneRow: document.getElementById("demo-scene-row"),
     demoStatusCopy: document.getElementById("demo-status-copy"),
+    demoSceneDetail: document.getElementById("demo-scene-detail"),
     onboardingPanel: document.getElementById("onboarding-panel"),
     onboardingCopy: document.getElementById("onboarding-copy"),
     onboardingStepPill: document.getElementById("onboarding-step-pill"),
@@ -858,7 +869,7 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
   state.userId = userId;
   localStorage.setItem("emmaus.userId", userId);
 
-  const [profile, recommendation, streaks, actionItemsResponse, prayerItemsResponse, reviewHistory, latestMood, activeSession, memorySummary] = await Promise.all([
+  const [profile, recommendation, streaks, actionItemsResponse, prayerItemsResponse, reviewHistory, latestMood, activeSession, memorySummary, lookBack] = await Promise.all([
     fetchJson(`/v1/users/${encodeURIComponent(userId)}/profile`),
     fetchJson(`/v1/agent/recommendations/${encodeURIComponent(userId)}`),
     fetchJson(`/v1/engagement/streaks/${encodeURIComponent(userId)}`),
@@ -868,6 +879,7 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
     fetchJson(`/v1/study/mood/${encodeURIComponent(userId)}`, { allowNull: true }),
     fetchJson(`/v1/agent/session/active/${encodeURIComponent(userId)}`, { allowNull: true }),
     fetchJson(`/v1/users/${encodeURIComponent(userId)}/memory`, { allowNull: true }),
+    fetchJson(`/v1/study/look-back/${encodeURIComponent(userId)}`, { allowNull: true }),
   ]);
 
   state.profile = profile;
@@ -880,6 +892,7 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
   state.activeSessionPayload = activeSession;
   state.currentQuestion = activeSession?.current_question || null;
   state.memorySummary = memorySummary;
+  state.lookBack = lookBack;
   state.nudge = null;
   state.nudgePlan = null;
 
@@ -915,6 +928,7 @@ function renderDemoDashboard({ restoreScreen = false } = {}) {
   state.nudge = demo.nudge;
   state.nudgePlan = demo.nudgePlan;
   state.memorySummary = demo.memorySummary;
+  state.lookBack = demo.lookBack || null;
 
   renderDashboardShell({
     profile: demo.profile,
@@ -1421,23 +1435,38 @@ function setSessionEntryFormLocked(locked, { allowMinutes = false } = {}) {
   elements.textSourceSelect.disabled = locked;
 }
 
+function setSessionResumeMode(active) {
+  [
+    elements.entryPointInput?.closest("label"),
+    elements.sessionGuideMode?.closest("label"),
+    elements.textSourceSelect?.closest("label"),
+  ].forEach((field) => {
+    if (!field) {
+      return;
+    }
+    field.classList.toggle("hidden", active);
+  });
+}
+
 function updateSessionEntryState(activeSession) {
   if (activeSession) {
     const session = activeSession.session;
     const sessionSourceName = getSourceById(session.text_source_id)?.name || "the Bible chosen for this session";
     elements.sessionStatusPill.textContent = "Active";
-    elements.sessionFormCopy.textContent = `You already have an active session in ${formatReference(session.reference)}. This session will keep using ${sessionSourceName}, but you can still adjust the time you have left and Emmaus will reshape the rest of today's plan.`;
+    elements.sessionFormCopy.textContent = `You already have an active session in ${formatReference(session.reference)}. This session will keep using ${sessionSourceName}. Adjust the time you have left, then resume where you left off.`;
     elements.sessionFormButton.textContent = "Adjust time and resume";
-    elements.entryPointInput.value = humanizeEntryPoint(session.entry_point || state.recommendation?.recommended_entry_point || "continue where I left off");
+    elements.entryPointInput.value = "continue where I left off";
     elements.requestedMinutesInput.value = session.requested_minutes || state.recommendation?.recommended_minutes || "";
     elements.sessionGuideMode.value = session.guide_mode || "";
     if (session.text_source_id) {
       elements.textSourceSelect.value = session.text_source_id;
     }
+    setSessionResumeMode(true);
     setSessionEntryFormLocked(true, { allowMinutes: true });
     return;
   }
 
+  setSessionResumeMode(false);
   setSessionEntryFormLocked(false);
   elements.sessionStatusPill.textContent = "Ready";
   elements.sessionFormCopy.textContent = state.recommendation
@@ -1843,18 +1872,17 @@ function buildSessionContextCard(payload) {
   const memorySummary = state.memorySummary;
   const leadingPattern = safeArray(recommendation?.gap_report?.observed_patterns)[0] || null;
   const shortReason = buildPastoralSessionReason(recommendation, memorySummary);
-  const shortPattern = leadingPattern ? truncateGuideCopy(polishGuideCopy(leadingPattern), 100) : null;
+  const shortPattern = leadingPattern ? truncateGuideCopy(polishGuideCopy(leadingPattern), 95) : null;
   const meta = [
     recommendation?.focus_area ? `<span class="meta-pill">${escapeHtml(humanizeFocusArea(recommendation.focus_area))}</span>` : "",
-    recommendation?.recommended_guide_mode ? `<span class="meta-pill">${escapeHtml(humanizeGuideMode(recommendation.recommended_guide_mode))}</span>` : "",
     recommendation?.recommended_minutes ? `<span class="meta-pill">${escapeHtml(String(recommendation.recommended_minutes))} min</span>` : "",
   ].filter(Boolean).join("");
 
   return `
     <div class="session-context-card">
-      <p><strong>Where Emmaus is leading today</strong></p>
+      <p><strong>Why this passage today</strong></p>
       <p class="session-context-copy">${escapeHtml(shortReason)}</p>
-      ${shortPattern ? `<p class="session-context-copy"><strong>Pay attention to:</strong> ${escapeHtml(shortPattern)}</p>` : ""}
+      ${shortPattern ? `<p class="session-context-copy"><strong>Growth edge:</strong> ${escapeHtml(shortPattern)}</p>` : ""}
       ${meta ? `<div class="session-meta">${meta}</div>` : ""}
     </div>
   `;
@@ -1932,21 +1960,31 @@ function buildSessionLengthCopy(session, commentaryNotes) {
 
 function buildPastoralSessionReason(recommendation, memorySummary) {
   const focus = humanizeFocusArea(recommendation?.focus_area || "growth").toLowerCase();
-  const carryForwardPrompt = memorySummary?.carry_forward_prompt ? truncateGuideCopy(polishGuideCopy(memorySummary.carry_forward_prompt), 110) : null;
-  const reason = truncateGuideCopy(polishGuideCopy(recommendation?.reason || "Emmaus is helping you stay close to Christ in this passage."), 145);
+  const carryForwardPrompt = memorySummary?.carry_forward_prompt ? truncateGuideCopy(polishGuideCopy(memorySummary.carry_forward_prompt), 100) : null;
+  const reason = truncateGuideCopy(polishGuideCopy(recommendation?.reason || "Emmaus is helping you stay close to Christ in this passage."), 125);
   if (carryForwardPrompt) {
-    return `Today Emmaus is guiding you toward ${focus}. ${carryForwardPrompt}`;
+    return `Emmaus is bringing you back to ${focus} today so the last thread can deepen instead of getting left behind.`;
   }
   return reason;
 }
 
 function buildQuestionTransitionCopy(session, currentQuestion) {
-  const latestMessage = truncateGuideCopy(polishGuideCopy(session?.latest_message || ""), 120);
-  if (latestMessage) {
-    return latestMessage.replace(/^Next question:\s*/i, "");
+  const latestMessage = polishGuideCopy(session?.latest_message || "").trim();
+  const cleanedMessage = latestMessage.replace(/^Next question:\s*/i, "").trim();
+  if (cleanedMessage && !/[.]{3}$/.test(cleanedMessage) && !/[\u2026]$/.test(cleanedMessage)) {
+    return cleanedMessage;
   }
   if (!currentQuestion) {
     return "You've worked through the questions. Finish the session and let Emmaus help you carry one response into today.";
+  }
+  if (currentQuestion?.type === "observation") {
+    return "Stay close to the passage and notice what it is saying before you move on.";
+  }
+  if (currentQuestion?.type === "interpretation") {
+    return "Name what the passage means before you rush toward application.";
+  }
+  if (currentQuestion?.type === "application") {
+    return "Let the passage shape one clear response you can carry into today.";
   }
   return "Take this next question slowly and stay close to the passage.";
 }
@@ -1958,14 +1996,14 @@ function renderSessionStart(payload, { navigate = true } = {}) {
   const session = payload.session;
   const commentaryNotes = safeArray(payload.commentary);
   const guideIntro = state.currentQuestion
-    ? `Emmaus will guide this session one question at a time to help you ${humanizeQuestionType(state.currentQuestion.type).toLowerCase()}.`
+    ? `Emmaus will guide this session one question at a time, starting with ${humanizeQuestionType(state.currentQuestion.type).toLowerCase()}.`
     : "Emmaus is ready to guide this session one step at a time as you read and respond.";
   const lengthIntro = buildSessionLengthCopy(session, commentaryNotes);
   const guideLabelMap = {
-    guide: "Guided study",
-    peer: "Conversation guide",
-    challenger: "Deeper challenge",
-    coach: "Coaching guide",
+    guide: "How this session will work",
+    peer: "How this session will work",
+    challenger: "How this session will work",
+    coach: "How this session will work",
   };
   const guideLabel = guideLabelMap[session.guide_mode] || sentenceCase(session.guide_mode);
   elements.sessionStatusPill.textContent = sentenceCase(session.status);
@@ -1982,7 +2020,6 @@ function renderSessionStart(payload, { navigate = true } = {}) {
         <span class="meta-pill">${escapeHtml(String(session.requested_minutes))} min</span>
         <span class="meta-pill">${escapeHtml(sessionLengthLabel(session.requested_minutes))}</span>
       </div>
-      <p class="micro-copy session-setup-note"><strong>Starting from:</strong> ${escapeHtml(humanizeEntryPoint(session.entry_point))}</p>
     </div>
   `;
   elements.passageText.innerHTML = buildPassageMarkup(payload.passage);
@@ -2263,11 +2300,19 @@ function buildNudgeThreadContext(nudge) {
 function renderDemoControls() {
   const label = DEMO_SCENARIO_LABELS[state.demoScenario] || DEMO_SCENARIO_LABELS.first_visit;
   elements.demoStatusCopy.textContent = isDemoMode()
-    ? `Showing ${label}. Demo scenes are read-only and never write to your live Emmaus data.`
+    ? `Currently previewing ${label}. Demo scenes are read-only and never write to your live Emmaus data.`
     : "Live mode is using the real API-backed data for the current user. Switch to a seeded demo scene anytime.";
+  if (elements.demoSceneDetail) {
+    elements.demoSceneDetail.innerHTML = `
+      <p><strong>${escapeHtml(isDemoMode() ? `Previewing ${label}` : "Current view")}</strong></p>
+      <p class="micro-copy">${escapeHtml(DEMO_SCENARIO_DETAILS[state.demoScenario] || DEMO_SCENARIO_DETAILS.live)}</p>
+    `;
+  }
 
   elements.demoSceneRow.querySelectorAll("[data-demo-scenario]").forEach((button) => {
-    button.classList.toggle("choice-chip-active", button.dataset.demoScenario === state.demoScenario);
+    const isSelected = button.dataset.demoScenario === state.demoScenario;
+    button.classList.toggle("choice-chip-active", isSelected);
+    button.setAttribute("aria-pressed", isSelected ? "true" : "false");
   });
 }
 async function onDemoScenarioSelect(event) {
@@ -2670,6 +2715,37 @@ async function onSubmitActionFollowUp(event) {
   showToast("You saved what happened, and Emmaus updated your thread.");
 }
 
+async function onSubmitLookBack(event) {
+  event.preventDefault();
+  if (!ensureLiveMode("Switch to Live to save a real look-back reflection.")) {
+    return;
+  }
+  const prompt = state.lookBack?.prompt;
+  if (!prompt) {
+    showToast("There is not a look-back prompt ready right now.");
+    return;
+  }
+  const responseText = optionalText(elements.lookBackResponseText.value);
+  if (!responseText) {
+    showToast("Add a short reflection before saving it.");
+    return;
+  }
+
+  const review = await fetchJson("/v1/study/look-back/respond", {
+    method: "POST",
+    body: {
+      user_id: getUserId(),
+      session_id: prompt.session_id,
+      response_text: responseText,
+    },
+  });
+
+  elements.lookBackResponseText.value = "";
+  await refreshExperience({ restoreScreen: false });
+  showScreen("home");
+  showToast(review.outcome === "clear" ? "Emmaus saved that look-back clearly." : "Emmaus saved that look-back and will keep reinforcing the thread.");
+}
+
 async function onPreviewNudgeAtTime(event) {
   event.preventDefault();
   const previewAt = normalizePreviewAt(elements.previewAtInput.value);
@@ -2892,7 +2968,16 @@ function humanizeEntryPoint(value) {
     "I need clarity before application": "Help me understand before I apply this",
     "I want to begin gently": "Ease me in gently",
   };
-  return labels[value] || polishGuideCopy(value || "");
+  const resolved = labels[value] || polishGuideCopy(value || "");
+  return tidyGuidanceLine(resolved);
+}
+
+function tidyGuidanceLine(value) {
+  const normalized = String(value || "").trim().replace(/\s+/g, " ");
+  if (!normalized) {
+    return "";
+  }
+  return normalized.replace(/[\u2026]+$/g, "").replace(/[.]{3,}$/g, "").trim();
 }
 
 function humanizeNudgeType(value) {
@@ -3354,6 +3439,10 @@ function buildSourceIdCandidate(value) {
 function buildGeneratedSourceId(value) {
   return `${buildSourceIdCandidate(value)}_${Date.now()}`;
 }
+
+
+
+
 
 
 

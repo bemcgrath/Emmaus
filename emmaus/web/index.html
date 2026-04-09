@@ -8,7 +8,7 @@
       name="description"
       content="Emmaus is a mobile-first guide for Christ-centered Bible study, adaptive reflection, and practical action."
     />
-    <link rel="stylesheet" href="/static/styles.css?v=20260408m" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260408q" />
   </head>
   <body>
     <div class="app-shell">
@@ -47,6 +47,10 @@
               <button type="button" class="choice-chip" data-demo-scenario="in_progress">In progress</button>
               <button type="button" class="choice-chip" data-demo-scenario="overdue_action">Overdue action</button>
               <button type="button" class="choice-chip" data-demo-scenario="scheduled_nudge">Scheduled nudge</button>
+            </div>
+            <div id="demo-scene-detail" class="inline-card">
+              <p><strong>Current view</strong></p>
+              <p class="micro-copy">Live mode is using your real Emmaus data.</p>
             </div>
           </section>
 
@@ -225,8 +229,10 @@
                 <textarea id="response-text" name="responseText" rows="5" placeholder="Answer honestly and concretely."></textarea>
               </label>
               <label>
-                <span>Engagement</span>
+                <span>How engaged did this feel?</span>
                 <input id="engagement-input" name="engagement" type="range" min="1" max="5" value="4" />
+                <div class="range-labels" aria-hidden="true"><span>Low</span><span>High</span></div>
+                <span class="micro-copy">This is a quick 1-to-5 engagement rating Emmaus uses to pace future questions and follow-up.</span>
               </label>
               <button class="secondary-button full-width" id="submit-response-button" type="submit">Send response</button>
             </form>
@@ -549,6 +555,7 @@
     <script src="/static/app.js" defer></script>
   </body>
 </html>
+
 
 
 

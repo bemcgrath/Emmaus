@@ -9,6 +9,7 @@ from emmaus.api.schemas import (
     CreatePrayerItemRequest,
     MoodCheckInRequest,
     StudyEventRequest,
+    SubmitLookBackReviewRequest,
     UpdatePrayerItemRequest,
 )
 from emmaus.core.bootstrap import Container
@@ -87,6 +88,18 @@ def get_review_history(
     return container.study_service.build_review_history(user_id, limit_sessions=limit_sessions, limit_prayers=limit_prayers)
 
 
+@router.get("/look-back/{user_id}")
+def get_look_back_state(user_id: str, container: Container = Depends(get_container)):
+    return container.study_service.build_look_back_state(user_id)
+
+
+@router.post("/look-back/respond", status_code=201)
+def submit_look_back_review(payload: SubmitLookBackReviewRequest, container: Container = Depends(get_container)):
+    try:
+        return container.study_service.submit_look_back_response(payload.user_id, payload.session_id, payload.response_text)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
 @router.post("/prayer-items", status_code=201)
 def create_prayer_item(payload: CreatePrayerItemRequest, container: Container = Depends(get_container)):
     prayer_item = PrayerItem(
@@ -121,3 +134,5 @@ def mark_prayer_item_answered(
         return container.study_service.mark_prayer_item_answered(prayer_item_id, payload.user_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from emmaus.domain.models import (
     ActionItem,
+    LookBackReview,
     MoodCheckIn,
     PrayerItem,
     SeenPassageRecord,
@@ -140,6 +141,20 @@ class SQLiteStudyRepository:
                     last_seen_at TEXT NOT NULL,
                     session_count INTEGER NOT NULL DEFAULT 1,
                     PRIMARY KEY (user_id, focus_area, reference_key)
+                );
+
+                CREATE TABLE IF NOT EXISTS look_back_reviews (
+                    review_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    session_id TEXT NOT NULL,
+                    reference_json TEXT NOT NULL,
+                    review_type TEXT NOT NULL,
+                    prompt TEXT NOT NULL,
+                    response_text TEXT NOT NULL,
+                    retention_score REAL NOT NULL,
+                    outcome TEXT NOT NULL,
+                    encouragement TEXT NOT NULL,
+                    created_at TEXT NOT NULL
                 );
                 """
             )
@@ -609,6 +624,50 @@ class SQLiteStudyRepository:
             rows = connection.execute(query, tuple(params)).fetchall()
         return [self._row_to_seen_passage(row) for row in rows]
 
+    def add_look_back_review(self, review: LookBackReview) -> LookBackReview:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO look_back_reviews (
+                    review_id, user_id, session_id, reference_json, review_type, prompt, response_text, retention_score, outcome, encouragement, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    review.review_id,
+                    review.user_id,
+                    review.session_id,
+                    json.dumps(review.reference.model_dump()),
+                    review.review_type,
+                    review.prompt,
+                    review.response_text,
+                    review.retention_score,
+                    review.outcome,
+                    review.encouragement,
+                    review.created_at.isoformat(),
+                ),
+            )
+        return review
+
+    def list_look_back_reviews(self, user_id: str, limit: int | None = None) -> list[LookBackReview]:
+        query = "SELECT * FROM look_back_reviews WHERE user_id = ? ORDER BY created_at DESC"
+        params: list[object] = [user_id]
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+        with self._connect() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [self._row_to_look_back_review(row) for row in rows]
+
+    def get_latest_look_back_review_for_session(self, session_id: str) -> LookBackReview | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM look_back_reviews WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
+                (session_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_look_back_review(row)
+
     def list_completed_session_dates(self, user_id: str) -> Sequence[date]:
         with self._connect() as connection:
             rows = connection.execute(
@@ -708,6 +767,21 @@ class SQLiteStudyRepository:
             session_count=row["session_count"],
         )
 
+    def _row_to_look_back_review(self, row: sqlite3.Row) -> LookBackReview:
+        return LookBackReview(
+            review_id=row["review_id"],
+            user_id=row["user_id"],
+            session_id=row["session_id"],
+            reference=json.loads(row["reference_json"]),
+            review_type=row["review_type"],
+            prompt=row["prompt"],
+            response_text=row["response_text"],
+            retention_score=row["retention_score"],
+            outcome=row["outcome"],
+            encouragement=row["encouragement"],
+            created_at=self._parse_datetime(row["created_at"]),
+        )
+
     def _compute_streaks(self, completed_dates: Sequence[date]) -> tuple[int, int]:
         if not completed_dates:
             return 0, 0
@@ -750,4 +824,7 @@ class SQLiteStudyRepository:
 
     def _dt_or_none(self, value: datetime | None) -> str | None:
         return value.isoformat() if value is not None else None
+
+
+
 

@@ -174,7 +174,7 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "openBibleSettingsInProfile" in asset.text
     assert "resetViewportScroll" in asset.text
     assert "review-history-details" in asset.text
-    assert "session-setup-note" in asset.text
+    assert "How this session will work" in asset.text
     assert "previewBibleSource" in asset.text
     assert "onTranslationTemplateClick" in asset.text
     assert "buildPassageMarkup" in asset.text
@@ -193,7 +193,7 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "scripture-adjacent-helps" in asset.text
     assert "commentary-details" in asset.text
     assert "Pray before you continue" in asset.text
-    assert "Where Emmaus is leading today" in asset.text
+    assert "Why this passage today" in asset.text
     assert "renderCompletionSummary" in asset.text
     assert "Carry this with you today" in asset.text
     assert "lastFollowThroughUpdate" in asset.text
@@ -1507,6 +1507,81 @@ def test_review_history_groups_recent_sessions_prayers_and_actions(tmp_path, mon
     assert payload["prayers"][0]["related_session_id"] == session_id
 
 
+def test_look_back_prompt_and_response_are_saved(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    client.app.state.container.llm_registry.register(StrongResponseProvider())
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "requested_minutes": 15,
+        },
+    )
+    assert start.status_code == 200
+    session_id = start.json()["session"]["session_id"]
+    session_reference = start.json()["session"]["reference"]
+
+    current_question = start.json().get("current_question")
+    answers = iter([
+        "I notice this passage presses me to listen carefully before moving on.",
+        "It shows God wants his word to shape real obedience instead of self-deception.",
+        "My next step is to act on what I hear instead of only agreeing with it.",
+    ])
+    while current_question is not None:
+        turn = client.post(
+            "/v1/agent/session/respond",
+            json={
+                "session_id": session_id,
+                "user_id": "demo-user",
+                "response_text": next(answers),
+                "engagement_score": 4,
+            },
+        )
+        assert turn.status_code == 200
+        current_question = turn.json().get("next_question")
+
+    complete = client.post(
+        "/v1/agent/session/complete",
+        json={
+            "session_id": session_id,
+            "user_id": "demo-user",
+            "summary_notes": "Christ is calling me to hear the word and do it.",
+        },
+    )
+    assert complete.status_code == 200
+
+    look_back = client.get("/v1/study/look-back/demo-user")
+    assert look_back.status_code == 200
+    payload = look_back.json()
+    assert payload["prompt"] is not None
+    assert payload["prompt"]["session_id"] == session_id
+    assert payload["prompt"]["reference"]["book"]
+    assert payload["prompt"]["reference"]["chapter"] >= 1
+
+    submit = client.post(
+        "/v1/study/look-back/respond",
+        json={
+            "user_id": "demo-user",
+            "session_id": session_id,
+            "response_text": "I remember that this passage says hearing God's word should lead to real obedience.",
+        },
+    )
+    assert submit.status_code == 201
+    review = submit.json()
+    assert review["session_id"] == session_id
+    assert review["outcome"] in {"clear", "partial", "needs_reinforcement"}
+    assert review["encouragement"]
+
+    refreshed = client.get("/v1/study/look-back/demo-user")
+    assert refreshed.status_code == 200
+    refreshed_payload = refreshed.json()
+    assert refreshed_payload["prompt"] is None
+    assert refreshed_payload["latest_review"] is not None
+    assert refreshed_payload["latest_review"]["session_id"] == session_id
+
+
 def test_nudge_preview_and_plan_fall_back_to_builtin_utc_without_tzdata(tmp_path, monkeypatch):
     client = build_client(tmp_path, monkeypatch)
 
@@ -1629,5 +1704,9 @@ def test_theme_weighted_reference_selection_prefers_service_passages(tmp_path, m
 def test_curated_passage_bank_is_expanded_for_each_focus():
     assert set(CURATED_PASSAGE_BANK) == {"consistency", "application", "comprehension", "growth"}
     assert all(len(bank) >= 8 for bank in CURATED_PASSAGE_BANK.values())
+
+
+
+
 
 

@@ -204,7 +204,14 @@ class UpdatePrayerItemRequest(BaseModel):
     user_id: str
 
 
+class SubmitLookBackReviewRequest(BaseModel):
+    user_id: str
+    session_id: str
+    response_text: str = Field(min_length=1)
+
 class NudgePreviewRequest(BaseModel):
     user_id: str
     preview_at: str | None = None
+
+
 

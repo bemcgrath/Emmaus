@@ -204,6 +204,35 @@ class ReviewHistory(BaseModel):
     prayers: list[PrayerItem] = Field(default_factory=list)
 
 
+class LookBackPrompt(BaseModel):
+    user_id: str
+    session_id: str
+    reference: PassageReference
+    review_type: Literal["meaning", "next_step", "truth"]
+    prompt: str
+    support_text: str
+
+
+class LookBackReview(BaseModel):
+    review_id: str
+    user_id: str
+    session_id: str
+    reference: PassageReference
+    review_type: Literal["meaning", "next_step", "truth"]
+    prompt: str
+    response_text: str
+    retention_score: float = Field(ge=0, le=1)
+    outcome: Literal["clear", "partial", "needs_reinforcement"]
+    encouragement: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class LookBackState(BaseModel):
+    user_id: str
+    prompt: LookBackPrompt | None = None
+    latest_review: LookBackReview | None = None
+
+
 class SeenPassageRecord(BaseModel):
     user_id: str
     focus_area: Literal["comprehension", "application", "consistency", "growth"]
@@ -316,3 +345,4 @@ class AgentSessionCompleteResponse(BaseModel):
     session: StudySession
     action_item: ActionItem
     engagement: EngagementSummary
+

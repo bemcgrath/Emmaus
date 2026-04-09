@@ -3,10 +3,14 @@ from __future__ import annotations
 from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
 from emmaus.domain.models import (
     ActionItem,
     EngagementSummary,
+    LookBackPrompt,
+    LookBackReview,
+    LookBackState,
     MoodCheckIn,
     PrayerItem,
     ReviewHistory,
@@ -307,6 +311,140 @@ class StudyService:
             prayers=prayers,
         )
 
+    def build_look_back_state(self, user_id: str) -> LookBackState:
+        latest_review = self.list_look_back_reviews(user_id, limit=1)
+        return LookBackState(
+            user_id=user_id,
+            prompt=self.build_look_back_prompt(user_id),
+            latest_review=latest_review[0] if latest_review else None,
+        )
+
+    def build_look_back_prompt(self, user_id: str, limit_sessions: int = 5) -> LookBackPrompt | None:
+        sessions = sorted(
+            self.list_sessions(user_id, status="completed"),
+            key=lambda session: (session.completed_at or session.started_at, session.started_at),
+            reverse=True,
+        )[:limit_sessions]
+        reviewed_session_ids = {review.session_id for review in self.list_look_back_reviews(user_id, limit=limit_sessions * 3)}
+        for session in sessions:
+            if session.session_id not in reviewed_session_ids:
+                return self._build_look_back_prompt_for_session(user_id, session)
+        return None
+
+    def submit_look_back_response(self, user_id: str, session_id: str, response_text: str) -> LookBackReview:
+        session = self.get_session(session_id)
+        if session.user_id != user_id or session.status != "completed":
+            raise KeyError(f"Unknown completed session '{session_id}'.")
+        prompt = self._build_look_back_prompt_for_session(user_id, session)
+        if prompt is None:
+            raise KeyError(f"No look-back prompt is available for session '{session_id}'.")
+        retention_score, outcome, encouragement = self._evaluate_look_back_response(user_id, session, prompt, response_text)
+        review = LookBackReview(
+            review_id=str(uuid4()),
+            user_id=user_id,
+            session_id=session.session_id,
+            reference=session.reference,
+            review_type=prompt.review_type,
+            prompt=prompt.prompt,
+            response_text=response_text,
+            retention_score=retention_score,
+            outcome=outcome,
+            encouragement=encouragement,
+        )
+        self.repository.add_look_back_review(review)
+        self.record_event(
+            StudyEvent(
+                user_id=user_id,
+                event_type="reflection_saved",
+                reference=session.reference,
+                engagement_score=4 if outcome == "clear" else 3,
+                notes=f"look_back:{outcome}:{session.session_id}",
+            )
+        )
+        return review
+
+    def list_look_back_reviews(self, user_id: str, limit: int = 5) -> list[LookBackReview]:
+        return self.repository.list_look_back_reviews(user_id, limit=limit)
+
+    def get_latest_look_back_review_for_session(self, session_id: str) -> LookBackReview | None:
+        return self.repository.get_latest_look_back_review_for_session(session_id)
+
+    def _build_look_back_prompt_for_session(self, user_id: str, session: StudySession) -> LookBackPrompt | None:
+        memory = self.get_latest_spiritual_memory_for_session(session.session_id)
+        action_item = next((item for item in self.list_action_items(user_id) if item.session_id == session.session_id), None)
+        review_type = "meaning"
+        prompt = "Before you look back, what do you remember this passage showing about God or what it was saying?"
+        support_text = "Answer from memory first, then let Emmaus reinforce what needs to stay with you."
+        growth_text = " ".join(memory.growth_areas) if memory else ""
+        recurring_text = " ".join(memory.recurring_themes) if memory else ""
+        if any(keyword in f"{growth_text} {recurring_text}".lower() for keyword in ("understand", "meaning", "clarity", "scripture")):
+            review_type = "meaning"
+            prompt = "Before you look back, what do you remember this passage showing about God or what it was saying?"
+        elif action_item is not None:
+            review_type = "next_step"
+            prompt = "What next step did this passage call you toward when you studied it?"
+            support_text = "Name the obedience or response this passage surfaced before you look back at your notes."
+        elif memory and memory.recurring_themes:
+            review_type = "truth"
+            prompt = "What truth from this passage are you still carrying with you today?"
+            support_text = "Say what stayed with you most, even if it is only one clear sentence."
+        return LookBackPrompt(
+            user_id=user_id,
+            session_id=session.session_id,
+            reference=session.reference,
+            review_type=review_type,
+            prompt=prompt,
+            support_text=support_text,
+        )
+
+    def _evaluate_look_back_response(
+        self,
+        user_id: str,
+        session: StudySession,
+        prompt: LookBackPrompt,
+        response_text: str,
+    ) -> tuple[float, str, str]:
+        memory = self.get_latest_spiritual_memory_for_session(session.session_id)
+        action_item = next((item for item in self.list_action_items(user_id) if item.session_id == session.session_id), None)
+        responses = self.list_session_responses(session.session_id)
+        source_parts = [
+            memory.summary if memory else "",
+            memory.carry_forward_prompt if memory else "",
+            " ".join(memory.recurring_themes) if memory else "",
+            " ".join(memory.growth_areas) if memory else "",
+            action_item.title if action_item else "",
+            action_item.detail if action_item else "",
+            " ".join(response.response_text for response in responses[:3]),
+        ]
+        source_keywords = self._extract_keywords(" ".join(source_parts))[:12]
+        response_keywords = set(self._extract_keywords(response_text))
+        overlap = len(response_keywords.intersection(source_keywords))
+        length_bonus = 0.1 if len(response_text.strip()) >= 80 else 0.0
+        retention_score = min(1.0, round(0.32 + (overlap * 0.14) + length_bonus, 2))
+        if overlap >= 4 or retention_score >= 0.78:
+            outcome = "clear"
+            encouragement = "You remembered the heart of this passage well. Keep building on what Christ has already surfaced."
+        elif overlap >= 2 or retention_score >= 0.56:
+            outcome = "partial"
+            encouragement = "You are holding onto part of the thread. Revisit the main idea before moving on too quickly."
+        else:
+            outcome = "needs_reinforcement"
+            encouragement = "This thread may need another slower pass so the meaning stays with you before Emmaus moves on."
+        return retention_score, outcome, encouragement
+
+    def _extract_keywords(self, text: str) -> list[str]:
+        stopwords = {
+            "this", "that", "with", "from", "have", "been", "what", "when", "your", "about", "into", "their",
+            "them", "they", "then", "will", "would", "before", "after", "where", "which", "because", "still",
+            "there", "those", "carry", "today", "christ", "jesus", "passage", "session", "thing", "more",
+        }
+        tokens: list[str] = []
+        for raw in str(text or "").lower().replace("'", " ").split():
+            token = "".join(character for character in raw if character.isalpha())
+            if len(token) >= 4 and token not in stopwords and token not in tokens:
+                tokens.append(token)
+        return tokens
+
     def _refresh_spiritual_memory_from_action_follow_up(self, action_item: ActionItem) -> None:
         memory = self.get_latest_spiritual_memory_for_session(action_item.session_id)
         if memory is None:
@@ -402,3 +540,5 @@ class StudyService:
         if reference.end_verse and reference.end_verse != reference.start_verse:
             return f"{reference.book} {reference.chapter}:{reference.start_verse}-{reference.end_verse}"
         return f"{reference.book} {reference.chapter}:{reference.start_verse}"
+
+
