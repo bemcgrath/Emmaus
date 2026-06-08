@@ -5,6 +5,7 @@ from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from emmaus.domain.models import (
+    LookBackReview,
     NudgeDeliveryPlan,
     NudgePreview,
     PassageReference,
@@ -163,6 +164,11 @@ class PersonalizationService:
             f"memory_summary:{user_id}",
             lambda: self.study_service.summarize_spiritual_memory(user_id),
         )
+        latest_look_back = self._get_cached(
+            cache,
+            f"latest_look_back:{user_id}",
+            lambda: self._get_latest_look_back_review(user_id),
+        )
 
         observed_patterns: list[str] = []
         focus_votes: Counter[str] = Counter()
@@ -252,6 +258,27 @@ class PersonalizationService:
             for theme in memory_summary.recurring_themes[:2]:
                 self._append_pattern(observed_patterns, f"Recurring theme in recent sessions: {theme}.")
 
+        if latest_look_back is not None:
+            if latest_look_back.outcome == "needs_reinforcement":
+                comprehension_gap = min(1.0, comprehension_gap + 0.12)
+                self._append_pattern(
+                    observed_patterns,
+                    "A recent look-back showed the last passage did not stay clear yet, so Emmaus should reinforce it before moving on too quickly.",
+                )
+            elif latest_look_back.outcome == "partial":
+                comprehension_gap = min(1.0, comprehension_gap + 0.06)
+                self._append_pattern(
+                    observed_patterns,
+                    "A recent look-back was only partly retained, so Emmaus should slow down and strengthen what needs to stay with the user.",
+                )
+            else:
+                comprehension_gap = max(0.0, comprehension_gap - 0.08)
+                application_gap = max(0.0, application_gap - 0.03)
+                self._append_pattern(
+                    observed_patterns,
+                    "A recent look-back came through clearly, so Emmaus can build on what the user actually carried forward.",
+                )
+
         if focus_votes["comprehension"] > focus_votes["application"]:
             comprehension_gap = min(1.0, comprehension_gap + 0.05)
         elif focus_votes["application"] > focus_votes["comprehension"]:
@@ -309,10 +336,15 @@ class PersonalizationService:
             f"memory_summary:{user_id}",
             lambda: self.study_service.summarize_spiritual_memory(user_id),
         )
+        latest_look_back = self._get_cached(
+            cache,
+            f"latest_look_back:{user_id}",
+            lambda: self._get_latest_look_back_review(user_id),
+        )
 
         focus = gap_report.focus_area
         lead_pattern = gap_report.observed_patterns[0] if gap_report.observed_patterns else None
-        reference, revisit_reason = self._select_reference_choice(user_id, focus, cache=cache)
+        reference, revisit_reason = self._select_reference_choice(user_id, focus, cache=cache, latest_look_back=latest_look_back)
         if focus == "consistency":
             guide_mode = "coach"
             entry_point = "help me restart after missing a few days"
@@ -341,6 +373,10 @@ class PersonalizationService:
         if revisit_reason:
             reason = f"{revisit_reason} {reason}"
 
+        look_back_reason = self._build_look_back_reason(latest_look_back, reference)
+        if look_back_reason:
+            reason = f"{look_back_reason} {reason}"
+
         if lead_pattern is not None:
             reason = f"{reason} {lead_pattern}"
 
@@ -362,11 +398,16 @@ class PersonalizationService:
                     "consistency",
                     cache=cache,
                     preferred_themes=Counter({"encouragement": 4, "rest": 3, "prayer": 3, "trust": 2, "hope": 2}),
+                    latest_look_back=latest_look_back,
                 )
                 guide_mode = "peer" if profile.preferences.preferred_guide_mode == "peer" else "guide"
                 entry_point = "I need encouragement"
                 reason = "Recent mood signals suggest the next session should steady and encourage the user before pressing harder."
                 suggested_action = "Keep the next session gentle, grounded, and prayerful."
+                if revisit_reason:
+                    reason = f"{revisit_reason} {reason}"
+                if look_back_reason:
+                    reason = f"{look_back_reason} {reason}"
             if latest_mood.energy == "low":
                 minutes = max(5, min(minutes, 10))
             elif latest_mood.energy == "high" and focus == "growth":
@@ -669,6 +710,7 @@ class PersonalizationService:
         focus: str,
         cache: dict[str, object] | None = None,
         preferred_themes: Counter[str] | None = None,
+        latest_look_back: LookBackReview | None = None,
     ) -> tuple[PassageReference, str | None]:
         cache = self._resolve_cache(cache)
         library = CURATED_PASSAGE_LIBRARY.get(focus) or CURATED_PASSAGE_LIBRARY["growth"]
@@ -688,6 +730,8 @@ class PersonalizationService:
             if record.last_seen_at >= recent_cutoff
         }
         most_recent_record = max(all_seen_records, key=lambda record: record.last_seen_at, default=None)
+        if latest_look_back is not None and latest_look_back.outcome in {"needs_reinforcement", "partial"}:
+            return latest_look_back.reference, self._build_revisit_reason(latest_look_back.reference, most_recent_record, latest_look_back)
         theme_weights = self._build_theme_weights(user_id, focus, cache=cache, preferred_themes=preferred_themes)
         unseen_entries = [entry for entry in library if self._format_reference(entry["reference"]) not in seen_records]
         unseen_without_recent = [
@@ -698,7 +742,7 @@ class PersonalizationService:
         if unseen_entries:
             chosen_entry = self._choose_best_entry(unseen_entries, theme_weights, library)
             chosen_reference = chosen_entry["reference"]
-            return chosen_reference, self._build_revisit_reason(chosen_reference, most_recent_record)
+            return chosen_reference, self._build_revisit_reason(chosen_reference, most_recent_record, latest_look_back)
 
         top_score = max(self._score_entry_themes(entry, theme_weights) for entry in library)
         top_entries = [entry for entry in library if self._score_entry_themes(entry, theme_weights) == top_score]
@@ -716,17 +760,41 @@ class PersonalizationService:
         chosen_reference = chosen_entry["reference"]
         revisit_reason = None
         if self._format_reference(chosen_reference) in recent_reference_keys:
-            revisit_reason = self._build_revisit_reason(chosen_reference, most_recent_record)
+            revisit_reason = self._build_revisit_reason(chosen_reference, most_recent_record, latest_look_back)
         return chosen_reference, revisit_reason
 
-    def _build_revisit_reason(self, reference: PassageReference, most_recent_record: object | None) -> str:
+    def _build_revisit_reason(
+        self,
+        reference: PassageReference,
+        most_recent_record: object | None,
+        latest_look_back: LookBackReview | None = None,
+    ) -> str:
         reference_label = self._format_reference(reference)
+        if latest_look_back is not None and self._format_reference(latest_look_back.reference) == reference_label:
+            if latest_look_back.outcome == "needs_reinforcement":
+                return f"Emmaus is bringing you back to {reference_label} because the last look-back showed this truth did not stay clear yet."
+            if latest_look_back.outcome == "partial":
+                return f"Emmaus is revisiting {reference_label} because the last look-back only partly stayed with you."
         if most_recent_record is not None and self._format_reference(most_recent_record.reference) == reference_label:
             return (
                 f"Emmaus is bringing you back to {reference_label} because your most recent session and next step "
                 "are still pointing to the same growth edge."
             )
         return f"Emmaus is revisiting {reference_label} because it still speaks directly to the thread it is carrying forward."
+
+    def _build_look_back_reason(self, latest_look_back: LookBackReview | None, reference: PassageReference) -> str | None:
+        if latest_look_back is None:
+            return None
+        reference_label = self._format_reference(reference)
+        if latest_look_back.outcome == "clear":
+            return f"Your last look-back came through clearly, so Emmaus is building on what stayed with you as it leads you into {reference_label}."
+        if latest_look_back.outcome == "partial":
+            return f"Your last look-back was only partly clear, so Emmaus is slowing down and reinforcing what needs to stay with you in {reference_label}."
+        return f"Your last look-back showed this truth still needs reinforcement, so Emmaus is keeping you close to {reference_label} instead of moving on too quickly."
+
+    def _get_latest_look_back_review(self, user_id: str) -> LookBackReview | None:
+        reviews = self.study_service.list_look_back_reviews(user_id, limit=1)
+        return reviews[0] if reviews else None
 
     def _build_theme_weights(
         self,
@@ -965,4 +1033,9 @@ class PersonalizationService:
         if key not in cache:
             cache[key] = factory()
         return cache[key]
+
+
+
+
+
 

@@ -8,7 +8,7 @@
       name="description"
       content="Emmaus is a mobile-first guide for Christ-centered Bible study, adaptive reflection, and practical action."
     />
-    <link rel="stylesheet" href="/static/styles.css?v=20260408q" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260607c" />
   </head>
   <body>
     <div class="app-shell">
@@ -236,6 +236,29 @@
             </div>
             <div class="commentary-block" id="commentary-block"></div>
             <div class="content-stack" id="session-plan"></div>
+          </section>
+
+          <section class="panel stack-panel" id="study-notes-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Notes</p>
+                <h2>Your notes on this passage</h2>
+              </div>
+              <span class="status-pill" id="study-notes-pill">0 notes</span>
+            </div>
+            <p class="micro-copy" id="study-notes-reference-copy">Start a session to capture notes on the active passage.</p>
+            <div id="study-notes-list" class="list-stack"></div>
+            <form id="study-notes-form" class="stack-form compact-form">
+              <label>
+                <span>Title (optional)</span>
+                <input id="study-notes-title" name="noteTitle" type="text" placeholder="A short label" />
+              </label>
+              <label>
+                <span>Note</span>
+                <textarea id="study-notes-body" name="noteBody" rows="4" placeholder="Observations, questions, cross-references, applications..."></textarea>
+              </label>
+              <button class="secondary-button full-width" type="submit" id="study-notes-submit" disabled>Save note</button>
+            </form>
           </section>
 
           <section class="panel stack-panel">
@@ -545,6 +568,134 @@
           </section>
 
         </section>
+        <section class="screen" data-screen="memorize">
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Memorize</p>
+                <h2>Hide God's word in your heart</h2>
+              </div>
+              <span class="status-pill" id="memorize-streak-pill">0 day streak</span>
+            </div>
+            <p class="micro-copy" id="memorize-progress-copy">Add ESV verses, drill them with progressive word-hiding, and track your daily review streak.</p>
+            <div class="dual-grid">
+              <article class="panel stat-card">
+                <p class="panel-label">Due today</p>
+                <h2 id="memorize-due-value">0</h2>
+                <p id="memorize-due-copy">Nothing due. Add a verse to get started.</p>
+              </article>
+              <article class="panel stat-card">
+                <p class="panel-label">Mastery</p>
+                <h2 id="memorize-mastery-value">0 verses</h2>
+                <p id="memorize-mastery-copy">Learning 0 · Familiar 0 · Mastered 0</p>
+              </article>
+            </div>
+            <button class="primary-button full-width" type="button" id="memorize-start-review-button" disabled>Start today's review</button>
+          </section>
+
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Target</p>
+                <h2>Set a memorization goal</h2>
+              </div>
+              <span class="status-pill" id="memorize-target-pill">No target</span>
+            </div>
+            <div id="memorize-target-card" class="content-stack"></div>
+            <form id="memorize-target-form" class="stack-form compact-form">
+              <label>
+                <span>Goal title</span>
+                <input id="memorize-target-title" type="text" placeholder="Romans 8 by August" />
+              </label>
+              <div class="inline-inputs">
+                <label>
+                  <span>Verses to learn</span>
+                  <input id="memorize-target-count" type="number" min="1" max="500" value="10" />
+                </label>
+                <label>
+                  <span>By date</span>
+                  <input id="memorize-target-date" type="date" />
+                </label>
+              </div>
+              <button class="secondary-button full-width" type="submit">Set new target</button>
+            </form>
+          </section>
+
+          <section class="panel stack-panel" id="memorize-drill-panel" hidden>
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Drill</p>
+                <h2 id="memorize-drill-reference">Today's verse</h2>
+              </div>
+              <span class="status-pill" id="memorize-drill-progress-pill">1 / 1</span>
+            </div>
+            <p class="micro-copy" id="memorize-drill-stage-copy">Stage 1 of 5 — full verse</p>
+            <div class="prompt-card" id="memorize-drill-display">Tap a verse to start the drill.</div>
+            <div id="memorize-drill-learning" class="content-stack">
+              <p class="micro-copy">Type the full verse from memory. Get ≥ 90% to advance.</p>
+              <label>
+                <span>Your attempt</span>
+                <textarea id="memorize-drill-input" rows="4" placeholder="Type the verse here..."></textarea>
+              </label>
+              <button type="button" class="primary-button full-width" id="memorize-drill-submit">Score my attempt</button>
+              <div id="memorize-drill-result" class="drill-result" hidden></div>
+            </div>
+            <div id="memorize-drill-review" class="content-stack" hidden>
+              <p class="micro-copy">This verse is mastered. Rate how the review felt.</p>
+              <div class="chip-row" id="memorize-drill-rating-row">
+                <button type="button" class="choice-chip" data-rating="again">Again</button>
+                <button type="button" class="choice-chip" data-rating="hard">Hard</button>
+                <button type="button" class="choice-chip" data-rating="good">Good</button>
+                <button type="button" class="choice-chip" data-rating="easy">Easy</button>
+              </div>
+            </div>
+            <button type="button" class="secondary-button full-width" id="memorize-drill-exit">Exit drill</button>
+          </section>
+
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Add verse</p>
+                <h2>Pick a verse from ESV</h2>
+              </div>
+            </div>
+            <p class="micro-copy">Verses are fetched from ESV and stored so you can drill offline. Connect ESV in Profile if you haven't yet.</p>
+            <form id="memorize-add-verse-form" class="stack-form compact-form">
+              <div class="inline-inputs">
+                <label>
+                  <span>Book</span>
+                  <input id="memorize-add-book" type="text" placeholder="John" required />
+                </label>
+                <label>
+                  <span>Chapter</span>
+                  <input id="memorize-add-chapter" type="number" min="1" max="150" required />
+                </label>
+              </div>
+              <div class="inline-inputs">
+                <label>
+                  <span>Start verse</span>
+                  <input id="memorize-add-start" type="number" min="1" max="200" required />
+                </label>
+                <label>
+                  <span>End verse (optional)</span>
+                  <input id="memorize-add-end" type="number" min="1" max="200" />
+                </label>
+              </div>
+              <button class="secondary-button full-width" type="submit">Add verse</button>
+            </form>
+          </section>
+
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">My verses</p>
+                <h2>Verse library</h2>
+              </div>
+            </div>
+            <div id="memorize-verse-list" class="list-stack"></div>
+          </section>
+        </section>
+
         <section class="screen" data-screen="nudges">
           <section class="panel stack-panel">
             <div class="panel-heading">
@@ -570,6 +721,7 @@
       <nav class="bottom-nav" aria-label="Primary">
         <button class="nav-pill nav-pill-active" type="button" data-nav-target="home">Home</button>
         <button class="nav-pill" type="button" data-nav-target="session">Study</button>
+        <button class="nav-pill" type="button" data-nav-target="memorize">Memorize</button>
         <button class="nav-pill" type="button" data-nav-target="actions">Actions</button>
         <button class="nav-pill" type="button" data-nav-target="profile">Profile</button>
       </nav>

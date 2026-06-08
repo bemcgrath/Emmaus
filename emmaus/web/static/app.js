@@ -183,6 +183,8 @@ function bindEvents() {
   elements.navButtons.forEach((button) => {
     button.addEventListener("click", () => showScreen(button.dataset.navTarget));
   });
+  bindMemorizeEvents();
+  bindStudyNotesEvents();
   elements.demoSceneRow.addEventListener("click", reportFailures(onDemoScenarioSelect));
   elements.refreshButton?.addEventListener("click", reportFailures(onRefreshClick));
   elements.heroPrimaryButton.addEventListener("click", reportFailures(onHeroPrimaryAction));
@@ -1007,6 +1009,20 @@ function renderLookBack(lookBack) {
 
   const prompt = lookBack?.prompt || null;
   const latestReview = lookBack?.latest_review || null;
+  const recentReviews = safeArray(lookBack?.recent_reviews).slice(0, 3);
+  const historyMarkup = recentReviews.length
+    ? `
+      <div class="review-response-list look-back-history-list">
+        ${recentReviews.map((review) => `
+          <div class="inline-card review-response-card look-back-history-card">
+            <p><strong>${escapeHtml(formatReference(review.reference))}</strong></p>
+            <p class="micro-copy">${escapeHtml(buildLookBackOutcomeLabel(review.outcome))}</p>
+            <p>${escapeHtml(truncateGuideCopy(review.encouragement, 120))}</p>
+          </div>
+        `).join("")}
+      </div>
+    `
+    : "";
 
   if (prompt) {
     elements.lookBackPill.textContent = "Ready";
@@ -1015,6 +1031,7 @@ function renderLookBack(lookBack) {
         <p><strong>${escapeHtml(formatReference(prompt.reference))}</strong></p>
         <p>${escapeHtml(prompt.prompt)}</p>
         <p class="micro-copy">${escapeHtml(prompt.support_text)}</p>
+        ${historyMarkup ? `<p class="micro-copy"><strong>Recent reinforcement</strong></p>${historyMarkup}` : ""}
       </div>
     `;
     elements.lookBackForm.classList.remove("hidden");
@@ -1034,6 +1051,7 @@ function renderLookBack(lookBack) {
           <p><strong>You remembered</strong></p>
           <p>${escapeHtml(latestReview.response_text)}</p>
         </div>
+        ${historyMarkup ? `<p class="micro-copy"><strong>Recent reinforcement</strong></p>${historyMarkup}` : ""}
       </div>
     `;
     return;
@@ -1041,6 +1059,16 @@ function renderLookBack(lookBack) {
 
   elements.lookBackPill.textContent = "Ready";
   elements.lookBackCard.innerHTML = '<p class="empty-state">Finish a session and Emmaus will bring one recent truth back into view here.</p>';
+}
+
+function buildLookBackOutcomeLabel(outcome) {
+  if (outcome === "clear") {
+    return "Stayed with you clearly";
+  }
+  if (outcome === "partial") {
+    return "Partly stayed with you";
+  }
+  return "Still needs reinforcement";
 }
 
 function renderHero(profile, recommendation, activeSession, actionItems) {
@@ -1693,18 +1721,10 @@ function renderCompletionSummary(memorySummary, actionItems) {
   const actionTitle = anchorAction?.title || "Your next action step";
   const actionDetail = anchorAction?.detail || "Emmaus will place your next step here after a session completes.";
   const actionCreatedAt = anchorAction?.created_at ? formatDateTime(anchorAction.created_at) : null;
-  const beforeSummary = followThroughUpdate?.beforeMemorySummary?.latest_summary || null;
-  const beforePrompt = followThroughUpdate?.beforeMemorySummary?.carry_forward_prompt || null;
-  const activePrayer = state.prayerItems.find((item) => item.status === "active") || null;
-  const changeSummary = beforeSummary && beforeSummary !== latestSummary
-    ? `<p class="session-context-copy"><strong>What changed:</strong> ${escapeHtml(latestSummary)}</p>`
-    : "";
-  const changePrompt = beforePrompt && beforePrompt !== carryForwardPrompt
-    ? `<p class="session-context-copy"><strong>Keep carrying this:</strong> ${escapeHtml(carryForwardPrompt || "")}</p>`
-    : "";
   const followThroughNote = followThroughUpdate?.actionItem?.follow_up_note
     ? `<p class="session-context-copy"><strong>What landed:</strong> ${escapeHtml(followThroughUpdate.actionItem.follow_up_note)}</p>`
     : "";
+  const activePrayer = state.prayerItems.find((item) => item.status === "active") || null;
   const prayerPrompt = activePrayer
     ? `Bring ${activePrayer.title} before Christ as you take this next step.`
     : "Ask Christ to help this passage move from reflection into obedience.";
@@ -1713,10 +1733,8 @@ function renderCompletionSummary(memorySummary, actionItems) {
     <div class="completion-card">
       <p><strong>${followThroughUpdate ? "Emmaus updated this thread" : "Carry this with you today"}</strong></p>
       <p class="today-plan-copy">${escapeHtml(latestSummary)}</p>
+      ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Next thread:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
       ${growthArea ? `<p><strong>Keep strengthening:</strong> ${escapeHtml(growthArea)}</p>` : ""}
-      ${carryForwardPrompt ? `<p class="memory-prompt"><strong>Keep building here:</strong> ${escapeHtml(carryForwardPrompt)}</p>` : ""}
-      ${changeSummary}
-      ${changePrompt}
       ${followThroughNote}
       <div class="inline-card">
         <p><strong>${escapeHtml(actionTitle)}</strong></p>
@@ -1725,7 +1743,6 @@ function renderCompletionSummary(memorySummary, actionItems) {
         ${followThroughUpdate?.actionItem?.follow_up_outcome ? `<span class="meta-pill">${escapeHtml(sentenceCase(followThroughUpdate.actionItem.follow_up_outcome.replaceAll("_", " ")))}</span>` : ""}
       </div>
       <p class="session-context-copy"><strong>Close in prayer:</strong> ${escapeHtml(prayerPrompt)}</p>
-      <p class="micro-copy">Go in peace, and let this passage stay with you as you take the next faithful step.</p>
     </div>
   `;
 }
@@ -2129,6 +2146,7 @@ function renderSessionStart(payload, { navigate = true } = {}) {
   }
 
   updateSessionEntryState(payload);
+  refreshStudyNotes().catch(handleError);
 
   if (navigate) {
     showScreen("session");
@@ -2152,6 +2170,7 @@ function clearSessionView() {
   elements.engagementInput.value = 4;
   elements.engagementInput.disabled = true;
   elements.submitResponseButton.disabled = true;
+  refreshStudyNotes().catch(handleError);
 }
 
 function renderTurnResponse(payload) {
@@ -2876,6 +2895,9 @@ function showScreen(screenName) {
     button.classList.toggle("nav-pill-active", button.dataset.navTarget === screenName);
   });
   resetViewportScroll();
+  if (screenName === "memorize") {
+    loadMemorizeScreen().catch(handleError);
+  }
 }
 
 function resetViewportScroll() {
@@ -2982,6 +3004,572 @@ async function fetchJson(url, { method = "GET", body = null, headers = {}, allow
 function handleError(error) {
   const message = error instanceof Error ? error.message : "Something went wrong.";
   showToast(message);
+}
+
+const memorizeState = {
+  verses: [],
+  progress: null,
+  drill: null,
+};
+
+const notesState = {
+  notes: [],
+  reference: null,
+};
+
+const MEMORIZE_DRILL_STAGES = [
+  { label: "Full verse" },
+  { label: "Every third word hidden" },
+  { label: "First letter cues" },
+  { label: "First letters only" },
+  { label: "Reference + first word" },
+];
+
+function bindMemorizeEvents() {
+  document.getElementById("memorize-add-verse-form")?.addEventListener("submit", onAddMemorizedVerse);
+  document.getElementById("memorize-target-form")?.addEventListener("submit", onCreateMemorizationTarget);
+  document.getElementById("memorize-start-review-button")?.addEventListener("click", onStartMemorizationReview);
+  document.getElementById("memorize-drill-submit")?.addEventListener("click", onMemorizeDrillSubmit);
+  document.getElementById("memorize-drill-exit")?.addEventListener("click", exitMemorizationDrill);
+  document.getElementById("memorize-verse-list")?.addEventListener("click", onMemorizeVerseListClick);
+  document.getElementById("memorize-drill-rating-row")?.addEventListener("click", onMemorizeRatingClick);
+}
+
+async function loadMemorizeScreen() {
+  const userId = getUserId();
+  const [verses, progress] = await Promise.all([
+    fetchJson(`/v1/memorization/${encodeURIComponent(userId)}/verses`),
+    fetchJson(`/v1/memorization/${encodeURIComponent(userId)}/progress`),
+  ]);
+  memorizeState.verses = Array.isArray(verses) ? verses : [];
+  memorizeState.progress = progress;
+  renderMemorizeProgress();
+  renderMemorizeTarget();
+  renderMemorizeVerseList();
+}
+
+function renderMemorizeProgress() {
+  const progress = memorizeState.progress;
+  const due = progress?.due_today || 0;
+  const total = progress?.total_verses || 0;
+  const mastery = progress?.mastery || { learning: 0, familiar: 0, mastered: 0 };
+  const streak = progress?.current_streak || 0;
+  setTextById("memorize-streak-pill", `${streak} day streak`);
+  setTextById("memorize-due-value", String(due));
+  setTextById(
+    "memorize-due-copy",
+    due === 0
+      ? total === 0
+        ? "Nothing due. Add a verse to get started."
+        : "All caught up. New reviews unlock as intervals come due."
+      : `${due} verse${due === 1 ? "" : "s"} ready for review.`,
+  );
+  setTextById("memorize-mastery-value", `${total} verse${total === 1 ? "" : "s"}`);
+  setTextById(
+    "memorize-mastery-copy",
+    `Learning ${mastery.learning} · Familiar ${mastery.familiar} · Mastered ${mastery.mastered}`,
+  );
+  const startButton = document.getElementById("memorize-start-review-button");
+  if (startButton) {
+    startButton.disabled = due === 0;
+    startButton.textContent = due === 0 ? "Nothing due to review" : `Start today's review (${due})`;
+  }
+}
+
+function renderMemorizeTarget() {
+  const target = memorizeState.progress?.active_target;
+  const progress = memorizeState.progress?.active_target_progress || 0;
+  const pill = document.getElementById("memorize-target-pill");
+  const card = document.getElementById("memorize-target-card");
+  if (!card) return;
+  if (!target) {
+    if (pill) pill.textContent = "No target";
+    card.innerHTML = '<p class="empty-state">Set a target below to keep momentum visible.</p>';
+    return;
+  }
+  const goal = target.verse_count_goal;
+  const percent = goal > 0 ? Math.min(100, Math.round((progress / goal) * 100)) : 0;
+  if (pill) pill.textContent = target.status === "achieved" ? "Achieved" : `${percent}%`;
+  card.innerHTML = `
+    <div class="inline-card">
+      <p><strong>${escapeHtml(target.title)}</strong></p>
+      <p class="micro-copy">By ${escapeHtml(target.target_date)} · ${progress} / ${goal} verses familiar or mastered</p>
+      <div class="progress-bar"><div class="progress-bar-fill" style="width:${percent}%"></div></div>
+    </div>
+  `;
+}
+
+function renderMemorizeVerseList() {
+  const list = document.getElementById("memorize-verse-list");
+  if (!list) return;
+  if (!memorizeState.verses.length) {
+    list.innerHTML = '<p class="empty-state">No verses yet. Add one above to begin.</p>';
+    return;
+  }
+  list.innerHTML = memorizeState.verses
+    .map((verse) => {
+      const reference = formatReference(verse.reference);
+      const mastery = verse.mastery_level || "learning";
+      const preview = (verse.verse_text || "").replace(/<[^>]+>/g, "").slice(0, 160);
+      const reviewLabel = mastery === "mastered"
+        ? `Reminder ${formatReviewDate(verse.next_review_at)}`
+        : `Next review ${formatReviewDate(verse.next_review_at)}`;
+      return `
+        <article class="inline-card">
+          <p><strong>${escapeHtml(reference)}</strong> <span class="mastery-chip mastery-${escapeHtml(mastery)}">${escapeHtml(sentenceCase(mastery))}</span></p>
+          <p class="micro-copy">${escapeHtml(reviewLabel)} · ${verse.repetition_count} reps</p>
+          <p>${escapeHtml(preview)}${preview.length === 160 ? "…" : ""}</p>
+          <div class="source-card-actions">
+            <button type="button" class="secondary-button" data-action="drill" data-verse-id="${escapeHtml(verse.verse_id)}">${mastery === "mastered" ? "Review" : "Drill"}</button>
+            <button type="button" class="secondary-button" data-action="delete" data-verse-id="${escapeHtml(verse.verse_id)}">Remove</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function formatReviewDate(value) {
+  if (!value) return "today";
+  const target = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return value;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((target - today) / 86400000);
+  if (diffDays < 0) return `overdue (${Math.abs(diffDays)}d)`;
+  if (diffDays === 0) return "today";
+  if (diffDays === 1) return "tomorrow";
+  if (diffDays <= 7) return `in ${diffDays} days`;
+  return `on ${target.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+}
+
+async function onAddMemorizedVerse(event) {
+  event.preventDefault();
+  if (!ensureLiveMode("Demo mode is read-only. Switch to Live to add verses.")) return;
+  const userId = getUserId();
+  const book = optionalText(document.getElementById("memorize-add-book").value);
+  const chapter = optionalNumber(document.getElementById("memorize-add-chapter").value);
+  const startVerse = optionalNumber(document.getElementById("memorize-add-start").value);
+  const endVerse = optionalNumber(document.getElementById("memorize-add-end").value);
+  if (!book || !chapter || !startVerse) {
+    showToast("Add a book, chapter, and start verse first.");
+    return;
+  }
+  try {
+    await fetchJson("/v1/memorization/verses", {
+      method: "POST",
+      body: {
+        user_id: userId,
+        book,
+        chapter,
+        start_verse: startVerse,
+        end_verse: endVerse,
+      },
+    });
+    showToast(`Added ${book} ${chapter}:${startVerse} from ESV.`);
+    event.target.reset();
+    await loadMemorizeScreen();
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+async function onCreateMemorizationTarget(event) {
+  event.preventDefault();
+  if (!ensureLiveMode("Demo mode is read-only.")) return;
+  const userId = getUserId();
+  const title = optionalText(document.getElementById("memorize-target-title").value);
+  const count = optionalNumber(document.getElementById("memorize-target-count").value);
+  const date = optionalText(document.getElementById("memorize-target-date").value);
+  if (!title || !count || !date) {
+    showToast("Add a title, verse count, and target date.");
+    return;
+  }
+  try {
+    await fetchJson(`/v1/memorization/${encodeURIComponent(userId)}/targets`, {
+      method: "POST",
+      body: { title, verse_count_goal: count, target_date: date },
+    });
+    showToast("Memorization target saved.");
+    event.target.reset();
+    await loadMemorizeScreen();
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+async function onMemorizeVerseListClick(event) {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  const verseId = button.dataset.verseId;
+  const verse = memorizeState.verses.find((item) => item.verse_id === verseId);
+  if (!verse) return;
+  if (button.dataset.action === "drill") {
+    startMemorizationDrill([verse]);
+  } else if (button.dataset.action === "delete") {
+    if (!confirm(`Remove ${formatReference(verse.reference)} from memorization?`)) return;
+    try {
+      await fetchJson(`/v1/memorization/verses/${encodeURIComponent(verseId)}`, { method: "DELETE" });
+      showToast("Verse removed.");
+      await loadMemorizeScreen();
+    } catch (error) {
+      handleError(error);
+    }
+  }
+}
+
+async function onStartMemorizationReview() {
+  const userId = getUserId();
+  try {
+    const queue = await fetchJson(`/v1/memorization/${encodeURIComponent(userId)}/queue`);
+    if (!Array.isArray(queue) || queue.length === 0) {
+      showToast("Nothing due to review right now.");
+      return;
+    }
+    startMemorizationDrill(queue);
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+function startMemorizationDrill(verses) {
+  memorizeState.drill = { queue: [...verses], index: 0 };
+  const panel = document.getElementById("memorize-drill-panel");
+  if (panel) panel.hidden = false;
+  renderMemorizeDrillStage();
+  panel?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function exitMemorizationDrill() {
+  memorizeState.drill = null;
+  const panel = document.getElementById("memorize-drill-panel");
+  if (panel) panel.hidden = true;
+}
+
+function renderMemorizeDrillStage() {
+  const drill = memorizeState.drill;
+  if (!drill) return;
+  const verse = drill.queue[drill.index];
+  if (!verse) {
+    exitMemorizationDrill();
+    showToast("You finished the review queue.");
+    loadMemorizeScreen().catch(handleError);
+    return;
+  }
+  const isMastered = verse.mastery_level === "mastered";
+  const stage = isMastered
+    ? MEMORIZE_DRILL_STAGES.length - 1
+    : Math.min(verse.learning_stage || 0, MEMORIZE_DRILL_STAGES.length - 1);
+  const stageMeta = MEMORIZE_DRILL_STAGES[stage];
+  setTextById("memorize-drill-reference", formatReference(verse.reference));
+  setTextById(
+    "memorize-drill-progress-pill",
+    `${drill.index + 1} / ${drill.queue.length}`,
+  );
+  setTextById(
+    "memorize-drill-stage-copy",
+    isMastered
+      ? `Mastered review — ${stageMeta.label}`
+      : `Stage ${stage + 1} of ${MEMORIZE_DRILL_STAGES.length} — ${stageMeta.label}`,
+  );
+  const display = document.getElementById("memorize-drill-display");
+  if (display) display.innerHTML = renderDrillVerseHtml(verse.verse_text, stage);
+
+  const learningSection = document.getElementById("memorize-drill-learning");
+  const reviewSection = document.getElementById("memorize-drill-review");
+  if (learningSection) learningSection.hidden = isMastered;
+  if (reviewSection) reviewSection.hidden = !isMastered;
+
+  const input = document.getElementById("memorize-drill-input");
+  if (input) input.value = "";
+  const resultEl = document.getElementById("memorize-drill-result");
+  if (resultEl) {
+    resultEl.hidden = true;
+    resultEl.innerHTML = "";
+  }
+}
+
+function renderDrillVerseHtml(verseText, stage) {
+  const cleaned = (verseText || "").replace(/\s+/g, " ").trim();
+  if (!cleaned) return "<em>This verse has no text.</em>";
+  if (stage === 0) return escapeHtml(cleaned);
+  const tokens = cleaned.split(/(\s+)/);
+  let wordIndex = -1;
+  const transformed = tokens.map((token) => {
+    if (/^\s+$/.test(token) || !/[A-Za-z]/.test(token)) return token;
+    wordIndex += 1;
+    return transformWord(token, stage, wordIndex);
+  });
+  return escapeHtml(transformed.join(""));
+}
+
+function transformWord(word, stage, wordIndex) {
+  const letters = word.match(/[A-Za-z]+/);
+  if (!letters) return word;
+  const lettersStr = letters[0];
+  const firstLetter = lettersStr.charAt(0);
+  if (stage === 1) {
+    return wordIndex % 3 === 2
+      ? word.replace(/[A-Za-z]+/, (group) => "_".repeat(Math.max(group.length, 3)))
+      : word;
+  }
+  if (stage === 2) {
+    return word.replace(/[A-Za-z]+/, (group) => group.charAt(0) + "_".repeat(Math.max(group.length - 1, 1)));
+  }
+  if (stage === 3) {
+    return word.replace(/[A-Za-z]+/, firstLetter);
+  }
+  if (stage === 4) {
+    return wordIndex === 0
+      ? word
+      : word.replace(/[A-Za-z]+/, (group) => "_".repeat(Math.max(group.length, 3)));
+  }
+  return word;
+}
+
+async function onMemorizeDrillSubmit() {
+  const drill = memorizeState.drill;
+  if (!drill) return;
+  const verse = drill.queue[drill.index];
+  if (!verse) return;
+  const input = document.getElementById("memorize-drill-input");
+  const typedText = (input?.value || "").trim();
+  if (!typedText) {
+    showToast("Type the verse from memory first.");
+    return;
+  }
+  try {
+    const payload = await fetchJson(
+      `/v1/memorization/verses/${encodeURIComponent(verse.verse_id)}/drill-attempt`,
+      { method: "POST", body: { typed_text: typedText } },
+    );
+    const result = payload.result;
+    drill.queue[drill.index] = result.verse;
+    const versesIndex = memorizeState.verses.findIndex((v) => v.verse_id === result.verse.verse_id);
+    if (versesIndex >= 0) memorizeState.verses[versesIndex] = result.verse;
+    if (payload.progress) {
+      memorizeState.progress = payload.progress;
+      renderMemorizeProgress();
+      renderMemorizeTarget();
+    }
+    renderDrillAttemptResult(result);
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+function renderDrillAttemptResult(result) {
+  const resultEl = document.getElementById("memorize-drill-result");
+  const display = document.getElementById("memorize-drill-display");
+  const input = document.getElementById("memorize-drill-input");
+  const verse = result.verse;
+  const isMastered = verse.mastery_level === "mastered";
+  const newStage = isMastered
+    ? MEMORIZE_DRILL_STAGES.length - 1
+    : Math.min(verse.learning_stage || 0, MEMORIZE_DRILL_STAGES.length - 1);
+
+  if (display) display.innerHTML = renderDrillVerseHtml(verse.verse_text, newStage);
+  if (input) input.value = "";
+  setTextById(
+    "memorize-drill-stage-copy",
+    isMastered
+      ? `Mastered — review with rating buttons below.`
+      : `Stage ${newStage + 1} of ${MEMORIZE_DRILL_STAGES.length} — ${MEMORIZE_DRILL_STAGES[newStage].label}`,
+  );
+
+  const learningSection = document.getElementById("memorize-drill-learning");
+  const reviewSection = document.getElementById("memorize-drill-review");
+  if (learningSection) learningSection.hidden = isMastered;
+  if (reviewSection) reviewSection.hidden = !isMastered;
+
+  if (!resultEl) return;
+  const percent = Math.round(result.score * 100);
+  let outcomeClass = "drill-result-stay";
+  let outcomeMsg;
+  if (result.mastered) {
+    outcomeClass = "drill-result-mastered";
+    const reminder = formatReviewDate(verse.next_review_at);
+    outcomeMsg = `Mastered! Reminder set ${reminder}. Pick another verse to keep going.`;
+  } else if (result.advanced) {
+    outcomeClass = "drill-result-advance";
+    outcomeMsg = `Nice — advancing to stage ${newStage + 1} of ${MEMORIZE_DRILL_STAGES.length}.`;
+  } else {
+    outcomeMsg = "Try again — get to 90% to advance.";
+  }
+  const diffHtml = result.diff
+    .map((entry) => {
+      if (entry.ok) return `<span class="word-diff ok">${escapeHtml(entry.expected)}</span>`;
+      const expected = entry.expected ? escapeHtml(entry.expected) : "—";
+      const typed = entry.typed ? escapeHtml(entry.typed) : "—";
+      return `<span class="word-diff miss" title="You typed: ${typed}">${expected}</span>`;
+    })
+    .join(" ");
+  const masteredActions = result.mastered
+    ? `<div class="source-card-actions">
+        <button type="button" class="primary-button" id="drill-pick-next-verse">Pick another verse</button>
+        <button type="button" class="secondary-button" id="drill-finish">Finish drill</button>
+      </div>`
+    : "";
+  resultEl.innerHTML = `
+    <div class="${outcomeClass}">
+      <p><strong>${percent}%</strong> — ${result.correct_words} / ${result.total_words} words correct</p>
+      <p>${escapeHtml(outcomeMsg)}</p>
+      <div class="word-diff-row">${diffHtml}</div>
+      ${masteredActions}
+    </div>
+  `;
+  resultEl.hidden = false;
+  if (result.mastered) {
+    document.getElementById("drill-pick-next-verse")?.addEventListener("click", () => {
+      exitMemorizationDrill();
+      const addForm = document.getElementById("memorize-add-verse-form");
+      addForm?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.getElementById("memorize-add-book")?.focus();
+    });
+    document.getElementById("drill-finish")?.addEventListener("click", () => {
+      exitMemorizationDrill();
+      loadMemorizeScreen().catch(handleError);
+    });
+  }
+}
+
+async function onMemorizeRatingClick(event) {
+  const button = event.target.closest("button[data-rating]");
+  if (!button) return;
+  const drill = memorizeState.drill;
+  if (!drill) return;
+  const verse = drill.queue[drill.index];
+  if (!verse) return;
+  const rating = button.dataset.rating;
+  try {
+    await fetchJson(`/v1/memorization/verses/${encodeURIComponent(verse.verse_id)}/review`, {
+      method: "POST",
+      body: { rating, drill_stage: MEMORIZE_DRILL_STAGES.length - 1 },
+    });
+    showToast(`Saved as "${rating}".`);
+    drill.index += 1;
+    renderMemorizeDrillStage();
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+function bindStudyNotesEvents() {
+  document.getElementById("study-notes-form")?.addEventListener("submit", onSaveStudyNote);
+  document.getElementById("study-notes-list")?.addEventListener("click", onStudyNotesListClick);
+}
+
+function activeStudyReference() {
+  return state.activeSessionPayload?.session?.reference || null;
+}
+
+async function refreshStudyNotes() {
+  const userId = getUserId();
+  const reference = activeStudyReference();
+  notesState.reference = reference;
+  const submitButton = document.getElementById("study-notes-submit");
+  const referenceCopy = document.getElementById("study-notes-reference-copy");
+  const pill = document.getElementById("study-notes-pill");
+  const list = document.getElementById("study-notes-list");
+  if (!list || !submitButton || !referenceCopy || !pill) return;
+  if (!reference) {
+    notesState.notes = [];
+    submitButton.disabled = true;
+    referenceCopy.textContent = "Start a session to capture notes on the active passage.";
+    pill.textContent = "0 notes";
+    list.innerHTML = '<p class="empty-state">Notes will appear once you start a session.</p>';
+    return;
+  }
+  submitButton.disabled = false;
+  referenceCopy.textContent = `Notes on ${formatReference(reference)}.`;
+  try {
+    const params = new URLSearchParams({
+      book: reference.book,
+      chapter: String(reference.chapter),
+      start_verse: String(reference.start_verse),
+    });
+    if (reference.end_verse) params.set("end_verse", String(reference.end_verse));
+    const notes = await fetchJson(`/v1/notes/${encodeURIComponent(userId)}?${params.toString()}`);
+    notesState.notes = Array.isArray(notes) ? notes : [];
+    pill.textContent = `${notesState.notes.length} note${notesState.notes.length === 1 ? "" : "s"}`;
+    if (!notesState.notes.length) {
+      list.innerHTML = '<p class="empty-state">No notes on this passage yet.</p>';
+      return;
+    }
+    list.innerHTML = notesState.notes
+      .map(
+        (note) => `
+        <article class="inline-card">
+          ${note.title ? `<p><strong>${escapeHtml(note.title)}</strong></p>` : ""}
+          <p>${escapeHtml(note.body).replace(/\n/g, "<br>")}</p>
+          <p class="micro-copy">Saved ${escapeHtml((note.updated_at || note.created_at || "").slice(0, 10))}</p>
+          <div class="source-card-actions">
+            <button type="button" class="secondary-button" data-action="delete-note" data-note-id="${escapeHtml(note.note_id)}">Delete</button>
+          </div>
+        </article>
+      `,
+      )
+      .join("");
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+async function onSaveStudyNote(event) {
+  event.preventDefault();
+  if (!ensureLiveMode("Demo mode is read-only. Switch to Live to save notes.")) return;
+  const reference = activeStudyReference();
+  if (!reference) {
+    showToast("Start a session before saving notes.");
+    return;
+  }
+  const title = optionalText(document.getElementById("study-notes-title").value);
+  const body = optionalText(document.getElementById("study-notes-body").value);
+  if (!body) {
+    showToast("Add a note before saving.");
+    return;
+  }
+  try {
+    await fetchJson("/v1/notes", {
+      method: "POST",
+      body: {
+        user_id: getUserId(),
+        book: reference.book,
+        chapter: reference.chapter,
+        start_verse: reference.start_verse,
+        end_verse: reference.end_verse || null,
+        title,
+        body,
+        session_id: state.activeSessionPayload?.session?.session_id || null,
+      },
+    });
+    showToast("Note saved.");
+    document.getElementById("study-notes-title").value = "";
+    document.getElementById("study-notes-body").value = "";
+    await refreshStudyNotes();
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+async function onStudyNotesListClick(event) {
+  const button = event.target.closest("button[data-action='delete-note']");
+  if (!button) return;
+  const noteId = button.dataset.noteId;
+  if (!noteId) return;
+  if (!confirm("Delete this note?")) return;
+  try {
+    await fetchJson(`/v1/notes/${encodeURIComponent(noteId)}`, { method: "DELETE" });
+    showToast("Note deleted.");
+    await refreshStudyNotes();
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+function setTextById(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.textContent = value;
 }
 
 function showToast(message) {
@@ -3513,6 +4101,7 @@ function buildSourceIdCandidate(value) {
 function buildGeneratedSourceId(value) {
   return `${buildSourceIdCandidate(value)}_${Date.now()}`;
 }
+
 
 
 

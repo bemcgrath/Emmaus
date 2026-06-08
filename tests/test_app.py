@@ -1,11 +1,12 @@
 import importlib
 import re
 from collections import Counter
+from datetime import UTC, datetime, timedelta
 import json
 
 from fastapi.testclient import TestClient
 
-from emmaus.domain.models import StudyGapReport, StudyResponseEvaluation
+from emmaus.domain.models import LookBackReview, PassageReference, StudyGapReport, StudyResponseEvaluation
 from emmaus.providers.llm import LLMProvider
 from emmaus.services.personalization import CURATED_PASSAGE_BANK
 
@@ -1521,6 +1522,36 @@ def test_review_history_groups_recent_sessions_prayers_and_actions(tmp_path, mon
     assert payload["prayers"][0]["related_session_id"] == session_id
 
 
+def test_look_back_outcome_shapes_recommendation_reason_and_revisit(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    personalization = client.app.state.container.personalization_service
+
+    monkeypatch.setattr(
+        personalization,
+        "_get_latest_look_back_review",
+        lambda user_id: LookBackReview(
+            review_id="look-back-1",
+            user_id=user_id,
+            session_id="session-1",
+            reference=PassageReference(book="James", chapter=1, start_verse=22, end_verse=25),
+            review_type="meaning",
+            prompt="What stayed with you?",
+            response_text="I still am not clear on it.",
+            retention_score=0.18,
+            outcome="needs_reinforcement",
+            encouragement="Let Emmaus bring you back and reinforce what needs to stay with you.",
+        ),
+    )
+
+    recommendation = personalization.build_recommendation("demo-user", cache={})
+
+    assert recommendation.recommended_reference.book == "James"
+    assert recommendation.recommended_reference.chapter == 1
+    assert recommendation.recommended_reference.start_verse == 22
+    assert "look-back" in recommendation.reason.lower()
+    assert "did not stay clear yet" in recommendation.reason.lower() or "needs reinforcement" in recommendation.reason.lower()
+
+
 def test_look_back_prompt_and_response_are_saved(tmp_path, monkeypatch):
     client = build_client(tmp_path, monkeypatch)
     client.app.state.container.llm_registry.register(StrongResponseProvider())
@@ -1594,6 +1625,8 @@ def test_look_back_prompt_and_response_are_saved(tmp_path, monkeypatch):
     assert refreshed_payload["prompt"] is None
     assert refreshed_payload["latest_review"] is not None
     assert refreshed_payload["latest_review"]["session_id"] == session_id
+    assert refreshed_payload["recent_reviews"]
+    assert refreshed_payload["recent_reviews"][0]["session_id"] == session_id
 
 
 def test_nudge_preview_and_plan_fall_back_to_builtin_utc_without_tzdata(tmp_path, monkeypatch):
@@ -1829,8 +1862,387 @@ def test_prayer_item_cannot_be_updated_by_another_user(tmp_path, monkeypatch):
     assert stored["answered_at"] is None
 
 
+def _stub_esv_urlopen(monkeypatch, text="For God so loved the world, that he gave his only Son."):
+    def fake_urlopen(req, timeout=15):
+        class DummyResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return json.dumps({
+                    "canonical": "John 3:16",
+                    "passages": [text],
+                }).encode("utf-8")
+
+        return DummyResponse()
+
+    monkeypatch.setattr("emmaus.providers.text.request.urlopen", fake_urlopen)
 
 
+def test_memorization_add_verse_requires_esv(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMMAUS_ESV_API_KEY", "")
+    client = build_client(tmp_path, monkeypatch)
+    response = client.post(
+        "/v1/memorization/verses",
+        json={"user_id": "demo-user", "book": "John", "chapter": 3, "start_verse": 16},
+    )
+    assert response.status_code == 400
+    assert "ESV" in response.json()["detail"]
+
+
+def test_memorization_add_verse_snapshots_esv_text(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMMAUS_ESV_API_KEY", "key")
+    _stub_esv_urlopen(monkeypatch)
+    client = build_client(tmp_path, monkeypatch)
+
+    response = client.post(
+        "/v1/memorization/verses",
+        json={"user_id": "demo-user", "book": "John", "chapter": 3, "start_verse": 16},
+    )
+    assert response.status_code == 200
+    verse = response.json()
+    assert "For God so loved" in verse["verse_text"]
+    assert verse["translation"] == "ESV"
+    assert verse["mastery_level"] == "learning"
+    assert verse["repetition_count"] == 0
+
+    listed = client.get("/v1/memorization/demo-user/verses").json()
+    assert len(listed) == 1
+    assert listed[0]["verse_id"] == verse["verse_id"]
+
+
+def test_memorization_review_advances_interval_and_mastery(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMMAUS_ESV_API_KEY", "key")
+    _stub_esv_urlopen(monkeypatch)
+    client = build_client(tmp_path, monkeypatch)
+
+    add = client.post(
+        "/v1/memorization/verses",
+        json={"user_id": "demo-user", "book": "John", "chapter": 3, "start_verse": 16},
+    ).json()
+    verse_id = add["verse_id"]
+
+    last_interval = 0
+    last_reps = 0
+    for _ in range(3):
+        review = client.post(
+            f"/v1/memorization/verses/{verse_id}/review",
+            json={"rating": "good", "drill_stage": 1},
+        ).json()
+        verse = review["verse"]
+        assert verse["repetition_count"] == last_reps + 1
+        assert verse["interval_days"] >= last_interval
+        last_reps = verse["repetition_count"]
+        last_interval = verse["interval_days"]
+
+    progress = review["progress"]
+    assert verse["mastery_level"] in ("familiar", "mastered")
+    assert progress["current_streak"] >= 1
+    assert progress["mastery"]["familiar"] + progress["mastery"]["mastered"] >= 1
+
+
+def test_memorization_again_rating_resets_progress(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMMAUS_ESV_API_KEY", "key")
+    _stub_esv_urlopen(monkeypatch)
+    client = build_client(tmp_path, monkeypatch)
+
+    verse = client.post(
+        "/v1/memorization/verses",
+        json={"user_id": "demo-user", "book": "John", "chapter": 3, "start_verse": 16},
+    ).json()
+    verse_id = verse["verse_id"]
+
+    client.post(f"/v1/memorization/verses/{verse_id}/review", json={"rating": "good"})
+    client.post(f"/v1/memorization/verses/{verse_id}/review", json={"rating": "good"})
+    reset = client.post(f"/v1/memorization/verses/{verse_id}/review", json={"rating": "again"}).json()
+    assert reset["verse"]["repetition_count"] == 0
+    assert reset["verse"]["interval_days"] == 0
+    assert reset["verse"]["mastery_level"] == "learning"
+
+
+def test_memorization_target_progress_tracks_familiar_verses(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMMAUS_ESV_API_KEY", "key")
+    _stub_esv_urlopen(monkeypatch)
+    client = build_client(tmp_path, monkeypatch)
+
+    target = client.post(
+        "/v1/memorization/demo-user/targets",
+        json={"title": "Summer plan", "verse_count_goal": 3, "target_date": "2099-12-31"},
+    )
+    assert target.status_code == 200
+
+    verse = client.post(
+        "/v1/memorization/verses",
+        json={"user_id": "demo-user", "book": "John", "chapter": 3, "start_verse": 16},
+    ).json()
+    verse_id = verse["verse_id"]
+
+    progress = client.get("/v1/memorization/demo-user/progress").json()
+    assert progress["active_target"]["title"] == "Summer plan"
+    assert progress["active_target_progress"] == 0
+
+    for _ in range(2):
+        client.post(f"/v1/memorization/verses/{verse_id}/review", json={"rating": "good"})
+
+    progress = client.get("/v1/memorization/demo-user/progress").json()
+    assert progress["active_target_progress"] >= 1
+
+
+def test_memorization_delete_verse_removes_it(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMMAUS_ESV_API_KEY", "key")
+    _stub_esv_urlopen(monkeypatch)
+    client = build_client(tmp_path, monkeypatch)
+
+    verse = client.post(
+        "/v1/memorization/verses",
+        json={"user_id": "demo-user", "book": "John", "chapter": 3, "start_verse": 16},
+    ).json()
+    client.delete(f"/v1/memorization/verses/{verse['verse_id']}")
+
+    assert client.get("/v1/memorization/demo-user/verses").json() == []
+
+
+def test_notes_crud_and_reference_filter(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    created = client.post(
+        "/v1/notes",
+        json={
+            "user_id": "demo-user",
+            "book": "Romans",
+            "chapter": 8,
+            "start_verse": 1,
+            "end_verse": 4,
+            "title": "No condemnation",
+            "body": "The 'therefore' points back to chapter 7's struggle.",
+        },
+    )
+    assert created.status_code == 200
+    note = created.json()
+    assert note["title"] == "No condemnation"
+
+    other = client.post(
+        "/v1/notes",
+        json={
+            "user_id": "demo-user",
+            "book": "John",
+            "chapter": 3,
+            "start_verse": 16,
+            "body": "God's love is the source.",
+        },
+    ).json()
+
+    all_notes = client.get("/v1/notes/demo-user").json()
+    assert {n["note_id"] for n in all_notes} == {note["note_id"], other["note_id"]}
+
+    filtered = client.get(
+        "/v1/notes/demo-user",
+        params={"book": "Romans", "chapter": 8, "start_verse": 1, "end_verse": 4},
+    ).json()
+    assert len(filtered) == 1
+    assert filtered[0]["note_id"] == note["note_id"]
+
+    updated = client.patch(
+        f"/v1/notes/{note['note_id']}",
+        json={"body": "Updated reflection on Paul's argument."},
+    ).json()
+    assert "Updated reflection" in updated["body"]
+    assert updated["updated_at"] >= updated["created_at"]
+
+    client.delete(f"/v1/notes/{note['note_id']}")
+    remaining = client.get("/v1/notes/demo-user").json()
+    assert len(remaining) == 1
+    assert remaining[0]["note_id"] == other["note_id"]
+
+
+def test_notes_reject_empty_body(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    response = client.post(
+        "/v1/notes",
+        json={
+            "user_id": "demo-user",
+            "book": "John",
+            "chapter": 3,
+            "start_verse": 16,
+            "body": "   ",
+        },
+    )
+    assert response.status_code == 400
+
+
+def _add_drill_verse(client, monkeypatch, text="For God so loved the world that he gave his only Son."):
+    monkeypatch.setenv("EMMAUS_ESV_API_KEY", "key")
+    _stub_esv_urlopen(monkeypatch, text=text)
+    return client.post(
+        "/v1/memorization/verses",
+        json={"user_id": "demo-user", "book": "John", "chapter": 3, "start_verse": 16},
+    ).json()
+
+
+def test_drill_attempt_below_threshold_stays_on_stage(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    verse = _add_drill_verse(client, monkeypatch)
+    verse_id = verse["verse_id"]
+
+    response = client.post(
+        f"/v1/memorization/verses/{verse_id}/drill-attempt",
+        json={"typed_text": "for god so loved the world"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["result"]["advanced"] is False
+    assert payload["result"]["mastered"] is False
+    assert payload["result"]["verse"]["learning_stage"] == 0
+    assert payload["result"]["score"] < 0.90
+
+
+def test_drill_attempt_80_to_89_stays_on_stage(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    # 10 words → 8 correct = 80%
+    verse = _add_drill_verse(client, monkeypatch, text="alpha bravo charlie delta echo foxtrot golf hotel india juliet")
+    verse_id = verse["verse_id"]
+
+    response = client.post(
+        f"/v1/memorization/verses/{verse_id}/drill-attempt",
+        json={"typed_text": "alpha bravo charlie delta echo foxtrot golf hotel WRONG WRONG"},
+    ).json()
+    assert 0.80 <= response["result"]["score"] < 0.90
+    assert response["result"]["advanced"] is False
+    assert response["result"]["verse"]["learning_stage"] == 0
+
+
+def test_drill_attempt_at_least_90_advances(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    verse = _add_drill_verse(client, monkeypatch, text="alpha bravo charlie delta echo foxtrot golf hotel india juliet")
+    verse_id = verse["verse_id"]
+
+    response = client.post(
+        f"/v1/memorization/verses/{verse_id}/drill-attempt",
+        json={"typed_text": "alpha bravo charlie delta echo foxtrot golf hotel india WRONG"},
+    ).json()
+    assert response["result"]["score"] >= 0.90
+    assert response["result"]["advanced"] is True
+    assert response["result"]["verse"]["learning_stage"] == 1
+
+
+def test_drill_attempt_tokenizer_ignores_case_and_punctuation(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    verse = _add_drill_verse(client, monkeypatch, text="For God so loved the world.")
+    verse_id = verse["verse_id"]
+
+    response = client.post(
+        f"/v1/memorization/verses/{verse_id}/drill-attempt",
+        json={"typed_text": "FOR, GOD! SO; LOVED THE WORLD"},
+    ).json()
+    assert response["result"]["score"] == 1.0
+    assert response["result"]["advanced"] is True
+
+
+def test_drill_attempt_promotes_to_mastered_at_final_stage(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    verse = _add_drill_verse(client, monkeypatch, text="For God so loved the world.")
+    verse_id = verse["verse_id"]
+
+    # Advance 4 times to reach stage 4
+    for expected_stage in range(1, 5):
+        result = client.post(
+            f"/v1/memorization/verses/{verse_id}/drill-attempt",
+            json={"typed_text": "for god so loved the world"},
+        ).json()["result"]
+        assert result["verse"]["learning_stage"] == expected_stage
+        assert result["mastered"] is False
+
+    # Final attempt at stage 4 → mastered
+    final = client.post(
+        f"/v1/memorization/verses/{verse_id}/drill-attempt",
+        json={"typed_text": "for god so loved the world"},
+    ).json()
+    assert final["result"]["mastered"] is True
+    assert final["result"]["verse"]["mastery_level"] == "mastered"
+    assert final["result"]["verse"]["ease_factor"] == 2.5
+    assert final["result"]["verse"]["repetition_count"] == 1
+    assert final["result"]["verse"]["interval_days"] == 2
+    expected_review = (datetime.now(UTC).date() + timedelta(days=2)).isoformat()
+    assert final["result"]["verse"]["next_review_at"] == expected_review
+    assert final["progress"]["current_streak"] >= 1
+
+
+def test_drill_attempt_rejected_when_mastered(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+    verse = _add_drill_verse(client, monkeypatch, text="For God so loved the world.")
+    verse_id = verse["verse_id"]
+
+    for _ in range(5):
+        client.post(
+            f"/v1/memorization/verses/{verse_id}/drill-attempt",
+            json={"typed_text": "for god so loved the world"},
+        )
+
+    response = client.post(
+        f"/v1/memorization/verses/{verse_id}/drill-attempt",
+        json={"typed_text": "for god so loved the world"},
+    )
+    assert response.status_code == 409
+
+
+def test_topic_sources_lists_available_datasets():
+    from emmaus.main import app
+
+    client = TestClient(app)
+    response = client.get("/v1/topics/sources")
+    assert response.status_code == 200
+    sources = {entry["source"] for entry in response.json()}
+    assert {"openbible", "naves"}.issubset(sources)
+
+
+def test_topic_search_filters_by_query():
+    from emmaus.main import app
+
+    client = TestClient(app)
+    response = client.get("/v1/topics", params={"source": "openbible", "q": "salvation", "limit": 5})
+    assert response.status_code == 200
+    results = response.json()
+    assert results
+    assert all("salvation" in entry["name"].lower() for entry in results)
+
+
+def test_topic_verses_returns_passage_references():
+    from emmaus.main import app
+
+    client = TestClient(app)
+    response = client.get("/v1/topics/naves/faith/verses")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["name"].lower() == "faith"
+    assert payload["verses"]
+    verse = payload["verses"][0]
+    assert {"book", "chapter", "start_verse"}.issubset(verse.keys())
+
+
+def test_topic_unknown_source_returns_404():
+    from emmaus.main import app
+
+    client = TestClient(app)
+    response = client.get("/v1/topics", params={"source": "nope"})
+    assert response.status_code == 404
+
+
+def test_books_endpoint_returns_66_books():
+    from emmaus.main import app
+
+    client = TestClient(app)
+    response = client.get("/v1/books")
+    assert response.status_code == 200
+    books = response.json()
+    assert len(books) == 66
+    assert books[0]["name"] == "Genesis"
+    assert books[-1]["name"] == "Revelation"
+    assert {b["testament"] for b in books} == {"old", "new"}
 
 
 

@@ -9,12 +9,17 @@ from pathlib import Path
 from emmaus.domain.models import (
     ActionItem,
     LookBackReview,
+    MemorizationReview,
+    MemorizationTarget,
+    MemorizedVerse,
     MoodCheckIn,
+    PassageReference,
     PrayerItem,
     SeenPassageRecord,
     SessionResponse,
     SpiritualMemoryEntry,
     StudyEvent,
+    StudyNote,
     StudySession,
     UserPreferences,
     UserProfile,
@@ -156,10 +161,69 @@ class SQLiteStudyRepository:
                     encouragement TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS memorized_verses (
+                    verse_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    reference_json TEXT NOT NULL,
+                    verse_text TEXT NOT NULL,
+                    translation TEXT NOT NULL,
+                    added_at TEXT NOT NULL,
+                    ease_factor REAL NOT NULL,
+                    interval_days INTEGER NOT NULL,
+                    repetition_count INTEGER NOT NULL,
+                    next_review_at TEXT NOT NULL,
+                    mastery_level TEXT NOT NULL,
+                    last_reviewed_at TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_memorized_verses_user_due
+                    ON memorized_verses (user_id, next_review_at);
+
+                CREATE TABLE IF NOT EXISTS memorization_reviews (
+                    review_id TEXT PRIMARY KEY,
+                    verse_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    rating TEXT NOT NULL,
+                    drill_stage INTEGER NOT NULL DEFAULT 0,
+                    reviewed_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_memorization_reviews_user
+                    ON memorization_reviews (user_id, reviewed_at);
+                CREATE INDEX IF NOT EXISTS idx_memorization_reviews_verse
+                    ON memorization_reviews (verse_id, reviewed_at);
+
+                CREATE TABLE IF NOT EXISTS memorization_targets (
+                    target_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    verse_count_goal INTEGER NOT NULL,
+                    target_date TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active'
+                );
+                CREATE INDEX IF NOT EXISTS idx_memorization_targets_user
+                    ON memorization_targets (user_id, status);
+
+                CREATE TABLE IF NOT EXISTS study_notes (
+                    note_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    reference_json TEXT NOT NULL,
+                    reference_key TEXT NOT NULL,
+                    title TEXT,
+                    body TEXT NOT NULL,
+                    session_id TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_study_notes_user
+                    ON study_notes (user_id, updated_at);
+                CREATE INDEX IF NOT EXISTS idx_study_notes_reference
+                    ON study_notes (user_id, reference_key);
                 """
             )
             self._ensure_column(connection, "action_items", "follow_up_note", "TEXT")
             self._ensure_column(connection, "action_items", "follow_up_outcome", "TEXT")
+            self._ensure_column(connection, "memorized_verses", "learning_stage", "INTEGER NOT NULL DEFAULT 0")
 
     def get_or_create_user(self, user_id: str, display_name: str | None = None) -> UserProfile:
         existing = self.get_user_profile(user_id)
@@ -705,6 +769,241 @@ class SQLiteStudyRepository:
                 (user_id,),
             ).fetchone()
         return int(row["count"])
+
+    def save_memorized_verse(self, verse: MemorizedVerse) -> MemorizedVerse:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO memorized_verses (
+                    verse_id, user_id, reference_json, verse_text, translation, added_at,
+                    ease_factor, interval_days, repetition_count, next_review_at,
+                    mastery_level, learning_stage, last_reviewed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(verse_id) DO UPDATE SET
+                    reference_json = excluded.reference_json,
+                    verse_text = excluded.verse_text,
+                    translation = excluded.translation,
+                    ease_factor = excluded.ease_factor,
+                    interval_days = excluded.interval_days,
+                    repetition_count = excluded.repetition_count,
+                    next_review_at = excluded.next_review_at,
+                    mastery_level = excluded.mastery_level,
+                    learning_stage = excluded.learning_stage,
+                    last_reviewed_at = excluded.last_reviewed_at
+                """,
+                (
+                    verse.verse_id,
+                    verse.user_id,
+                    json.dumps(verse.reference.model_dump()),
+                    verse.verse_text,
+                    verse.translation,
+                    verse.added_at.isoformat(),
+                    verse.ease_factor,
+                    verse.interval_days,
+                    verse.repetition_count,
+                    verse.next_review_at.isoformat(),
+                    verse.mastery_level,
+                    verse.learning_stage,
+                    self._dt_or_none(verse.last_reviewed_at),
+                ),
+            )
+        return verse
+
+    def get_memorized_verse(self, verse_id: str) -> MemorizedVerse | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM memorized_verses WHERE verse_id = ?",
+                (verse_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_memorized_verse(row)
+
+    def list_memorized_verses(self, user_id: str) -> list[MemorizedVerse]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM memorized_verses WHERE user_id = ? ORDER BY added_at DESC",
+                (user_id,),
+            ).fetchall()
+        return [self._row_to_memorized_verse(row) for row in rows]
+
+    def list_due_memorized_verses(self, user_id: str, on_date: date) -> list[MemorizedVerse]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM memorized_verses WHERE user_id = ? AND next_review_at <= ? ORDER BY next_review_at ASC",
+                (user_id, on_date.isoformat()),
+            ).fetchall()
+        return [self._row_to_memorized_verse(row) for row in rows]
+
+    def delete_memorized_verse(self, verse_id: str) -> None:
+        with self._connect() as connection:
+            connection.execute("DELETE FROM memorization_reviews WHERE verse_id = ?", (verse_id,))
+            connection.execute("DELETE FROM memorized_verses WHERE verse_id = ?", (verse_id,))
+
+    def add_memorization_review(self, review: MemorizationReview) -> MemorizationReview:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO memorization_reviews (
+                    review_id, verse_id, user_id, rating, drill_stage, reviewed_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    review.review_id,
+                    review.verse_id,
+                    review.user_id,
+                    review.rating,
+                    review.drill_stage,
+                    review.reviewed_at.isoformat(),
+                ),
+            )
+        return review
+
+    def list_memorization_review_dates(self, user_id: str) -> list[date]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT reviewed_at FROM memorization_reviews WHERE user_id = ? ORDER BY reviewed_at DESC",
+                (user_id,),
+            ).fetchall()
+        return [self._parse_datetime(row["reviewed_at"]).date() for row in rows]
+
+    def save_memorization_target(self, target: MemorizationTarget) -> MemorizationTarget:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO memorization_targets (
+                    target_id, user_id, title, verse_count_goal, target_date, created_at, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(target_id) DO UPDATE SET
+                    title = excluded.title,
+                    verse_count_goal = excluded.verse_count_goal,
+                    target_date = excluded.target_date,
+                    status = excluded.status
+                """,
+                (
+                    target.target_id,
+                    target.user_id,
+                    target.title,
+                    target.verse_count_goal,
+                    target.target_date.isoformat(),
+                    target.created_at.isoformat(),
+                    target.status,
+                ),
+            )
+        return target
+
+    def list_memorization_targets(self, user_id: str) -> list[MemorizationTarget]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM memorization_targets WHERE user_id = ? ORDER BY created_at DESC",
+                (user_id,),
+            ).fetchall()
+        return [self._row_to_memorization_target(row) for row in rows]
+
+    def get_active_memorization_target(self, user_id: str) -> MemorizationTarget | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM memorization_targets WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1",
+                (user_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_memorization_target(row)
+
+    def save_study_note(self, note: StudyNote) -> StudyNote:
+        reference_payload = note.reference.model_dump()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO study_notes (
+                    note_id, user_id, reference_json, reference_key, title, body, session_id, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(note_id) DO UPDATE SET
+                    reference_json = excluded.reference_json,
+                    reference_key = excluded.reference_key,
+                    title = excluded.title,
+                    body = excluded.body,
+                    session_id = excluded.session_id,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    note.note_id,
+                    note.user_id,
+                    json.dumps(reference_payload),
+                    self._reference_key(reference_payload),
+                    note.title,
+                    note.body,
+                    note.session_id,
+                    note.created_at.isoformat(),
+                    note.updated_at.isoformat(),
+                ),
+            )
+        return note
+
+    def get_study_note(self, note_id: str) -> StudyNote | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM study_notes WHERE note_id = ?",
+                (note_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_study_note(row)
+
+    def list_study_notes(self, user_id: str, reference: PassageReference | None = None) -> list[StudyNote]:
+        query = "SELECT * FROM study_notes WHERE user_id = ?"
+        params: list[object] = [user_id]
+        if reference is not None:
+            query += " AND reference_key = ?"
+            params.append(self._reference_key(reference.model_dump()))
+        query += " ORDER BY updated_at DESC"
+        with self._connect() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [self._row_to_study_note(row) for row in rows]
+
+    def delete_study_note(self, note_id: str) -> None:
+        with self._connect() as connection:
+            connection.execute("DELETE FROM study_notes WHERE note_id = ?", (note_id,))
+
+    def _row_to_memorized_verse(self, row: sqlite3.Row) -> MemorizedVerse:
+        return MemorizedVerse(
+            verse_id=row["verse_id"],
+            user_id=row["user_id"],
+            reference=json.loads(row["reference_json"]),
+            verse_text=row["verse_text"],
+            translation=row["translation"],
+            added_at=self._parse_datetime(row["added_at"]),
+            ease_factor=row["ease_factor"],
+            interval_days=row["interval_days"],
+            repetition_count=row["repetition_count"],
+            next_review_at=date.fromisoformat(row["next_review_at"]),
+            mastery_level=row["mastery_level"],
+            learning_stage=row["learning_stage"] if "learning_stage" in row.keys() else 0,
+            last_reviewed_at=self._parse_datetime(row["last_reviewed_at"]),
+        )
+
+    def _row_to_memorization_target(self, row: sqlite3.Row) -> MemorizationTarget:
+        return MemorizationTarget(
+            target_id=row["target_id"],
+            user_id=row["user_id"],
+            title=row["title"],
+            verse_count_goal=row["verse_count_goal"],
+            target_date=date.fromisoformat(row["target_date"]),
+            created_at=self._parse_datetime(row["created_at"]),
+            status=row["status"],
+        )
+
+    def _row_to_study_note(self, row: sqlite3.Row) -> StudyNote:
+        return StudyNote(
+            note_id=row["note_id"],
+            user_id=row["user_id"],
+            reference=json.loads(row["reference_json"]),
+            title=row["title"],
+            body=row["body"],
+            session_id=row["session_id"],
+            created_at=self._parse_datetime(row["created_at"]),
+            updated_at=self._parse_datetime(row["updated_at"]),
+        )
 
     def _enrich_profile(self, profile: UserProfile) -> UserProfile:
         completed_dates = list(self.list_completed_session_dates(profile.user_id))

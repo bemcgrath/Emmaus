@@ -4,7 +4,19 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from emmaus.api.routes import agent, commentary, engagement, health, study, text_sources, texts, users
+from emmaus.api.routes import (
+    agent,
+    commentary,
+    engagement,
+    health,
+    memorization,
+    notes,
+    study,
+    text_sources,
+    texts,
+    topics,
+    users,
+)
 from emmaus.core.bootstrap import build_container
 
 
@@ -37,3 +49,7 @@ app.include_router(commentary.router, prefix="/v1")
 app.include_router(study.router, prefix="/v1")
 app.include_router(engagement.router, prefix="/v1")
 app.include_router(agent.router, prefix="/v1")
+app.include_router(memorization.router, prefix="/v1")
+app.include_router(notes.router, prefix="/v1")
+app.include_router(topics.router, prefix="/v1")
+app.include_router(topics.books_router, prefix="/v1")

@@ -4,9 +4,14 @@ from emmaus.providers.llm import LLMProviderRegistry, NullLLMProvider, OllamaPro
 from emmaus.providers.text import ESVBibleTextProvider, LocalJsonBibleTextProvider, RemoteApiBibleTextProvider, TextProviderRegistry
 from emmaus.repositories.study import SQLiteStudyRepository
 from emmaus.services.agent import AdaptiveStudyAgent
+from emmaus.services.memorization import MemorizationService
+from emmaus.services.notes import NotesService
 from emmaus.services.personalization import PersonalizationService
 from emmaus.services.study import StudyService
 from emmaus.services.text import TextSourceService
+from emmaus.services.topics import TopicService
+
+from pathlib import Path
 
 
 class Container:
@@ -42,6 +47,14 @@ class Container:
             commentary_registry=self.commentary_registry,
             llm_registry=self.llm_registry,
             default_commentary_source=self.settings.default_commentary_source,
+        )
+        self.memorization_service = MemorizationService(
+            repository=self.study_repository,
+            text_registry=self.text_registry,
+        )
+        self.notes_service = NotesService(repository=self.study_repository)
+        self.topic_service = TopicService(
+            data_dir=Path(__file__).resolve().parent.parent / "data" / "topics",
         )
 
 

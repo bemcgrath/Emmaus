@@ -231,6 +231,7 @@ class LookBackState(BaseModel):
     user_id: str
     prompt: LookBackPrompt | None = None
     latest_review: LookBackReview | None = None
+    recent_reviews: list[LookBackReview] = Field(default_factory=list)
 
 
 class SeenPassageRecord(BaseModel):
@@ -345,4 +346,83 @@ class AgentSessionCompleteResponse(BaseModel):
     session: StudySession
     action_item: ActionItem
     engagement: EngagementSummary
+
+
+class MemorizedVerse(BaseModel):
+    verse_id: str
+    user_id: str
+    reference: PassageReference
+    verse_text: str
+    translation: str = "ESV"
+    added_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    ease_factor: float = 2.5
+    interval_days: int = 0
+    repetition_count: int = 0
+    next_review_at: date
+    mastery_level: Literal["learning", "familiar", "mastered"] = "learning"
+    learning_stage: int = 0
+    last_reviewed_at: datetime | None = None
+
+
+class WordDiff(BaseModel):
+    expected: str
+    typed: str
+    ok: bool
+
+
+class DrillAttemptResult(BaseModel):
+    verse: MemorizedVerse
+    score: float
+    correct_words: int
+    total_words: int
+    advanced: bool
+    mastered: bool
+    diff: list[WordDiff] = Field(default_factory=list)
+
+
+class MemorizationReview(BaseModel):
+    review_id: str
+    verse_id: str
+    user_id: str
+    rating: Literal["again", "hard", "good", "easy"]
+    drill_stage: int = 0
+    reviewed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class MemorizationTarget(BaseModel):
+    target_id: str
+    user_id: str
+    title: str
+    verse_count_goal: int
+    target_date: date
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    status: Literal["active", "achieved", "abandoned"] = "active"
+
+
+class MasteryBreakdown(BaseModel):
+    learning: int = 0
+    familiar: int = 0
+    mastered: int = 0
+
+
+class MemorizationProgress(BaseModel):
+    user_id: str
+    total_verses: int
+    mastery: MasteryBreakdown
+    current_streak: int
+    longest_streak: int
+    due_today: int
+    active_target: MemorizationTarget | None = None
+    active_target_progress: int = 0
+
+
+class StudyNote(BaseModel):
+    note_id: str
+    user_id: str
+    reference: PassageReference
+    title: str | None = None
+    body: str
+    session_id: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

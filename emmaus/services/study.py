@@ -326,11 +326,13 @@ class StudyService:
         )
 
     def build_look_back_state(self, user_id: str) -> LookBackState:
-        latest_review = self.list_look_back_reviews(user_id, limit=1)
+        recent_reviews = self.list_look_back_reviews(user_id, limit=3)
+        latest_review = recent_reviews[0] if recent_reviews else None
         return LookBackState(
             user_id=user_id,
             prompt=self.build_look_back_prompt(user_id),
-            latest_review=latest_review[0] if latest_review else None,
+            latest_review=latest_review,
+            recent_reviews=recent_reviews,
         )
 
     def build_look_back_prompt(self, user_id: str, limit_sessions: int = 5) -> LookBackPrompt | None:
