@@ -216,7 +216,9 @@ def test_every_element_the_client_looks_up_exists_in_the_shell(tmp_path, monkeyp
     markup = client.get("/").text
     script = client.get("/static/app.js").text
 
+    # An element is fair game if the shell renders it or the client renders it itself.
     available_ids = set(re.findall(r'id="([^"]+)"', markup))
+    available_ids.update(re.findall(r'id="([^"]+)"', script))
     requested_ids = set(re.findall(r'getElementById\("([^"]+)"\)', script))
     requested_ids.update(re.findall(r'querySelector\("#([\w-]+)"\)', script))
 
