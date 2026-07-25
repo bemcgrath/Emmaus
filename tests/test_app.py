@@ -2077,18 +2077,21 @@ def test_notes_reject_empty_body(tmp_path, monkeypatch):
     assert response.status_code == 400
 
 
-def _add_drill_verse(client, monkeypatch, text="For God so loved the world that he gave his only Son."):
+def _client_with_drill_verse(tmp_path, monkeypatch, text="For God so loved the world that he gave his only Son."):
+    # ESV has to be configured before the container is built, or the source is never registered.
     monkeypatch.setenv("EMMAUS_ESV_API_KEY", "key")
     _stub_esv_urlopen(monkeypatch, text=text)
-    return client.post(
+    client = build_client(tmp_path, monkeypatch)
+    response = client.post(
         "/v1/memorization/verses",
         json={"user_id": "demo-user", "book": "John", "chapter": 3, "start_verse": 16},
-    ).json()
+    )
+    assert response.status_code == 200, response.text
+    return client, response.json()
 
 
 def test_drill_attempt_below_threshold_stays_on_stage(tmp_path, monkeypatch):
-    client = build_client(tmp_path, monkeypatch)
-    verse = _add_drill_verse(client, monkeypatch)
+    client, verse = _client_with_drill_verse(tmp_path, monkeypatch)
     verse_id = verse["verse_id"]
 
     response = client.post(
@@ -2104,9 +2107,8 @@ def test_drill_attempt_below_threshold_stays_on_stage(tmp_path, monkeypatch):
 
 
 def test_drill_attempt_80_to_89_stays_on_stage(tmp_path, monkeypatch):
-    client = build_client(tmp_path, monkeypatch)
     # 10 words → 8 correct = 80%
-    verse = _add_drill_verse(client, monkeypatch, text="alpha bravo charlie delta echo foxtrot golf hotel india juliet")
+    client, verse = _client_with_drill_verse(tmp_path, monkeypatch, text="alpha bravo charlie delta echo foxtrot golf hotel india juliet")
     verse_id = verse["verse_id"]
 
     response = client.post(
@@ -2119,8 +2121,7 @@ def test_drill_attempt_80_to_89_stays_on_stage(tmp_path, monkeypatch):
 
 
 def test_drill_attempt_at_least_90_advances(tmp_path, monkeypatch):
-    client = build_client(tmp_path, monkeypatch)
-    verse = _add_drill_verse(client, monkeypatch, text="alpha bravo charlie delta echo foxtrot golf hotel india juliet")
+    client, verse = _client_with_drill_verse(tmp_path, monkeypatch, text="alpha bravo charlie delta echo foxtrot golf hotel india juliet")
     verse_id = verse["verse_id"]
 
     response = client.post(
@@ -2133,8 +2134,7 @@ def test_drill_attempt_at_least_90_advances(tmp_path, monkeypatch):
 
 
 def test_drill_attempt_tokenizer_ignores_case_and_punctuation(tmp_path, monkeypatch):
-    client = build_client(tmp_path, monkeypatch)
-    verse = _add_drill_verse(client, monkeypatch, text="For God so loved the world.")
+    client, verse = _client_with_drill_verse(tmp_path, monkeypatch, text="For God so loved the world.")
     verse_id = verse["verse_id"]
 
     response = client.post(
@@ -2146,8 +2146,7 @@ def test_drill_attempt_tokenizer_ignores_case_and_punctuation(tmp_path, monkeypa
 
 
 def test_drill_attempt_promotes_to_mastered_at_final_stage(tmp_path, monkeypatch):
-    client = build_client(tmp_path, monkeypatch)
-    verse = _add_drill_verse(client, monkeypatch, text="For God so loved the world.")
+    client, verse = _client_with_drill_verse(tmp_path, monkeypatch, text="For God so loved the world.")
     verse_id = verse["verse_id"]
 
     # Advance 4 times to reach stage 4
@@ -2175,8 +2174,7 @@ def test_drill_attempt_promotes_to_mastered_at_final_stage(tmp_path, monkeypatch
 
 
 def test_drill_attempt_rejected_when_mastered(tmp_path, monkeypatch):
-    client = build_client(tmp_path, monkeypatch)
-    verse = _add_drill_verse(client, monkeypatch, text="For God so loved the world.")
+    client, verse = _client_with_drill_verse(tmp_path, monkeypatch, text="For God so loved the world.")
     verse_id = verse["verse_id"]
 
     for _ in range(5):
