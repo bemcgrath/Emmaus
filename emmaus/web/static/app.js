@@ -135,6 +135,7 @@ function cacheElements() {
     textSourceSelect: document.getElementById("text-source-select"),
     sessionStatusPill: document.getElementById("session-status-pill"),
     sessionReference: document.getElementById("session-reference"),
+    passageReference: document.getElementById("passage-reference"),
     questionProgressPill: document.getElementById("question-progress-pill"),
     sessionHero: document.getElementById("session-hero"),
     passageText: document.getElementById("passage-text"),
@@ -1024,7 +1025,9 @@ function renderLookBack(lookBack) {
     `
     : "";
 
+  const lookBackPanelEl = elements.lookBackCard.closest(".panel");
   if (prompt) {
+    if (lookBackPanelEl) lookBackPanelEl.classList.remove("hidden");
     elements.lookBackPill.textContent = "Ready";
     elements.lookBackCard.innerHTML = `
       <div class="memory-card">
@@ -1042,6 +1045,7 @@ function renderLookBack(lookBack) {
   elements.lookBackForm.classList.add("hidden");
 
   if (latestReview) {
+    if (lookBackPanelEl) lookBackPanelEl.classList.remove("hidden");
     elements.lookBackPill.textContent = "Saved";
     elements.lookBackCard.innerHTML = `
       <div class="memory-card">
@@ -1059,6 +1063,8 @@ function renderLookBack(lookBack) {
 
   elements.lookBackPill.textContent = "Ready";
   elements.lookBackCard.innerHTML = '<p class="empty-state">Finish a session and Emmaus will bring one recent truth back into view here.</p>';
+  const lookBackPanel = elements.lookBackCard.closest(".panel");
+  if (lookBackPanel) lookBackPanel.classList.add("hidden");
 }
 
 function buildLookBackOutcomeLabel(outcome) {
@@ -1550,13 +1556,13 @@ function setSessionResumeMode(active) {
 }
 
 function updateSessionEntryState(activeSession) {
+  const entryPanel = document.getElementById("session-entry-panel");
+  const recommendationPanel = document.getElementById("recommendation-panel");
+  if (recommendationPanel) recommendationPanel.classList.toggle("hidden", !!activeSession);
   if (activeSession) {
+    if (entryPanel) entryPanel.classList.add("hidden");
     const session = activeSession.session;
-    const sessionSourceName = getSourceById(session.text_source_id)?.name || "the Bible chosen for this session";
-    elements.sessionPanelHeading.textContent = "Resume today's session";
     elements.sessionStatusPill.textContent = "Active";
-    elements.sessionFormCopy.textContent = `You already have an active session in ${formatReference(session.reference)} using ${sessionSourceName}. Adjust the time you have left, then resume.`;
-    elements.sessionFormButton.textContent = "Adjust time and resume";
     elements.entryPointInput.value = "continue where I left off";
     elements.requestedMinutesInput.value = session.requested_minutes || state.recommendation?.recommended_minutes || "";
     elements.sessionGuideMode.value = session.guide_mode || "";
@@ -1568,6 +1574,7 @@ function updateSessionEntryState(activeSession) {
     return;
   }
 
+  if (entryPanel) entryPanel.classList.remove("hidden");
   setSessionResumeMode(false);
   setSessionEntryFormLocked(false);
   elements.sessionPanelHeading.textContent = "Start or continue";
@@ -2099,7 +2106,12 @@ function renderSessionStart(payload, { navigate = true } = {}) {
   };
   const guideLabel = guideLabelMap[session.guide_mode] || sentenceCase(session.guide_mode);
   elements.sessionStatusPill.textContent = sentenceCase(session.status);
-  elements.sessionReference.textContent = formatReference(session.reference);
+  const referenceText = formatReference(session.reference);
+  elements.sessionReference.textContent = referenceText;
+  if (elements.passageReference) {
+    elements.passageReference.textContent = referenceText;
+    elements.passageReference.hidden = !referenceText;
+  }
   elements.questionProgressPill.textContent = buildQuestionProgress(session);
   elements.sessionHero.innerHTML = `
     ${buildSessionContextCard(payload)}
@@ -2157,6 +2169,10 @@ function clearSessionView() {
   state.activeSessionPayload = null;
   state.currentQuestion = null;
   elements.sessionReference.textContent = "No active session yet";
+  if (elements.passageReference) {
+    elements.passageReference.textContent = "";
+    elements.passageReference.hidden = true;
+  }
   elements.questionProgressPill.textContent = "Questions unavailable";
   elements.sessionHero.innerHTML = '<p class="empty-state">Start a session to see the passage, plan, and first question.</p>';
   elements.passageText.innerHTML = "Start a session to see the passage, plan, and first question.";
@@ -2886,16 +2902,20 @@ function restorePreferredScreen() {
 }
 
 function showScreen(screenName) {
+  if (screenName === "memorize") screenName = "session";
   state.activeScreen = screenName;
   localStorage.setItem("emmaus.activeScreen", screenName);
+  const memorizeUnderStudy = screenName === "session";
   elements.screens.forEach((screen) => {
-    screen.classList.toggle("screen-active", screen.dataset.screen === screenName);
+    const target = screen.dataset.screen;
+    const isActive = target === screenName || (memorizeUnderStudy && target === "memorize");
+    screen.classList.toggle("screen-active", isActive);
   });
   elements.navButtons.forEach((button) => {
     button.classList.toggle("nav-pill-active", button.dataset.navTarget === screenName);
   });
   resetViewportScroll();
-  if (screenName === "memorize") {
+  if (screenName === "session") {
     loadMemorizeScreen().catch(handleError);
   }
 }
@@ -3033,6 +3053,259 @@ function bindMemorizeEvents() {
   document.getElementById("memorize-drill-exit")?.addEventListener("click", exitMemorizationDrill);
   document.getElementById("memorize-verse-list")?.addEventListener("click", onMemorizeVerseListClick);
   document.getElementById("memorize-drill-rating-row")?.addEventListener("click", onMemorizeRatingClick);
+  bindVersePickerEvents();
+}
+
+const versePickerState = {
+  activeTab: "reference",
+  themeLoaded: false,
+  navesLoaded: false,
+  booksLoaded: false,
+  selectedBook: null,
+  selectedChapter: null,
+};
+
+function bindVersePickerEvents() {
+  document.querySelectorAll(".verse-picker-tab").forEach((tab) => {
+    tab.addEventListener("click", () => setVersePickerTab(tab.dataset.pickerTab));
+  });
+  document.getElementById("theme-search")?.addEventListener("input", debouncePickerSearch("openbible"));
+  document.getElementById("naves-search")?.addEventListener("input", debouncePickerSearch("naves"));
+  document.getElementById("theme-topic-list")?.addEventListener("click", (e) => onPickerTopicClick(e, "openbible"));
+  document.getElementById("naves-topic-list")?.addEventListener("click", (e) => onPickerTopicClick(e, "naves"));
+  document.getElementById("theme-verse-list")?.addEventListener("click", (e) => onPickerVerseListClick(e, "openbible"));
+  document.getElementById("naves-verse-list")?.addEventListener("click", (e) => onPickerVerseListClick(e, "naves"));
+  document.getElementById("book-list")?.addEventListener("click", onPickerBookClick);
+  document.getElementById("book-chapter-list")?.addEventListener("click", onPickerChapterClick);
+  document.getElementById("book-verse-form")?.addEventListener("submit", onPickerBookVerseSubmit);
+}
+
+function setVersePickerTab(tab) {
+  if (!tab) return;
+  versePickerState.activeTab = tab;
+  document.querySelectorAll(".verse-picker-tab").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.pickerTab === tab);
+  });
+  document.querySelectorAll(".verse-picker-pane").forEach((pane) => {
+    pane.hidden = pane.dataset.pickerPane !== tab;
+  });
+  if (tab === "theme" && !versePickerState.themeLoaded) loadPickerTopics("openbible");
+  if (tab === "topic" && !versePickerState.navesLoaded) loadPickerTopics("naves");
+  if (tab === "book" && !versePickerState.booksLoaded) loadPickerBooks();
+}
+
+let _pickerSearchTimers = {};
+function debouncePickerSearch(source) {
+  return (event) => {
+    clearTimeout(_pickerSearchTimers[source]);
+    const query = event.target.value;
+    _pickerSearchTimers[source] = setTimeout(() => loadPickerTopics(source, query), 220);
+  };
+}
+
+async function loadPickerTopics(source, query = "") {
+  const listId = source === "openbible" ? "theme-topic-list" : "naves-topic-list";
+  const verseListId = source === "openbible" ? "theme-verse-list" : "naves-verse-list";
+  const list = document.getElementById(listId);
+  const verseList = document.getElementById(verseListId);
+  if (!list) return;
+  verseList.hidden = true;
+  verseList.innerHTML = "";
+  list.hidden = false;
+  list.innerHTML = '<p class="picker-empty-state">Loading...</p>';
+  try {
+    const params = new URLSearchParams({ source, limit: "75" });
+    if (query.trim()) params.set("q", query.trim());
+    const topics = await fetchJson(`/v1/topics?${params.toString()}`);
+    if (source === "openbible") versePickerState.themeLoaded = true;
+    else versePickerState.navesLoaded = true;
+    if (!topics.length) {
+      list.innerHTML = '<p class="picker-empty-state">No topics matched.</p>';
+      return;
+    }
+    list.innerHTML = topics
+      .map(
+        (t) => `
+        <button type="button" class="picker-list-item" data-topic-id="${escapeHtml(t.topic_id)}">
+          <span>${escapeHtml(toTitleCase(t.name))}</span>
+          <span class="picker-list-item-meta">${t.verse_count} verses</span>
+        </button>`,
+      )
+      .join("");
+  } catch (error) {
+    list.innerHTML = `<p class="picker-empty-state">${escapeHtml(error.message || "Failed to load topics.")}</p>`;
+  }
+}
+
+async function onPickerTopicClick(event, source) {
+  const button = event.target.closest(".picker-list-item");
+  if (!button) return;
+  const topicId = button.dataset.topicId;
+  const listId = source === "openbible" ? "theme-topic-list" : "naves-topic-list";
+  const verseListId = source === "openbible" ? "theme-verse-list" : "naves-verse-list";
+  const list = document.getElementById(listId);
+  const verseList = document.getElementById(verseListId);
+  list.hidden = true;
+  verseList.hidden = false;
+  verseList.innerHTML = '<p class="picker-empty-state">Loading verses...</p>';
+  try {
+    const data = await fetchJson(
+      `/v1/topics/${encodeURIComponent(source)}/${encodeURIComponent(topicId)}/verses`,
+    );
+    const items = (data.verses || [])
+      .map((v) => {
+        const refLabel = formatReference(v);
+        const payload = JSON.stringify(v).replaceAll('"', "&quot;");
+        return `
+          <button type="button" class="picker-list-item" data-verse-ref="${payload}">
+            <span>${escapeHtml(refLabel)}</span>
+            <span class="picker-list-item-meta">Add</span>
+          </button>`;
+      })
+      .join("");
+    verseList.innerHTML = `
+      <button type="button" class="picker-back-button" data-picker-back>&larr; Back to topics</button>
+      <p><strong>${escapeHtml(toTitleCase(data.name))}</strong></p>
+      <div class="picker-list">${items || '<p class="picker-empty-state">No verses for this topic.</p>'}</div>
+    `;
+  } catch (error) {
+    verseList.innerHTML = `<p class="picker-empty-state">${escapeHtml(error.message || "Failed to load verses.")}</p>`;
+  }
+}
+
+async function onPickerVerseListClick(event, source) {
+  if (event.target.closest("[data-picker-back]")) {
+    const listId = source === "openbible" ? "theme-topic-list" : "naves-topic-list";
+    const verseListId = source === "openbible" ? "theme-verse-list" : "naves-verse-list";
+    document.getElementById(listId).hidden = false;
+    document.getElementById(verseListId).hidden = true;
+    document.getElementById(verseListId).innerHTML = "";
+    return;
+  }
+  const button = event.target.closest("[data-verse-ref]");
+  if (!button) return;
+  const ref = JSON.parse(button.dataset.verseRef.replaceAll("&quot;", '"'));
+  await addVerseFromReference(ref, button);
+}
+
+async function loadPickerBooks() {
+  const list = document.getElementById("book-list");
+  if (!list) return;
+  list.innerHTML = '<p class="picker-empty-state">Loading books...</p>';
+  try {
+    const books = await fetchJson("/v1/books");
+    versePickerState.booksLoaded = true;
+    list.innerHTML = books
+      .map(
+        (b) => `
+        <button type="button" class="picker-list-item" data-book-name="${escapeHtml(b.name)}" data-chapters="${b.chapters}">
+          <span>${escapeHtml(b.name)}</span>
+          <span class="picker-list-item-meta">${b.chapters} ch &middot; ${b.testament === "old" ? "OT" : "NT"}</span>
+        </button>`,
+      )
+      .join("");
+  } catch (error) {
+    list.innerHTML = `<p class="picker-empty-state">${escapeHtml(error.message || "Failed to load books.")}</p>`;
+  }
+}
+
+function onPickerBookClick(event) {
+  const button = event.target.closest("[data-book-name]");
+  if (!button) return;
+  const book = button.dataset.bookName;
+  const chapters = Number(button.dataset.chapters) || 1;
+  versePickerState.selectedBook = book;
+  versePickerState.selectedChapter = null;
+  const bookList = document.getElementById("book-list");
+  const chapterList = document.getElementById("book-chapter-list");
+  const form = document.getElementById("book-verse-form");
+  bookList.hidden = true;
+  chapterList.hidden = false;
+  form.hidden = true;
+  const chips = [];
+  for (let i = 1; i <= chapters; i += 1) {
+    chips.push(
+      `<button type="button" class="picker-list-item" data-chapter="${i}"><span>Chapter ${i}</span></button>`,
+    );
+  }
+  chapterList.innerHTML = `
+    <button type="button" class="picker-back-button" data-picker-back-book>&larr; Back to books</button>
+    <p><strong>${escapeHtml(book)}</strong></p>
+    ${chips.join("")}
+  `;
+}
+
+function onPickerChapterClick(event) {
+  if (event.target.closest("[data-picker-back-book]")) {
+    document.getElementById("book-list").hidden = false;
+    document.getElementById("book-chapter-list").hidden = true;
+    document.getElementById("book-verse-form").hidden = true;
+    versePickerState.selectedBook = null;
+    return;
+  }
+  const button = event.target.closest("[data-chapter]");
+  if (!button) return;
+  const chapter = Number(button.dataset.chapter);
+  versePickerState.selectedChapter = chapter;
+  const form = document.getElementById("book-verse-form");
+  form.hidden = false;
+  document.getElementById("book-verse-summary").textContent =
+    `${versePickerState.selectedBook} ${chapter}:?`;
+  document.getElementById("book-start-verse").value = "";
+  document.getElementById("book-end-verse").value = "";
+  document.getElementById("book-start-verse").focus();
+}
+
+async function onPickerBookVerseSubmit(event) {
+  event.preventDefault();
+  const start = optionalNumber(document.getElementById("book-start-verse").value);
+  const end = optionalNumber(document.getElementById("book-end-verse").value);
+  if (!versePickerState.selectedBook || !versePickerState.selectedChapter || !start) {
+    showToast("Pick a book, chapter, and start verse.");
+    return;
+  }
+  await addVerseFromReference(
+    {
+      book: versePickerState.selectedBook,
+      chapter: versePickerState.selectedChapter,
+      start_verse: start,
+      end_verse: end,
+    },
+    event.submitter,
+  );
+}
+
+async function addVerseFromReference(reference, button) {
+  if (!ensureLiveMode("Demo mode is read-only. Switch to Live to add verses.")) return;
+  const userId = getUserId();
+  if (button) {
+    button.disabled = true;
+  }
+  try {
+    await fetchJson("/v1/memorization/verses", {
+      method: "POST",
+      body: {
+        user_id: userId,
+        book: reference.book,
+        chapter: reference.chapter,
+        start_verse: reference.start_verse,
+        end_verse: reference.end_verse ?? null,
+      },
+    });
+    showToast(`Added ${formatReference(reference)} from ESV.`);
+    await loadMemorizeScreen();
+  } catch (error) {
+    handleError(error);
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
+  }
+}
+
+function toTitleCase(text) {
+  if (!text) return "";
+  return text.replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
 }
 
 async function loadMemorizeScreen() {

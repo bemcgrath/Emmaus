@@ -8,7 +8,7 @@
       name="description"
       content="Emmaus is a mobile-first guide for Christ-centered Bible study, adaptive reflection, and practical action."
     />
-    <link rel="stylesheet" href="/static/styles.css?v=20260607c" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260613d" />
   </head>
   <body>
     <div class="app-shell">
@@ -33,27 +33,24 @@
             </div>
           </div>
 
-          <section class="panel stack-panel">
-            <div class="panel-heading">
-              <div>
-                <p class="panel-label">Demo Mode</p>
-                <h2>Preview key journeys</h2>
+          <details class="dev-disclosure">
+            <summary>Demo states</summary>
+            <section class="panel stack-panel">
+              <p class="micro-copy" id="demo-status-copy">Switch between live data and seeded scenes that make the mobile UI feel populated immediately.</p>
+              <div class="chip-row demo-chip-row" id="demo-scene-row">
+                <button type="button" class="choice-chip" data-demo-scenario="live">Live</button>
+                <button type="button" class="choice-chip" data-demo-scenario="first_visit">First visit</button>
+                <button type="button" class="choice-chip" data-demo-scenario="comprehension_gap">Comprehension gap</button>
+                <button type="button" class="choice-chip" data-demo-scenario="in_progress">In progress</button>
+                <button type="button" class="choice-chip" data-demo-scenario="overdue_action">Overdue action</button>
+                <button type="button" class="choice-chip" data-demo-scenario="scheduled_nudge">Scheduled nudge</button>
               </div>
-            </div>
-            <p class="micro-copy" id="demo-status-copy">Switch between live data and seeded scenes that make the mobile UI feel populated immediately.</p>
-            <div class="chip-row demo-chip-row" id="demo-scene-row">
-              <button type="button" class="choice-chip" data-demo-scenario="live">Live</button>
-              <button type="button" class="choice-chip" data-demo-scenario="first_visit">First visit</button>
-              <button type="button" class="choice-chip" data-demo-scenario="comprehension_gap">Comprehension gap</button>
-              <button type="button" class="choice-chip" data-demo-scenario="in_progress">In progress</button>
-              <button type="button" class="choice-chip" data-demo-scenario="overdue_action">Overdue action</button>
-              <button type="button" class="choice-chip" data-demo-scenario="scheduled_nudge">Scheduled nudge</button>
-            </div>
-            <div id="demo-scene-detail" class="inline-card">
-              <p><strong>Current view</strong></p>
-              <p class="micro-copy">Live mode is using your real Emmaus data.</p>
-            </div>
-          </section>
+              <div id="demo-scene-detail" class="inline-card">
+                <p><strong>Current view</strong></p>
+                <p class="micro-copy">Live mode is using your real Emmaus data.</p>
+              </div>
+            </section>
+          </details>
 
           <section class="panel accent-panel hidden" id="onboarding-panel">
             <div class="panel-heading">
@@ -104,13 +101,9 @@
             </article>
           </section>
 
-          <section class="panel stack-panel">
-            <div class="panel-heading">
-              <div>
-                <p class="panel-label">Check-in</p>
-                <h2>How are you arriving today?</h2>
-              </div>
-            </div>
+          <details class="quiet-disclosure">
+            <summary>How are you arriving today?</summary>
+            <section class="panel stack-panel">
             <p class="micro-copy">A quick check-in helps Emmaus shape today's study with the right tone and pace.</p>
             <form id="mood-form" class="stack-form compact-form">
               <div class="chip-row" id="mood-chip-row">
@@ -136,12 +129,12 @@
               <button class="secondary-button full-width" type="submit">Save check-in</button>
               <p class="micro-copy" id="latest-mood-copy">No mood check-in saved yet.</p>
             </form>
-          </section>
+            </section>
+          </details>
 
-          <section class="panel">
+          <section class="panel" id="recommendation-panel">
             <div class="panel-heading">
               <div>
-                <p class="panel-label">Next study</p>
                 <h2>Recommended focus</h2>
               </div>
               <span class="status-pill" id="focus-pill">Loading</span>
@@ -186,10 +179,9 @@
         </section>
 
         <section class="screen" data-screen="session">
-          <section class="panel stack-panel">
+          <section class="panel stack-panel" id="session-entry-panel">
             <div class="panel-heading">
               <div>
-                <p class="panel-label">Session</p>
                 <h2 id="session-panel-heading">Start or continue</h2>
               </div>
               <span class="status-pill" id="session-status-pill">Ready</span>
@@ -231,6 +223,7 @@
               <span class="status-pill" id="question-progress-pill">0 / 0</span>
             </div>
             <div class="content-stack" id="session-hero"></div>
+            <h2 class="passage-reference" id="passage-reference" hidden></h2>
             <div class="session-passage" id="passage-text">
               Start a session to see the passage, plan, and first question.
             </div>
@@ -652,7 +645,7 @@
             <button type="button" class="secondary-button full-width" id="memorize-drill-exit">Exit drill</button>
           </section>
 
-          <section class="panel stack-panel">
+          <section class="panel stack-panel" id="memorize-picker-panel">
             <div class="panel-heading">
               <div>
                 <p class="panel-label">Add verse</p>
@@ -660,29 +653,72 @@
               </div>
             </div>
             <p class="micro-copy">Verses are fetched from ESV and stored so you can drill offline. Connect ESV in Profile if you haven't yet.</p>
-            <form id="memorize-add-verse-form" class="stack-form compact-form">
-              <div class="inline-inputs">
-                <label>
-                  <span>Book</span>
-                  <input id="memorize-add-book" type="text" placeholder="John" required />
-                </label>
-                <label>
-                  <span>Chapter</span>
-                  <input id="memorize-add-chapter" type="number" min="1" max="150" required />
-                </label>
-              </div>
-              <div class="inline-inputs">
-                <label>
-                  <span>Start verse</span>
-                  <input id="memorize-add-start" type="number" min="1" max="200" required />
-                </label>
-                <label>
-                  <span>End verse (optional)</span>
-                  <input id="memorize-add-end" type="number" min="1" max="200" />
-                </label>
-              </div>
-              <button class="secondary-button full-width" type="submit">Add verse</button>
-            </form>
+            <div class="verse-picker-tabs" role="tablist">
+              <button type="button" class="verse-picker-tab active" data-picker-tab="reference" role="tab">Reference</button>
+              <button type="button" class="verse-picker-tab" data-picker-tab="theme" role="tab">Theme</button>
+              <button type="button" class="verse-picker-tab" data-picker-tab="topic" role="tab">Topic</button>
+              <button type="button" class="verse-picker-tab" data-picker-tab="book" role="tab">Book</button>
+            </div>
+
+            <div class="verse-picker-pane" data-picker-pane="reference">
+              <form id="memorize-add-verse-form" class="stack-form compact-form">
+                <div class="inline-inputs">
+                  <label>
+                    <span>Book</span>
+                    <input id="memorize-add-book" type="text" placeholder="John" required />
+                  </label>
+                  <label>
+                    <span>Chapter</span>
+                    <input id="memorize-add-chapter" type="number" min="1" max="150" required />
+                  </label>
+                </div>
+                <div class="inline-inputs">
+                  <label>
+                    <span>Start verse</span>
+                    <input id="memorize-add-start" type="number" min="1" max="200" required />
+                  </label>
+                  <label>
+                    <span>End verse (optional)</span>
+                    <input id="memorize-add-end" type="number" min="1" max="200" />
+                  </label>
+                </div>
+                <button class="secondary-button full-width" type="submit">Add verse</button>
+              </form>
+            </div>
+
+            <div class="verse-picker-pane" data-picker-pane="theme" hidden>
+              <p class="micro-copy">Browse OpenBible's community-voted topics (CC-BY).</p>
+              <input type="search" id="theme-search" class="picker-search" placeholder="Search themes, e.g. salvation" />
+              <div id="theme-topic-list" class="picker-list"></div>
+              <div id="theme-verse-list" class="picker-verses" hidden></div>
+            </div>
+
+            <div class="verse-picker-pane" data-picker-pane="topic" hidden>
+              <p class="micro-copy">Browse Nave's Topical Bible (public domain).</p>
+              <input type="search" id="naves-search" class="picker-search" placeholder="Search topics, e.g. faith" />
+              <div id="naves-topic-list" class="picker-list"></div>
+              <div id="naves-verse-list" class="picker-verses" hidden></div>
+            </div>
+
+            <div class="verse-picker-pane" data-picker-pane="book" hidden>
+              <p class="micro-copy">Pick a book, then a chapter, then your verse range.</p>
+              <div id="book-list" class="picker-list"></div>
+              <div id="book-chapter-list" class="picker-list" hidden></div>
+              <form id="book-verse-form" class="stack-form compact-form" hidden>
+                <p class="micro-copy" id="book-verse-summary"></p>
+                <div class="inline-inputs">
+                  <label>
+                    <span>Start verse</span>
+                    <input id="book-start-verse" type="number" min="1" max="200" required />
+                  </label>
+                  <label>
+                    <span>End verse (optional)</span>
+                    <input id="book-end-verse" type="number" min="1" max="200" />
+                  </label>
+                </div>
+                <button class="secondary-button full-width" type="submit">Add verse</button>
+              </form>
+            </div>
           </section>
 
           <section class="panel stack-panel">
@@ -693,6 +729,23 @@
               </div>
             </div>
             <div id="memorize-verse-list" class="list-stack"></div>
+          </section>
+        </section>
+
+        <section class="screen" data-screen="community">
+          <section class="panel stack-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-label">Community</p>
+                <h2>Study Scripture with others</h2>
+              </div>
+              <span class="status-pill">Coming soon</span>
+            </div>
+            <p class="micro-copy">Community features will let serious students share notes on a passage, follow study plans together, and learn from teachers grounded in historic Christian doctrine.</p>
+            <div class="inline-card">
+              <p><strong>What this will include</strong></p>
+              <p class="micro-copy">Shared passage discussions, group study plans, vetted teacher commentary, and Q&amp;A around hard texts.</p>
+            </div>
           </section>
         </section>
 
@@ -721,14 +774,14 @@
       <nav class="bottom-nav" aria-label="Primary">
         <button class="nav-pill nav-pill-active" type="button" data-nav-target="home">Home</button>
         <button class="nav-pill" type="button" data-nav-target="session">Study</button>
-        <button class="nav-pill" type="button" data-nav-target="memorize">Memorize</button>
+        <button class="nav-pill" type="button" data-nav-target="community">Community</button>
         <button class="nav-pill" type="button" data-nav-target="actions">Actions</button>
         <button class="nav-pill" type="button" data-nav-target="profile">Profile</button>
       </nav>
     </div>
 
     <div class="toast" id="toast"></div>
-    <script src="/static/app.js" defer></script>
+    <script src="/static/app.js?v=20260613a" defer></script>
   </body>
 </html>
 
