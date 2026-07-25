@@ -183,30 +183,49 @@ function bindEvents() {
   elements.navButtons.forEach((button) => {
     button.addEventListener("click", () => showScreen(button.dataset.navTarget));
   });
-  elements.demoSceneRow.addEventListener("click", onDemoScenarioSelect);
-  elements.refreshButton?.addEventListener("click", onRefreshClick);
-  elements.heroPrimaryButton.addEventListener("click", onHeroPrimaryAction);
+  elements.demoSceneRow.addEventListener("click", reportFailures(onDemoScenarioSelect));
+  elements.refreshButton?.addEventListener("click", reportFailures(onRefreshClick));
+  elements.heroPrimaryButton.addEventListener("click", reportFailures(onHeroPrimaryAction));
   elements.previewNudgeButton.addEventListener("click", () => {
     showScreen("nudges");
     loadNudgeArtifacts().catch(handleError);
   });
-  elements.identityForm.addEventListener("submit", onSaveIdentity);
-  elements.moodForm.addEventListener("submit", onSaveMood);
-  elements.lookBackForm?.addEventListener("submit", onSubmitLookBack);
-  elements.sessionForm.addEventListener("submit", onStartSession);
-  elements.responseForm.addEventListener("submit", onSubmitResponse);
-  elements.completeForm.addEventListener("submit", onCompleteSession);
-  elements.actionFollowUpForm.addEventListener("submit", onSubmitActionFollowUp);
-  elements.nudgePreviewForm.addEventListener("submit", onPreviewNudgeAtTime);
-  elements.todayPlanCard.addEventListener("click", onTodayPlanAction);
-  elements.onboardingPanel.addEventListener("click", onOnboardingAction);
+  elements.identityForm.addEventListener("submit", reportFailures(onSaveIdentity));
+  elements.moodForm.addEventListener("submit", reportFailures(onSaveMood));
+  elements.lookBackForm?.addEventListener("submit", reportFailures(onSubmitLookBack));
+  elements.sessionForm.addEventListener("submit", reportFailures(onStartSession));
+  elements.responseForm.addEventListener("submit", reportFailures(onSubmitResponse));
+  elements.completeForm.addEventListener("submit", reportFailures(onCompleteSession));
+  elements.actionFollowUpForm.addEventListener("submit", reportFailures(onSubmitActionFollowUp));
+  elements.nudgePreviewForm.addEventListener("submit", reportFailures(onPreviewNudgeAtTime));
+  elements.todayPlanCard.addEventListener("click", reportFailures(onTodayPlanAction));
+  elements.onboardingPanel.addEventListener("click", reportFailures(onOnboardingAction));
   elements.actionItemList.addEventListener("click", onActionListClick);
-  elements.prayerItemList?.addEventListener("click", onPrayerListClick);
-  elements.sessionHero?.addEventListener("click", onPrayerListClick);
-  elements.prayerForm?.addEventListener("submit", onSubmitPrayerItem);
+  elements.prayerItemList?.addEventListener("click", reportFailures(onPrayerListClick));
+  elements.sessionHero?.addEventListener("click", reportFailures(onPrayerListClick));
+  elements.prayerForm?.addEventListener("submit", reportFailures(onSubmitPrayerItem));
   elements.moodChipRow.querySelectorAll(".choice-chip").forEach((chip) => chip.addEventListener("click", () => selectMood(chip.dataset.value)));
   elements.studyDaysRow.querySelectorAll(".choice-chip").forEach((chip) => chip.addEventListener("click", () => toggleStudyDay(chip.dataset.day)));
   bindActionFieldTabFill();
+}
+
+const reportingHandlers = new WeakMap();
+
+// Returns one stable wrapper per handler so re-binding stays de-duplicated by addEventListener.
+function reportFailures(handler) {
+  if (!reportingHandlers.has(handler)) {
+    reportingHandlers.set(handler, (event) => {
+      try {
+        const result = handler(event);
+        if (result && typeof result.catch === "function") {
+          result.catch(handleError);
+        }
+      } catch (error) {
+        handleError(error);
+      }
+    });
+  }
+  return reportingHandlers.get(handler);
 }
 
 function bindActionFieldTabFill() {
@@ -912,7 +931,11 @@ async function loadLiveDashboard({ restoreScreen = false } = {}) {
     activeSession,
   });
 
-  await loadNudgeArtifacts();
+  try {
+    await loadNudgeArtifacts();
+  } catch (error) {
+    handleError(error);
+  }
   renderTodayPlan(recommendation, activeSession, state.actionItems, state.memorySummary);
   if (restoreScreen) {
     restorePreferredScreen();
@@ -2494,7 +2517,6 @@ async function onOnboardingAction(event) {
     return;
   }
   if (action === "onboarding-start-session") {
-    completeOnboarding();
     await startGuidedSession({ fromOnboarding: true });
     return;
   }
@@ -2663,7 +2685,7 @@ async function startGuidedSession({ fromOnboarding = false } = {}) {
   }
   state.recommendation = payload.recommendation;
   renderSessionStart(payload, { navigate: true });
-  renderTodayPlan(state.recommendation, payload, state.actionItems);
+  renderTodayPlan(state.recommendation, payload, state.actionItems, state.memorySummary);
   showToast(fromOnboarding ? "Your first session is ready." : "Session started.");
 }
 
@@ -3174,14 +3196,14 @@ function bibleSourceElements() {
 
 document.addEventListener("DOMContentLoaded", () => {
   const sourceUi = bibleSourceElements();
-  sourceUi.templateList?.addEventListener("click", onTranslationTemplateClick);
-  sourceUi.library?.addEventListener("click", onSourceLibraryClick);
-  sourceUi.useStarterButton?.addEventListener("click", onUseStarterBible);
-  sourceUi.focusEsvButton?.addEventListener("click", onPrimaryEsvAction);
-  sourceUi.esvForm?.addEventListener("submit", onConnectEsvSource);
+  sourceUi.templateList?.addEventListener("click", reportFailures(onTranslationTemplateClick));
+  sourceUi.library?.addEventListener("click", reportFailures(onSourceLibraryClick));
+  sourceUi.useStarterButton?.addEventListener("click", reportFailures(onUseStarterBible));
+  sourceUi.focusEsvButton?.addEventListener("click", reportFailures(onPrimaryEsvAction));
+  sourceUi.esvForm?.addEventListener("submit", reportFailures(onConnectEsvSource));
   sourceUi.advancedToggle?.addEventListener("click", onToggleAdvancedBibleSetup);
-  sourceUi.uploadForm?.addEventListener("submit", onUploadBibleSource);
-  sourceUi.apiForm?.addEventListener("submit", onConnectBibleApiSource);
+  sourceUi.uploadForm?.addEventListener("submit", reportFailures(onUploadBibleSource));
+  sourceUi.apiForm?.addEventListener("submit", reportFailures(onConnectBibleApiSource));
 });
 
 function renderBibleSourceManager() {
