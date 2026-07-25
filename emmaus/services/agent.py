@@ -11,6 +11,7 @@ from emmaus.domain.models import (
     AgentSessionStartResponse,
     AgentSessionTurnResponse,
     AgentStudyResponse,
+    CommentaryNote,
     PassageReference,
     PassageText,
     SessionResponse,
@@ -310,7 +311,9 @@ class AdaptiveStudyAgent:
         if session.user_id != user_id:
             raise KeyError(f"Session '{session_id}' does not belong to user '{user_id}'.")
         if session.status == "completed":
-            action_item = self.study_service.list_action_items(user_id)[0]
+            action_item = self._existing_action_item_for_session(session)
+            if action_item is None:
+                raise KeyError(f"No action item is recorded for completed session '{session_id}'.")
             return AgentSessionCompleteResponse(
                 session=session,
                 action_item=action_item,
@@ -371,6 +374,20 @@ class AdaptiveStudyAgent:
             session=completed_session,
             action_item=created_action_item,
             engagement=self.study_service.get_engagement_summary(user_id),
+        )
+
+    def _existing_action_item_for_session(self, session: StudySession) -> ActionItem | None:
+        if session.action_item_id:
+            action_item = self.study_service.get_action_item(session.action_item_id)
+            if action_item is not None and action_item.user_id == session.user_id:
+                return action_item
+        return next(
+            (
+                item
+                for item in self.study_service.list_action_items(session.user_id)
+                if item.session_id == session.session_id
+            ),
+            None,
         )
 
     def _resolve_commentary_source(self, requested_commentary_source: str | None, text_source_id: str) -> str:
@@ -1097,51 +1114,6 @@ class AdaptiveStudyAgent:
             f"Return to {primary_theme} and follow through on '{action_item.title}' before moving on to something new."
         )[:180]
         return summary, recurring_themes[:3], growth_areas[:3], carry_forward_prompt
-
-    def _apply_style_to_questions(
-        self,
-        questions: list[StudyQuestion],
-        style_profile: StudyStyleProfile,
-    ) -> list[StudyQuestion]:
-        return [
-            question.model_copy(
-                update={
-                    "question": self._style_question_text(question.question, question.type, style_profile),
-                }
-            )
-            for question in questions
-        ]
-
-    def _style_question_text(
-        self,
-        question: str,
-        question_type: str,
-        style_profile: StudyStyleProfile,
-    ) -> str:
-        styled = question.strip()
-
-        if style_profile.question_style == "concise":
-            replacements = {
-                "Which phrase should you slow down and notice first in this passage?": "What should you notice first?",
-                "Which words or repeated idea stand out first in this passage?": "What stands out first?",
-                "How does": "How does",
-                "Because this passage": "What will you do because of this passage",
-            }
-            for old, new in replacements.items():
-                styled = styled.replace(old, new)
-        elif style_profile.question_style == "reflective" and question_type in {"observation", "reflection"}:
-            styled = f"Take a moment with this: {styled}"
-        elif style_profile.question_style == "probing" and question_type in {"interpretation", "reflection"}:
-            styled = f"Go a little deeper: {styled}"
-        elif style_profile.question_style == "practical" and question_type in {"application", "reflection"}:
-            styled = f"Make this concrete: {styled}"
-
-        if style_profile.guidance_tone == "warm" and not styled.startswith("Take a moment"):
-            styled = f"Gently consider this: {styled}"
-        elif style_profile.guidance_tone == "direct" and not styled.startswith("Go a little deeper"):
-            styled = f"Answer plainly: {styled}"
-
-        return styled
 
     def _normalize_short_list(self, value: object) -> list[str]:
         if not isinstance(value, list):
