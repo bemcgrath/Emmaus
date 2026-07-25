@@ -1706,6 +1706,115 @@ def test_curated_passage_bank_is_expanded_for_each_focus():
     assert all(len(bank) >= 8 for bank in CURATED_PASSAGE_BANK.values())
 
 
+def test_updated_session_length_survives_a_resume(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={
+            "user_id": "demo-user",
+            "text_source_id": "sample_local",
+            "reference": {"book": "John", "chapter": 3, "start_verse": 16, "end_verse": 17},
+            "requested_minutes": 30,
+        },
+    )
+    assert start.status_code == 200
+    session_id = start.json()["session"]["session_id"]
+
+    updated = client.post(
+        "/v1/agent/session/update",
+        json={"session_id": session_id, "user_id": "demo-user", "requested_minutes": 10},
+    )
+    assert updated.status_code == 200
+    updated_session = updated.json()["session"]
+
+    resumed = client.get("/v1/agent/session/active/demo-user")
+    assert resumed.status_code == 200
+    resumed_session = resumed.json()["session"]
+
+    assert resumed_session["requested_minutes"] == 10
+    assert resumed_session["questions"] == updated_session["questions"]
+    assert resumed_session["plan"] == updated_session["plan"]
+
+
+def test_completing_an_already_completed_session_returns_its_own_action_item(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    def start_and_complete() -> tuple[str, str]:
+        start = client.post(
+            "/v1/agent/session/start",
+            json={"user_id": "demo-user", "text_source_id": "sample_local"},
+        )
+        assert start.status_code == 200
+        session_id = start.json()["session"]["session_id"]
+        completed = client.post(
+            "/v1/agent/session/complete",
+            json={"session_id": session_id, "user_id": "demo-user"},
+        )
+        assert completed.status_code == 200
+        return session_id, completed.json()["action_item"]["action_item_id"]
+
+    first_session_id, first_action_item_id = start_and_complete()
+    _, second_action_item_id = start_and_complete()
+    assert first_action_item_id != second_action_item_id
+
+    replayed = client.post(
+        "/v1/agent/session/complete",
+        json={"session_id": first_session_id, "user_id": "demo-user"},
+    )
+    assert replayed.status_code == 200
+    assert replayed.json()["action_item"]["action_item_id"] == first_action_item_id
+
+
+def test_action_item_cannot_be_completed_by_another_user(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    start = client.post(
+        "/v1/agent/session/start",
+        json={"user_id": "owner", "text_source_id": "sample_local"},
+    )
+    assert start.status_code == 200
+    completed = client.post(
+        "/v1/agent/session/complete",
+        json={"session_id": start.json()["session"]["session_id"], "user_id": "owner"},
+    )
+    action_item_id = completed.json()["action_item"]["action_item_id"]
+
+    attempt = client.post(
+        f"/v1/study/action-items/{action_item_id}/complete",
+        json={"user_id": "intruder", "follow_up_note": "not mine", "follow_up_outcome": "completed"},
+    )
+    assert attempt.status_code == 404
+
+    items = client.get("/v1/study/action-items/owner").json()["items"]
+    stored = next(item for item in items if item["action_item_id"] == action_item_id)
+    assert stored["status"] == "open"
+    assert stored["follow_up_note"] is None
+
+
+def test_prayer_item_cannot_be_updated_by_another_user(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    created = client.post(
+        "/v1/study/prayer-items",
+        json={"user_id": "owner", "title": "Pray for patience", "detail": "Ask for steadiness this week."},
+    )
+    assert created.status_code == 201
+    prayer_item_id = created.json()["prayer_item_id"]
+
+    for endpoint in ("pray", "answer"):
+        attempt = client.post(
+            f"/v1/study/prayer-items/{prayer_item_id}/{endpoint}",
+            json={"user_id": "intruder"},
+        )
+        assert attempt.status_code == 404
+
+    stored = client.get("/v1/study/prayer-items/owner").json()["items"][0]
+    assert stored["status"] == "active"
+    assert stored["last_prayed_at"] is None
+    assert stored["answered_at"] is None
+
+
 
 
 
