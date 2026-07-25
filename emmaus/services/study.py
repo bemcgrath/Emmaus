@@ -206,6 +206,9 @@ class StudyService:
     def create_action_item(self, action_item: ActionItem) -> ActionItem:
         return self.repository.create_action_item(action_item)
 
+    def get_action_item(self, action_item_id: str) -> ActionItem | None:
+        return self.repository.get_action_item(action_item_id)
+
     def list_action_items(self, user_id: str, status: str | None = None) -> list[ActionItem]:
         return self.repository.list_action_items(user_id, status)
 
@@ -216,13 +219,16 @@ class StudyService:
         follow_up_note: str | None = None,
         follow_up_outcome: str | None = None,
     ) -> ActionItem:
+        existing = self.repository.get_action_item(action_item_id)
+        if existing is None or existing.user_id != user_id:
+            raise KeyError(f"Unknown action item '{action_item_id}'.")
         action_item = self.repository.complete_action_item(
             action_item_id,
             datetime.now(UTC),
             follow_up_note=follow_up_note,
             follow_up_outcome=follow_up_outcome,
         )
-        if action_item is None or action_item.user_id != user_id:
+        if action_item is None:
             raise KeyError(f"Unknown action item '{action_item_id}'.")
         summary_bits = [action_item.title]
         if follow_up_outcome:
@@ -255,8 +261,9 @@ class StudyService:
         return self.repository.list_prayer_items(user_id, status)
 
     def mark_prayer_item_prayed(self, prayer_item_id: str, user_id: str) -> PrayerItem:
+        self._require_own_prayer_item(prayer_item_id, user_id)
         prayer_item = self.repository.mark_prayer_item_prayed(prayer_item_id, datetime.now(UTC))
-        if prayer_item is None or prayer_item.user_id != user_id:
+        if prayer_item is None:
             raise KeyError(f"Unknown prayer item '{prayer_item_id}'.")
         self.record_event(
             StudyEvent(
@@ -268,8 +275,9 @@ class StudyService:
         return prayer_item
 
     def mark_prayer_item_answered(self, prayer_item_id: str, user_id: str) -> PrayerItem:
+        self._require_own_prayer_item(prayer_item_id, user_id)
         prayer_item = self.repository.mark_prayer_item_answered(prayer_item_id, datetime.now(UTC))
-        if prayer_item is None or prayer_item.user_id != user_id:
+        if prayer_item is None:
             raise KeyError(f"Unknown prayer item '{prayer_item_id}'.")
         self.record_event(
             StudyEvent(
@@ -278,6 +286,12 @@ class StudyService:
                 notes=prayer_item.title,
             )
         )
+        return prayer_item
+
+    def _require_own_prayer_item(self, prayer_item_id: str, user_id: str) -> PrayerItem:
+        prayer_item = self.repository.get_prayer_item(prayer_item_id)
+        if prayer_item is None or prayer_item.user_id != user_id:
+            raise KeyError(f"Unknown prayer item '{prayer_item_id}'.")
         return prayer_item
 
     def build_review_history(self, user_id: str, limit_sessions: int = 6, limit_prayers: int = 20) -> ReviewHistory:
