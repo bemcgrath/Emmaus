@@ -126,7 +126,7 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "Start Today's Plan" in response.text
-    assert "Demo Mode" in response.text
+    assert "Demo states" in response.text
     assert "data-demo-scenario=\"comprehension_gap\"" in response.text
     assert "data-demo-scenario=\"scheduled_nudge\"" in response.text
     assert "translation-template-list" in response.text
