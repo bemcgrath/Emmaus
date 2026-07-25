@@ -1,4 +1,5 @@
 import importlib
+import re
 from collections import Counter
 import json
 
@@ -206,6 +207,19 @@ def test_frontend_shell_and_assets(tmp_path, monkeypatch):
     assert "followUpOutcomeSelect" in asset.text
     assert "delivery_status" in asset.text
 
+
+
+def test_every_element_the_client_looks_up_exists_in_the_shell(tmp_path, monkeypatch):
+    client = build_client(tmp_path, monkeypatch)
+
+    markup = client.get("/").text
+    script = client.get("/static/app.js").text
+
+    available_ids = set(re.findall(r'id="([^"]+)"', markup))
+    requested_ids = set(re.findall(r'getElementById\("([^"]+)"\)', script))
+    requested_ids.update(re.findall(r'querySelector\("#([\w-]+)"\)', script))
+
+    assert requested_ids - available_ids == set()
 
 
 def test_text_source_templates_expose_translation_first_setup_options(tmp_path, monkeypatch):
