@@ -350,11 +350,33 @@ class SQLiteStudyRepository:
             connection.execute(
                 """
                 UPDATE study_sessions
-                SET status = ?, completed_at = ?, current_question_index = ?, latest_message = ?, action_item_id = ?
+                SET status = ?,
+                    entry_point = ?,
+                    guide_mode = ?,
+                    requested_minutes = ?,
+                    text_source_id = ?,
+                    commentary_source_id = ?,
+                    llm_source_id = ?,
+                    reference_json = ?,
+                    questions_json = ?,
+                    plan_json = ?,
+                    completed_at = ?,
+                    current_question_index = ?,
+                    latest_message = ?,
+                    action_item_id = ?
                 WHERE session_id = ?
                 """,
                 (
                     session.status,
+                    session.entry_point,
+                    session.guide_mode,
+                    session.requested_minutes,
+                    session.text_source_id,
+                    session.commentary_source_id,
+                    session.llm_source_id,
+                    json.dumps(session.reference.model_dump()),
+                    json.dumps([question.model_dump() for question in session.questions]),
+                    json.dumps([step.model_dump() for step in session.plan]),
                     self._dt_or_none(session.completed_at),
                     session.current_question_index,
                     session.latest_message,
